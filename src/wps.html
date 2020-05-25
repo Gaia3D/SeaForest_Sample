@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width">
+	<title>MagoWorld</title>
+	<link rel="stylesheet" href="./css/style.css" />
+	<script type="text/javascript" src="./js/jquery/jquery.js"></script>
+	<script type="text/javascript" src="./js/mago3djs/mago3d.js"></script>
+	<script type="text/javascript" src="./js/map.js"></script>
+	<script type="text/javascript" src="./js/wpsRequest.js"></script>
+</head>
+
+<body>
+<div id="loadingWrap">
+	<div class="loading">
+		<span class="spinner"></span>
+	</div>
+</div>
+<ul class="nav">
+	<li id="homeMenu" class="home">
+		<img src="./images/home-icon.png" style="width: 35px; height: 35px; padding-right: 2px;" title="Home" />
+	</li>
+	<li>
+		<span id="profile" class="analysis">단면분석</span>
+	</li>
+	<li>
+		<span id="deleteLine">단면제거</span>
+	</li>
+	<li>
+		<span id="aspect" class="analysis">향분석</span>
+	</li>
+	<li>
+		<span id="slope" class="analysis">경사분석</span>
+	</li>
+
+	<li>
+		<span id="toggleWms">wms토글</span>
+	</li>
+</ul>
+
+<div id="magoContainer">
+	<canvas id="objectLabel"></canvas>
+</div>
+
+<script>
+	magoStart('magoContainer');
+
+	function startLoading() {
+		$('#loadingWrap').show();
+	}
+	//로딩 중지
+	function stopLoading() {
+		$('#loadingWrap').hide();
+	}
+</script>
+</body>
+</html>
