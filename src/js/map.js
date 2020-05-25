@@ -45,6 +45,7 @@ var policy = {
     "initAltitude":60000,
     "terrainType":"elevation", //terrain type, default plane. 
     "terrainValue":"http://localhost:9090/f4d/terrain/" //terrain file path. When use elevation type, require this param. 
+    //"terrainValue":"http://test.muhanit.kr:41515/MagoTerrain/"
 }
 
 // mago3d start
@@ -68,26 +69,64 @@ function magoStart(renderDivId) {
      * @param {object} callback loadstart callback, loadend callback.
      * @param {object} option 생성자 생성 시 옵션, 
      */
-    mago3d = new Mago3D.Mago3d(renderDivId, policy, {loadend : loadEndFunc},{
-        layers : [
-            new Mago3D.XYZLayer({url: 'https://services.arcgisonline.com/arcgis/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'}),
-        ]
-    });
-
-    //
-    //magoManager = mago3d.getMagoManager();
-    //viewer = mago3d.getViewer();
+    mago3d = new Mago3D.Mago3d(renderDivId, policy, {loadend : loadEndFunc});
 }
 
 function loadEndFunc(e) {
     magoManager = e.getMagoManager();
     viewer = e.getViewer();
 
+    /**
+     * XYZLayer urlFunction 설명 및 예
+     * @typedef {function} urlFunction
+     * @param {object} coordinate 타일의 x , y, z 정보를 가지고 있는 object. {x:'1', y:'1', z:'1'}
+     */
+
+    /**
+     * XYZLayer 옵션 정보.
+     * @typedef {object} xyzOption
+     * @property {string} url xyz url, if defined urlFunction, ignore this value.
+     * @property {function} urlFunction url making funcion, using x,y,z argument.
+     * @property {boolean} show show layer. default is true.
+     * @property {number} minZoom mimimum zoom level, default is 0. Instance contructed, can't change this value.
+     * @property {number} maxZoom maximum zoom level, default is 18. Instance contructed, can't change this value.
+     */
+
+    /**
+     * @type {Mago3D.XYZLayer} xyz layer
+     * @param {object} xyzOption
+     */
+    var baseLayer = new Mago3D.XYZLayer({
+        
+        urlFunction : function(coordinate) {
+            /*var url = 'http://test.muhanit.kr:37080/seaForest/tile/oceanmap/street/baseMap.do?z={z}&x={x}&y={y}';
+            return url.replace('{z}',convertZ(coordinate.z))
+            .replace('{y}',coordinate.y)
+            .replace('{x}',coordinate.x);*/
+
+            var url = 'https://services.arcgisonline.com/arcgis/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}';
+            return url.replace('{z}',coordinate.z)
+            .replace('{y}',coordinate.y)
+            .replace('{x}',coordinate.x);
+        }
+    });
+    function convertZ(z) {
+
+        return 'L' + zeroPadder(z);
+        function zeroPadder(str){
+            return (str.length === 1) ? '0'+str : str;
+        }
+    }
+    
+    magoManager.addLayer(baseLayer);
+
     //wmslayer 생성 후 등록
     wmsLayer = new Mago3D.WMSLayer({
+        //url: 'http://test.muhanit.kr:41515/geoserver/gwc/service/wms',
         url: 'http://localhost:8080/geoserver/mago3d/gwc/service/wms', 
         show: true, 
         filter:Mago3D.CODE.imageFilter.BATHYMETRY,  
+        //param: {layers: 'SeaForest:5m_image', tiled: true}
         param: {layers: 'mago3d:15m_susim', tiled: true}
     });
     magoManager.addLayer(wmsLayer);
