@@ -219,15 +219,14 @@ function loadEndFunc(e) {
             var reader = new FileReader();
             reader.readAsDataURL(blob); 
             reader.onloadend = function() {
-                var base64data = reader.result;                
-
-                rectangle.init(magoManager);
-                rectangle.style = {
+                var base64data = reader.result;   
+                
+                rectangle.setStyle({
                     imageUrl : base64data,
                     strokeColor : '#349feb',
                     strokeWidth : 3,
                     opacity : 1
-                };
+                }, magoManager);
                 stopLoading();
             }
         });

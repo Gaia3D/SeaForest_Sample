@@ -3,25 +3,21 @@ var ProfileChart = (function() {
 
     myChart.on('mouseover',function(e){
         var point = _getTargetPoint(e.dataIndex);
-
-        point.init(magoManager);
-        point.style = {
+        point.setStyle({
             size        : 22,
             strokeColor : '#00FFFF',
             color       : '#00FFFF',
             opacity     : 0.7
-        };
+        }, magoManager);
     });
     myChart.on('mouseout',function(e){
         var point = _getTargetPoint(e.dataIndex);
-
-        point.init(magoManager);
-        point.style = {
+        point.setStyle({
             size        : 12,
             strokeColor : '#FF0000',
             color       : '#FF0000',
             opacity     : 0.7
-        };
+        }, magoManager);
     });
 
     function _getTargetPoint(index) {
