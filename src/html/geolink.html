@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width">
+	<title>MagoWorld</title>
+	<link rel="stylesheet" href="../css/style.css" />
+	<script type="text/javascript" src="../js/lib/jquery/jquery.js"></script>
+	<script type="text/javascript" src="../js/lib/mago3djs/mago3d.js"></script>
+	<script type="text/javascript" src="https://cdn.jsdelivr.net/gh/openlayers/openlayers.github.io@master/en/v5.3.0/build/ol.js"></script>
+	<script type="text/javascript" src="../js/geolink/map.js"></script>
+</head>
+
+<body>
+<div id="loadingWrap">
+	<div class="loading">
+		<span class="spinner"></span>
+	</div>
+</div>
+<div id="chartArea"></div>
+<ul class="nav">
+	<li id="homeMenu" class="home">
+		<img src="../images/home-icon.png" style="width: 35px; height: 35px; padding-right: 2px;" title="Home" />
+	</li>
+	<li>
+		<span id="3d" class="analysis">3D</span>
+	</li>
+	<li>
+		<span id="2d" class="analysis">2D</span>
+	</li>
+</ul>
+
+<div id="magoContainer" style="width:50%;float:left;">
+	<canvas id="objectLabel"></canvas>
+</div>
+<div id="olmap" style="width:50%;right:0px;position: absolute;height: 100%;">
+</div>
+<script>
+	magoStart('magoContainer');
+</script>
+</body>
+</html>

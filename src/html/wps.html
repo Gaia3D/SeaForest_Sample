@@ -4,11 +4,12 @@
 	<meta charset="UTF-8">
 	<meta name="viewport" content="width=device-width">
 	<title>MagoWorld</title>
-	<link rel="stylesheet" href="./css/style.css" />
-	<script type="text/javascript" src="./js/jquery/jquery.js"></script>
-	<script type="text/javascript" src="./js/mago3djs/mago3d.js"></script>
-	<script type="text/javascript" src="./js/map.js"></script>
-	<script type="text/javascript" src="./js/wpsRequest.js"></script>
+	<link rel="stylesheet" href="../css/style.css" />
+	<script type="text/javascript" src="../js/lib/jquery/jquery.js"></script>
+	<script type="text/javascript" src="../js/lib/mago3djs/mago3d.js"></script>
+	<script type="text/javascript" src="../js/lib/echarts/echarts-en.min.js"></script>
+	<script type="text/javascript" src="../js/wps/map.js"></script>
+	<script type="text/javascript" src="../js/wps/wpsRequest.js"></script>
 </head>
 
 <body>
@@ -17,9 +18,10 @@
 		<span class="spinner"></span>
 	</div>
 </div>
+<div id="chartArea"></div>
 <ul class="nav">
 	<li id="homeMenu" class="home">
-		<img src="./images/home-icon.png" style="width: 35px; height: 35px; padding-right: 2px;" title="Home" />
+		<img src="../images/home-icon.png" style="width: 35px; height: 35px; padding-right: 2px;" title="Home" />
 	</li>
 	<li>
 		<span id="profile" class="analysis">단면분석</span>
@@ -42,7 +44,7 @@
 <div id="magoContainer">
 	<canvas id="objectLabel"></canvas>
 </div>
-
+<script type="text/javascript" src="../js/wps/ProfileChart.js"></script>
 <script>
 	magoStart('magoContainer');
 

@@ -94,3 +94,12 @@ overflow:hidden;
 		transform: rotate(360deg);
 	}
 }
+
+#chartArea {
+position: absolute;
+width: 100%;
+height: 300px;
+bottom: 0px;
+z-index: 10000;
+display: none;
+}

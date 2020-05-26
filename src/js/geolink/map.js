@@ -14,24 +14,9 @@ var magoManager;
 var viewer;
 
 /**
- * @type {Mago3D.RectangleDrawer} 직사각형 그리기 툴, 향분석, 경사분석 수행 시 분석할 영역을 생성할때 사용
- */
-var rectangleDrawer;
-
-/**
- * @type {Mago3D.PointDrawer} point 그리기 툴, 단면분석 수행 시 두 점을 선택할때 사용
- */
-var pointDrawer;
-
-/**
  * @type {Mago3D.WMSLayer} wms layer
  */
 var wmsLayer;
-
-/**
- * @type {Array<Mago3D.MagoPolyLine>} 폴리라인 객체 배열, 단면분석 결과들을 담음.
- */
-var drawedLines = [];
 
 /**
  * @type {object}} mago3d 정책, Mago3D 객체 생성 시 사용.
@@ -47,6 +32,8 @@ var policy = {
     "terrainValue":"http://localhost:9090/f4d/terrain/" //terrain file path. When use elevation type, require this param. 
     //"terrainValue":"http://test.muhanit.kr:41515/MagoTerrain/"
 }
+
+var olmap;
 
 // mago3d start
 function magoStart(renderDivId) {
@@ -70,6 +57,20 @@ function magoStart(renderDivId) {
      * @param {object} option 생성자 생성 시 옵션, 
      */
     mago3d = new Mago3D.Mago3d(renderDivId, policy, {loadend : loadEndFunc});
+
+    olmap = new ol.Map({
+        view: new ol.View({
+            center: [policy.initLongitude, policy.initLatitude],
+            zoom: 10,
+            projection : 'EPSG:4326'
+          }),
+          layers: [
+            new ol.layer.Tile({
+              source: new ol.source.OSM()
+            })
+          ],
+          target: 'olmap'
+    });
 }
 
 function loadEndFunc(e) {
@@ -130,91 +131,6 @@ function loadEndFunc(e) {
         param: {layers: 'mago3d:15m_susim', tiled: true}
     });
     magoManager.addLayer(wmsLayer);
-
-    pointDrawer = Mago3D.DrawGeometryInteraction.createDrawGeometryInteraction('point');
-    pointDrawer.on(Mago3D.PointDrawer.EVENT_TYPE.DRAWEND, function(e) {
-        if(pointDrawer.result.length === 2) {
-            var pointList = pointDrawer.result;
-            var positons = [];
-            for(var i = 0,len=pointList.length;i<len;i++) {
-                positons.push(pointList[i].geoCoord);
-            }
-
-            var wkt = Mago3D.ManagerUtils.geographicToWkt(positons, 'LINE');
-            startLoading();
-            requestJsonResource(getXmlRasterProfile(100, wkt)).then(function(response){
-                var features = response.features;
-                var array = [];
-                for(var i=0,len=features.length; i<len; i++) {
-                    var feature = features[i];
-                    var coordinates = feature.geometry.coordinates;
-                    array.push({
-                        longitude : coordinates[0],
-                        latitude  : coordinates[1],
-                        altitude  : coordinates[2]
-                    });
-                }
-
-                var position = {
-                    coordinates : array
-                }
-                var style = {
-                    color     : '#ff0000',
-                    thickness : 2.0
-                };
-    
-                var magoPolyline = new Mago3D.MagoPolyline(position, style);
-                magoManager.modeler.addObject(magoPolyline, 1);    
-                drawedLines.push(magoPolyline);
-                pointDrawer.setActive(false);
-                $('#profile').removeClass('on');
-                stopLoading();
-            });
-        }
-    });
-
-    magoManager.interactions.add(pointDrawer);
-
-    rectangleDrawer = Mago3D.DrawGeometryInteraction.createDrawGeometryInteraction('rectangle');
-    rectangleDrawer.setStyle({
-        fillColor : '#34e8eb',
-        strokeColor : '#349feb',
-        strokeWidth : 3,
-        opacity : 0.5
-    });
-    rectangleDrawer.on(Mago3D.RectangleDrawer.EVENT_TYPE.DRAWEND, function(e){
-        var rectangle = e;
-        var xml = '';
-
-        var type = $('span.analysis.on').attr('id');
-        if(type === 'slope') {
-            var zFactor = getZfactor(rectangle);
-            xml = getXmlRasterSlope(rectangle.minGeographicCoord, rectangle.maxGeographicCoord, zFactor);
-        } else {
-            xml = getXmlRasterAspect(rectangle.minGeographicCoord, rectangle.maxGeographicCoord);
-        }
-        startLoading();
-        requestBlobResource(xml).then(function(response){
-            var blob = response;
-            
-            var reader = new FileReader();
-            reader.readAsDataURL(blob); 
-            reader.onloadend = function() {
-                var base64data = reader.result;                
-
-                rectangle.init(magoManager);
-                rectangle.style = {
-                    imageUrl : base64data,
-                    strokeColor : '#349feb',
-                    strokeWidth : 3,
-                    opacity : 1
-                };
-                stopLoading();
-            }
-        });
-    });
-
-    magoManager.interactions.add(rectangleDrawer);
 
     addJqueryEvent()
 }
