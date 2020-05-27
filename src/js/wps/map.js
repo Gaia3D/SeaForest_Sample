@@ -24,6 +24,11 @@ var rectangleDrawer;
 var pointDrawer;
 
 /**
+ * @type {Mago3D.LineDrawer} line 그리기 툴, 마지막점은 우클릭으로.
+ */
+var lineDrawer;
+
+/**
  * @type {Mago3D.WMSLayer} wms layer
  */
 var wmsLayer;
@@ -131,6 +136,62 @@ function loadEndFunc(e) {
     });
     magoManager.addLayer(wmsLayer);
 
+    lineDrawer = Mago3D.DrawGeometryInteraction.createDrawGeometryInteraction('line');
+    magoManager.interactions.add(lineDrawer);
+    lineDrawer.on(Mago3D.LineDrawer.EVENT_TYPE.DRAWEND, function(e) {
+        var positons = e.knotGeoCoordsArray;
+        var wkt = Mago3D.ManagerUtils.geographicToWkt(positons, 'LINE');
+        startLoading();
+        requestJsonResource(getXmlRasterProfile(20, wkt)).then(function(response){
+            var features = response.features;
+            var array = [];
+
+            //x축은 첫번째 점으로부터의 거리
+            var xAxisValues = [];
+            //y축은 높이
+            var yAxisValues = [];
+            for(var i=0,len=features.length; i<len; i++) {
+                var feature = features[i];
+                var prop = feature.properties;
+                var coordinates = feature.geometry.coordinates;
+                array.push({
+                    longitude : coordinates[0],
+                    latitude  : coordinates[1],
+                    altitude  : coordinates[2]
+                });
+                xAxisValues.push(prop.distance);
+                yAxisValues.push(prop.value);
+            }
+
+            var position = {
+                coordinates : array
+            }
+            var style = {
+                color     : '#ff0000',
+                thickness : 2.0,
+                point     : {
+                    size        : 12,
+                    strokeColor : '#FF0000',
+                    color       : '#FF0000',
+                    opacity     : 0.7
+                }
+            };
+
+            var option = ProfileChart.getBasicAreaOption(xAxisValues,yAxisValues);
+            if (option && typeof option === "object") {
+                ProfileChart.active(option);
+            }
+
+            var magoPolyline = new Mago3D.MagoPolyline(position, style);
+            magoManager.modeler.addObject(magoPolyline, 1);    
+            drawedLines.push(magoPolyline);
+            lineDrawer.setActive(false);
+            $('#profile').removeClass('on');
+            stopLoading();
+        });
+    });
+
+    //라인으로 대체
     pointDrawer = Mago3D.DrawGeometryInteraction.createDrawGeometryInteraction('point');
     pointDrawer.on(Mago3D.PointDrawer.EVENT_TYPE.DRAWEND, function(e) {
         if(pointDrawer.result.length === 2) {
@@ -241,7 +302,7 @@ function addJqueryEvent(){
     //단면분석,향분석,경사분석 클릭
     $('ul.nav span.analysis').click(function() {
         var id = $(this).attr('id');
-        var drawer = (id === 'profile') ? pointDrawer : rectangleDrawer;
+        var drawer = (id === 'profile') ? lineDrawer : rectangleDrawer;
 
         if(!$(this).hasClass('on')) {
             $('span.analysis.on').removeClass('on');
