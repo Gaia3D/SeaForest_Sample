@@ -46,7 +46,7 @@ var policy = {
     "initCameraEnable":true, // 초기 카메라 위치 이동 사용 유무
     "initLatitude":35.127464,
     "initLongitude":128.915708,
-    "initDuration":0,
+    "initDuration":3,
     "initAltitude":60000,
     "terrainType":"elevation", //terrain type, default plane. 
     "terrainValue":"http://localhost:9090/f4d/terrain/" //terrain file path. When use elevation type, require this param. 

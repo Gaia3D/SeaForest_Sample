@@ -28,12 +28,13 @@ var policy = {
     "initLongitude":128.915708,
     "initDuration":0,
     "initAltitude":60000,
-    "terrainType":"elevation", //terrain type, default plane. 
+    "terrainType":"elevation", //terrain type, default plain. 
     "terrainValue":"http://localhost:9090/f4d/terrain/" //terrain file path. When use elevation type, require this param. 
     //"terrainValue":"http://test.muhanit.kr:41515/MagoTerrain/"
 }
 
 var olmap;
+var olMagoWorld;
 
 // mago3d start
 function magoStart(renderDivId) {
@@ -89,13 +90,6 @@ function loadEndFunc(e) {
           target: 'olmap'
     });
 
-    olmap.getView().on('change:resolution',function(e){
-        syncByOlHeight();
-    });
-    olmap.getView().on('change:center',function(e){
-        syncByOlCenter();
-    });
-
     magoManager = e.getMagoManager();
     viewer = e.getViewer();
 
@@ -145,7 +139,12 @@ function loadEndFunc(e) {
     }
     
     magoManager.addLayer(baseLayer);
-    syncByOlHeight(true);
+
+
+    olMagoWorld = new OlMagoWorld({olmap : olmap, magoManager: magoManager});
+    
+
+
     addJqueryEvent();
 }
 
@@ -154,69 +153,4 @@ function addJqueryEvent(){
     $('#homeMenu').click(function(){
         viewer.goto(policy.initLongitude, policy.initLatitude, policy.initAltitude, 2);
     });
-}
-
-function syncByOlCenter(){
-    var center = ol.proj.toLonLat(olmap.getView().getCenter());
-
-    var lon = center[0];
-    var lat = center[1];
-
-    var curHeight = Mago3D.ManagerUtils.pointToGeographicCoord(magoManager.sceneState.camera.position).altitude;
-    viewer.goto(lon,lat,curHeight, 0);
-}
-
-function syncByOlHeight() {
-    var center = ol.proj.toLonLat(olmap.getView().getCenter());
-    var resolution = olmap.getView().getResolution();
-
-    var lon = center[0];
-    var lat = center[1];
-
-    var offsetDistance = calcDistanceForResolution(resolution, lat);
-    console.info(offsetDistance);
-    viewer.goto(lon,lat,Math.abs(offsetDistance), 0);
-
-    /*if(!first) {
-        viewer.goto(lon,lat,curHeight, 0);
-        viewer.moveBackward(offsetDistance);
-    } else {
-        viewer.goto(lon,lat,-offsetDistance, 0);
-    }*/
-    
-
-    function calcDistanceForResolution(resolution, latitude) {
-        var sceneState = magoManager.sceneState;
-        var canvas = sceneState.canvas;
-        var fovy = sceneState.camera.frustum.fovyRad;
-
-        console.assert(!isNaN(fovy));
-        var metersPerUnit = olmap.getView().getProjection().getMetersPerUnit();
-    
-        // number of "map units" visible in 2D (vertically)
-        var visibleMapUnits = resolution * canvas.clientHeight;
-    
-        // The metersPerUnit does not take latitude into account, but it should
-        // be lower with increasing latitude -- we have to compensate.
-        // In 3D it is not possible to maintain the resolution at more than one point,
-        // so it only makes sense to use the latitude of the "target" point.
-        var relativeCircumference = Math.cos(Math.abs(latitude));
-    
-        // how many meters should be visible in 3D
-        var visibleMeters = visibleMapUnits * metersPerUnit * relativeCircumference;
-    
-        // distance required to view the calculated length in meters
-        //
-        //  fovy/2
-        //    |\
-        //  x | \
-        //    |--\
-        // visibleMeters/2
-        var requiredDistance = (visibleMeters / 2) / Math.tan(fovy / 2);
-    
-        // NOTE: This calculation is not absolutely precise, because metersPerUnit
-        // is a great simplification. It does not take ellipsoid/terrain into account.
-    
-        return requiredDistance;
-    }
 }

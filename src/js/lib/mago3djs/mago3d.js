@@ -15293,305 +15293,6 @@ LodAPI.changeLod = function(api, magoManager)
 'use strict';
 
 /**
- * @alias Effect
- * @class Effect
- */
-var Effect = function(options) 
-{
-	if (!(this instanceof Effect)) 
-	{
-		throw new Error(Messages.CONSTRUCT_ERROR);
-	}
-	
-	// Test class to do effects.
-	this.effectsManager;
-	this.birthData;
-	this.durationSeconds;
-	this.effectType = "unknown";
-	
-	if (options)
-	{
-		if (options.effectType)
-		{ this.effectType = options.effectType; }
-		
-		if (options.durationSeconds)
-		{ this.durationSeconds = options.durationSeconds; }
-	
-		if (options.zVelocity)
-		{ this.zVelocity = options.zVelocity; }
-	
-		if (options.zMax)
-		{ this.zMax = options.zMax; }
-		
-		if (options.zMin)
-		{ this.zMin = options.zMin; }
-	
-	}
-	
-	// available effectType:
-	// 1: zBounceLinear
-	// 2: zBounceSpring
-	// 3: borningLight
-	// 4: zMovement
-};
-
-/**
- *
- */
-Effect.prototype.execute = function(currTimeSec)
-{
-	var effectFinished = false;
-	if (this.birthData === undefined)
-	{
-		this.birthData = currTimeSec;
-		return effectFinished;
-	}
-	
-	var timeDiffSeconds = (currTimeSec - this.birthData);
-	var gl = this.effectsManager.gl;
-	
-	if (this.effectType === "zBounceSpring")
-	{
-		var zScale = 1.0;
-		if (timeDiffSeconds >= this.durationSeconds)
-		{
-			zScale = 1.0;
-			effectFinished = true; // if return true, then this effect is finished, so this effect will be deleted.
-		}
-		else
-		{
-			//https://en.wikipedia.org/wiki/Damped_sine_wave
-			var amp = 1.0;
-			var lambda = 0.1; // is the decay constant, in the reciprocal of the time units of the X axis.
-			var w = 5/this.durationSeconds; // angular frequency.
-			var t = timeDiffSeconds;
-			var fita = 0.0; // initial angle in t=0.
-			zScale = amp*Math.pow(Math.E, -lambda*t)*(Math.cos(w*t+fita) + Math.sin(w*t+fita));
-			zScale = (1.0-zScale)*Math.log(t/this.durationSeconds+1.1);
-		}
-		gl.uniform3fv(this.effectsManager.currShader.scaleLC_loc, [1.0, 1.0, zScale]); // init referencesMatrix.
-		return effectFinished;
-	}
-	else if (this.effectType === "zBounceLinear")
-	{
-		var zScale = 1.0;
-		if (timeDiffSeconds >= this.durationSeconds)
-		{
-			zScale = 1.0;
-			effectFinished = true; // if return true, then this effect is finished, so this effect will be deleted.
-		}
-		else
-		{
-			zScale = timeDiffSeconds/this.durationSeconds;
-		}
-		gl.uniform3fv(this.effectsManager.currShader.scaleLC_loc, [1.0, 1.0, zScale]); // init referencesMatrix.
-		return effectFinished;
-	}
-	else if (this.effectType === "borningLight")
-	{
-		var colorMultiplier = 1.0;
-		if (timeDiffSeconds >= this.durationSeconds)
-		{
-			colorMultiplier = 1.0;
-			effectFinished = true; // if return true, then this effect is finished, so this effect will be deleted.
-		}
-		else
-		{
-			var timeRatio = timeDiffSeconds/this.durationSeconds;
-			colorMultiplier = 1/(timeRatio*timeRatio);
-		}
-		gl.uniform4fv(this.effectsManager.currShader.colorMultiplier_loc, [colorMultiplier, colorMultiplier, colorMultiplier, 1.0]);
-		return effectFinished;
-	}
-	else if (this.effectType === "zMovement")
-	{
-		if (this.zVelocity === undefined)
-		{ this.zVelocity = 1.0; }
-
-		if (this.zMax === undefined)
-		{ this.zMax = 1.0; }
-
-		if (this.zMin === undefined)
-		{ this.zMin = -1.0; }
-
-		if (this.zOffset === undefined)
-		{ this.zOffset = 0.0; }
-
-		if (this.lastTime === undefined)
-		{ this.lastTime = currTimeSec; }
-
-
-		if (timeDiffSeconds >= this.durationSeconds)
-		{
-			this.zOffset = 0.0;
-			effectFinished = true; // if return true, then this effect is finished, so this effect will be deleted.
-		}
-		else
-		{
-			var diffTime = currTimeSec - this.lastTime;
-			this.zOffset += this.zVelocity * diffTime;
-
-			if (this.zVelocity > 0.0)
-			{
-				if (this.zOffset > this.zMax)
-				{
-					var diff = (this.zOffset - this.zMax);
-					this.zOffset = this.zMax - diff;
-					this.zVelocity *= -1.0;
-				}
-			}
-			else
-			{
-				if (this.zOffset < this.zMin)
-				{
-					var diff = (this.zOffset - this.zMin);
-					this.zOffset = this.zMin - diff;
-					this.zVelocity *= -1.0;
-				}
-			}
-		}
-		gl.uniform3fv(this.effectsManager.currShader.aditionalOffset_loc, [0.0, this.zOffset, 0.0 ]); // init referencesMatrix.
-		this.lastTime = currTimeSec;
-		return effectFinished;
-	}
-};
-'use strict';
-
-/**
- * @alias EffectsManager
- * @class EffectsManager
- */
-var EffectsManager = function(options) 
-{
-	if (!(this instanceof EffectsManager)) 
-	{
-		throw new Error(Messages.CONSTRUCT_ERROR);
-	}
-	
-	this.effectsObjectsMap = {};
-	this.gl;
-	this.currShader;
-};
-
-/**
- *
- */
-EffectsManager.prototype.setCurrentShader = function(shader)
-{
-	this.currShader = shader;
-};
-
-/**
- *
- */
-EffectsManager.prototype.getEffectsObject = function(id)
-{
-	return this.effectsObjectsMap[id];
-};
-
-EffectsManager.prototype.hasEffects = function(id) 
-{
-	
-	if (!this.effectsObjectsMap[id]) 
-	{
-		return false;
-	}
-
-	if (!this.effectsObjectsMap[id].effectsArray || this.effectsObjectsMap[id].effectsArray.length === 0)
-	{
-		return false;
-	}
-
-	return true;
-};
-
-
-/**
- *
- */
-EffectsManager.prototype.addEffect = function(id, effect)
-{
-	var effectsObject = this.getEffectsObject(id);
-	
-	if (effectsObject === undefined)
-	{
-		effectsObject = {};
-		this.effectsObjectsMap[id] = effectsObject;
-	}
-	
-	if (effectsObject.effectsArray === undefined)
-	{ effectsObject.effectsArray = []; }
-	
-	effect.effectsManager = this;
-	effectsObject.effectsArray.push(effect);
-};
-
-EffectsManager.prototype.executeEffects = function(id, currTime)
-{
-	var effectsObject = this.getEffectsObject(id);
-	var effectExecuted = false;
-	if (effectsObject === undefined)
-	{ return false; }
-	
-	var effectsCount = effectsObject.effectsArray.length;
-	for (var i=0; i<effectsCount; i++)
-	{
-		var effect = effectsObject.effectsArray[i];
-		if (effect.execute(currTime/1000))
-		{
-			effectsObject.effectsArray.splice(i, 1);
-			effectsCount = effectsObject.effectsArray.length;
-		}
-		effectExecuted = true;
-		
-		if (effectsObject.effectsArray.length === 0)
-		{ 
-			this.effectsObjectsMap[id] = undefined;
-			delete this.effectsObjectsMap[id];
-		}
-	}
-	
-	return effectExecuted;
-};
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-'use strict';
-
-/**
  * mago3djs API
  * 
  * @alias API
@@ -20026,6 +19727,22 @@ Camera.prototype.getTargetPositionAtDistance = function (dist, resultTargetPos)
 	return resultTargetPos;
 };
 
+Camera.prototype.getTargetOnTerrain = function (magoManager, resultTargetPos) 
+{
+	if (resultTargetPos === undefined)
+	{ resultTargetPos = new Point3D(); }
+
+	//ManagerUtils.calculatePixelPositionWorldCoord = function(gl, pixelX, pixelY, resultPixelPos, depthFbo, frustumNear, frustumFar, magoManager) 
+	// 1rst, calculate the center position of the screen.
+	var sceneState = magoManager.sceneState;
+	var screenCenterPixels = sceneState.getScreenCenterPositionPixels(undefined);
+
+	var gl = magoManager.getGl();
+	resultTargetPos = ManagerUtils.calculatePixelPositionWorldCoord(gl, screenCenterPixels.x, screenCenterPixels.y, resultTargetPos, undefined, undefined, undefined, magoManager);
+
+	return resultTargetPos;
+};
+
 /**
  * set position and orientation ( direction, up) of the camera
  * only cesium
@@ -20055,6 +19772,21 @@ Camera.setByPositionAndTarget = function (camera, camTarget, camPos, aproxCamUp)
 };
 
 /**
+ * sets orientation ( direction, up) of the camera
+ * 
+ * @static
+ * @param {Cesium.Camera} camera cesium camera object.
+ * @param {Number} heading
+ * @param {Number} pitch
+ * @param {Number} roll
+ */
+Camera.setOrientation = function (camera, heading, pitch, roll) 
+{
+	// calculate the camera direction and the up.
+
+};
+
+/**
  * 어떤 일을 하고 있습니까?
  */
 Camera.prototype.calculateUp = function(aproxCamUp) 
@@ -20069,6 +19801,87 @@ Camera.prototype.calculateUp = function(aproxCamUp)
  * 어떤 일을 하고 있습니까?
  */
 Camera.prototype.finishedAnimation = function(magoManager) 
+{
+	var finished = false;
+	var animData = this.animationData;
+	
+	if (animData === undefined)
+	{ return true; }
+
+	var currTime = magoManager.getCurrentTime();
+	
+	var nextLongitude;
+	var nextLatitude;
+	var nextAltitude;
+	var nextHeading;
+	var nextPitch;
+	var nextRoll;
+
+	// Check animationType.***
+	var animType = animData.animationType;
+	if (animType === CODE.animationType.PATH)
+	{
+		// Test.***
+		var nextPosLine = AnimationManager.getNextPosition(animData, currTime, magoManager);
+		
+		if (nextPosLine === undefined)
+		{ 
+			animData.finished = true;
+			return true; 
+		}
+
+		var camera = this;
+		var camPos = camera.position;
+		var camDir = camera.direction;
+		var camUp = camera.up;
+
+		var path = animData.path;
+		var pathGeoLocDataManager = path.getGeoLocationDataManager();
+		var pathGeoLocData = pathGeoLocDataManager.getCurrentGeoLocationData();
+
+		// Now, calculate the geographic coords of the position.***
+		var posLocal = nextPosLine.point;
+		//var dir = nextPosLine.direction;
+
+		// calculate worldPos.***
+		var tMat = pathGeoLocData.tMatrix;
+		var posWC = tMat.transformPoint3D(posLocal, undefined);
+	
+		var oldCamPos = new Point3D(camPos.x, camPos.y, camPos.z);
+		var camNewPos = new Point3D(posWC.x, posWC.y, posWC.z);
+		camPos.set(camNewPos.x,  camNewPos.y,  camNewPos.z);
+		
+		// calculate the camera's global rotation, and then rotate de cam's direction.
+		var rotAxis;
+		rotAxis = oldCamPos.crossProduct(camNewPos, rotAxis);
+		rotAxis.unitary();
+		if (rotAxis.isNAN())
+		{ return; }
+			
+		var angRad = oldCamPos.angleRadToVector(camNewPos);
+		if (angRad === 0 || isNaN(angRad))
+		{ return; }
+			
+		var rotMat = new Matrix4();
+		rotMat.rotationAxisAngRad(angRad, rotAxis.x, rotAxis.y, rotAxis.z);
+		camDir = rotMat.transformPoint3D(camDir, camDir);
+		camUp = rotMat.transformPoint3D(camUp, camUp);
+
+		var magoWorld = magoManager.magoWorld;
+		magoWorld.updateModelViewMatrixByCamera(this);
+		
+		// finally update "lastTime".
+		animData.lastTime = currTime;
+		return finished;
+	}
+
+	return finished;
+};
+
+/**
+ * 어떤 일을 하고 있습니까?
+ */
+Camera.prototype.finishedAnimation__original = function(magoManager) 
 {
 	var finished = false;
 	var animData = this.animationData;
@@ -27352,7 +27165,7 @@ MagoManager.prototype.upDateSceneStateMatrices = function(sceneState)
 		if (camHeight > 50000)
 		{ far *= 1.5; }
 
-		if (camHeight > 4000)
+		if (camHeight > 10000)
 		{
 			frustum0.near[0] = 0.1 + camHeight*0.8;
 		}
@@ -43192,6 +43005,305 @@ XYZLayer.prototype.getUrl = function(info)
 'use strict';
 
 /**
+ * @alias Effect
+ * @class Effect
+ */
+var Effect = function(options) 
+{
+	if (!(this instanceof Effect)) 
+	{
+		throw new Error(Messages.CONSTRUCT_ERROR);
+	}
+	
+	// Test class to do effects.
+	this.effectsManager;
+	this.birthData;
+	this.durationSeconds;
+	this.effectType = "unknown";
+	
+	if (options)
+	{
+		if (options.effectType)
+		{ this.effectType = options.effectType; }
+		
+		if (options.durationSeconds)
+		{ this.durationSeconds = options.durationSeconds; }
+	
+		if (options.zVelocity)
+		{ this.zVelocity = options.zVelocity; }
+	
+		if (options.zMax)
+		{ this.zMax = options.zMax; }
+		
+		if (options.zMin)
+		{ this.zMin = options.zMin; }
+	
+	}
+	
+	// available effectType:
+	// 1: zBounceLinear
+	// 2: zBounceSpring
+	// 3: borningLight
+	// 4: zMovement
+};
+
+/**
+ *
+ */
+Effect.prototype.execute = function(currTimeSec)
+{
+	var effectFinished = false;
+	if (this.birthData === undefined)
+	{
+		this.birthData = currTimeSec;
+		return effectFinished;
+	}
+	
+	var timeDiffSeconds = (currTimeSec - this.birthData);
+	var gl = this.effectsManager.gl;
+	
+	if (this.effectType === "zBounceSpring")
+	{
+		var zScale = 1.0;
+		if (timeDiffSeconds >= this.durationSeconds)
+		{
+			zScale = 1.0;
+			effectFinished = true; // if return true, then this effect is finished, so this effect will be deleted.
+		}
+		else
+		{
+			//https://en.wikipedia.org/wiki/Damped_sine_wave
+			var amp = 1.0;
+			var lambda = 0.1; // is the decay constant, in the reciprocal of the time units of the X axis.
+			var w = 5/this.durationSeconds; // angular frequency.
+			var t = timeDiffSeconds;
+			var fita = 0.0; // initial angle in t=0.
+			zScale = amp*Math.pow(Math.E, -lambda*t)*(Math.cos(w*t+fita) + Math.sin(w*t+fita));
+			zScale = (1.0-zScale)*Math.log(t/this.durationSeconds+1.1);
+		}
+		gl.uniform3fv(this.effectsManager.currShader.scaleLC_loc, [1.0, 1.0, zScale]); // init referencesMatrix.
+		return effectFinished;
+	}
+	else if (this.effectType === "zBounceLinear")
+	{
+		var zScale = 1.0;
+		if (timeDiffSeconds >= this.durationSeconds)
+		{
+			zScale = 1.0;
+			effectFinished = true; // if return true, then this effect is finished, so this effect will be deleted.
+		}
+		else
+		{
+			zScale = timeDiffSeconds/this.durationSeconds;
+		}
+		gl.uniform3fv(this.effectsManager.currShader.scaleLC_loc, [1.0, 1.0, zScale]); // init referencesMatrix.
+		return effectFinished;
+	}
+	else if (this.effectType === "borningLight")
+	{
+		var colorMultiplier = 1.0;
+		if (timeDiffSeconds >= this.durationSeconds)
+		{
+			colorMultiplier = 1.0;
+			effectFinished = true; // if return true, then this effect is finished, so this effect will be deleted.
+		}
+		else
+		{
+			var timeRatio = timeDiffSeconds/this.durationSeconds;
+			colorMultiplier = 1/(timeRatio*timeRatio);
+		}
+		gl.uniform4fv(this.effectsManager.currShader.colorMultiplier_loc, [colorMultiplier, colorMultiplier, colorMultiplier, 1.0]);
+		return effectFinished;
+	}
+	else if (this.effectType === "zMovement")
+	{
+		if (this.zVelocity === undefined)
+		{ this.zVelocity = 1.0; }
+
+		if (this.zMax === undefined)
+		{ this.zMax = 1.0; }
+
+		if (this.zMin === undefined)
+		{ this.zMin = -1.0; }
+
+		if (this.zOffset === undefined)
+		{ this.zOffset = 0.0; }
+
+		if (this.lastTime === undefined)
+		{ this.lastTime = currTimeSec; }
+
+
+		if (timeDiffSeconds >= this.durationSeconds)
+		{
+			this.zOffset = 0.0;
+			effectFinished = true; // if return true, then this effect is finished, so this effect will be deleted.
+		}
+		else
+		{
+			var diffTime = currTimeSec - this.lastTime;
+			this.zOffset += this.zVelocity * diffTime;
+
+			if (this.zVelocity > 0.0)
+			{
+				if (this.zOffset > this.zMax)
+				{
+					var diff = (this.zOffset - this.zMax);
+					this.zOffset = this.zMax - diff;
+					this.zVelocity *= -1.0;
+				}
+			}
+			else
+			{
+				if (this.zOffset < this.zMin)
+				{
+					var diff = (this.zOffset - this.zMin);
+					this.zOffset = this.zMin - diff;
+					this.zVelocity *= -1.0;
+				}
+			}
+		}
+		gl.uniform3fv(this.effectsManager.currShader.aditionalOffset_loc, [0.0, this.zOffset, 0.0 ]); // init referencesMatrix.
+		this.lastTime = currTimeSec;
+		return effectFinished;
+	}
+};
+'use strict';
+
+/**
+ * @alias EffectsManager
+ * @class EffectsManager
+ */
+var EffectsManager = function(options) 
+{
+	if (!(this instanceof EffectsManager)) 
+	{
+		throw new Error(Messages.CONSTRUCT_ERROR);
+	}
+	
+	this.effectsObjectsMap = {};
+	this.gl;
+	this.currShader;
+};
+
+/**
+ *
+ */
+EffectsManager.prototype.setCurrentShader = function(shader)
+{
+	this.currShader = shader;
+};
+
+/**
+ *
+ */
+EffectsManager.prototype.getEffectsObject = function(id)
+{
+	return this.effectsObjectsMap[id];
+};
+
+EffectsManager.prototype.hasEffects = function(id) 
+{
+	
+	if (!this.effectsObjectsMap[id]) 
+	{
+		return false;
+	}
+
+	if (!this.effectsObjectsMap[id].effectsArray || this.effectsObjectsMap[id].effectsArray.length === 0)
+	{
+		return false;
+	}
+
+	return true;
+};
+
+
+/**
+ *
+ */
+EffectsManager.prototype.addEffect = function(id, effect)
+{
+	var effectsObject = this.getEffectsObject(id);
+	
+	if (effectsObject === undefined)
+	{
+		effectsObject = {};
+		this.effectsObjectsMap[id] = effectsObject;
+	}
+	
+	if (effectsObject.effectsArray === undefined)
+	{ effectsObject.effectsArray = []; }
+	
+	effect.effectsManager = this;
+	effectsObject.effectsArray.push(effect);
+};
+
+EffectsManager.prototype.executeEffects = function(id, currTime)
+{
+	var effectsObject = this.getEffectsObject(id);
+	var effectExecuted = false;
+	if (effectsObject === undefined)
+	{ return false; }
+	
+	var effectsCount = effectsObject.effectsArray.length;
+	for (var i=0; i<effectsCount; i++)
+	{
+		var effect = effectsObject.effectsArray[i];
+		if (effect.execute(currTime/1000))
+		{
+			effectsObject.effectsArray.splice(i, 1);
+			effectsCount = effectsObject.effectsArray.length;
+		}
+		effectExecuted = true;
+		
+		if (effectsObject.effectsArray.length === 0)
+		{ 
+			this.effectsObjectsMap[id] = undefined;
+			delete this.effectsObjectsMap[id];
+		}
+	}
+	
+	return effectExecuted;
+};
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+'use strict';
+
+/**
  * 버퍼 안의 데이터를 어떻게 읽어야 할지 키가 되는 객체
  * @deprecated NeoSimpleBuilding에서 인스턴스 생성하는 부분이 있으나 NeoSimpleBuilding도 사용하지 않고 있음
  * 
@@ -57473,11 +57585,41 @@ TinTerrain.prototype.isChildrenPrepared = function()
 	
 	if (this.childMap.length < 4)
 	{ return false; }
-	
-	if (this.childMap.LU.isPrepared() && this.childMap.LD.isPrepared() && this.childMap.RU.isPrepared() &&  this.childMap.RD.isPrepared())
+
+	var luVisible = this.childMap.LU.isVisible();
+	var ldVisible = this.childMap.LD.isVisible();
+	var ruVisible = this.childMap.RU.isVisible();
+	var rdVisible = this.childMap.RD.isVisible();
+
+	if ((this.childMap.LU.isPrepared() || !luVisible) && (this.childMap.LD.isPrepared() || !ldVisible) && (this.childMap.RU.isPrepared() || !ruVisible) &&  (this.childMap.RD.isPrepared() || !rdVisible))
 	{ return true; }
 	else
 	{ return false; }
+};
+
+TinTerrain.prototype.hasAnyChildVisible = function()
+{
+	if (this.childMap === undefined)
+	{ return false; }
+	
+	if (this.childMap.length < 4)
+	{ return false; }
+
+	if (this.childMap.LU.isVisible())
+	{ return true; }
+	else if (this.childMap.LD.isVisible())
+	{ return true; }
+	else if (this.childMap.RU.isVisible())
+	{ return true; }
+	else if (this.childMap.RD.isVisible())
+	{ return true; }
+	
+	return false;
+};
+
+TinTerrain.prototype.isVisible = function()
+{
+	return this.intersectionType !== Constant.INTERSECTION_OUTSIDE;
 };
 
 TinTerrain.prototype.isTexturePrepared = function(texturesMap)
@@ -57617,10 +57759,19 @@ TinTerrain.prototype.prepareTinTerrain = function(magoManager, tinTerrainManager
 	if (magoManager.fileRequestControler.tinTerrainTexturesRequested >= 2)
 	{ return false; }
 
+	//if (!this.isVisible())
+	//{
+	//	if (this.owner.isVisible())
+	////	{
+	//		return this.owner.prepareTinTerrain(magoManager, tinTerrainManager);
+	//	}
+	//
+	//	return false;
+	//}
 
 	// This function 1- loads file & 2- parses file & 3- makes vbo.
 	// 1rst, check if the parent is prepared. If parent is not prepared, then prepare the parent.
-	if (this.owner === undefined || this.owner.isPrepared())
+	if (this.owner === undefined || (this.owner.isPrepared() &&  this.owner.hasAnyChildVisible()))
 	{
 		// 1rst, try to erase from procesQueue_deleting if exist.
 		magoManager.processQueue.eraseTinTerrainToDelete(this);
@@ -58453,7 +58604,7 @@ TinTerrain.prototype.getFrustumIntersectedTinTerrainsQuadTree = function(frustum
 	var currDepth = this.depth;
 
 	// Test frustumCulling.***************************************************
-	//this.intersectionType = frustum.intersectionSphere(this.sphereExtent);
+	this.intersectionType = frustum.intersectionSphere(this.sphereExtent);
 	//if (this.intersectionType === Constant.INTERSECTION_OUTSIDE)
 	//{ return; }
 	//else if (this.intersectionType === Constant.INTERSECTION_INSIDE)
@@ -58468,14 +58619,18 @@ TinTerrain.prototype.getFrustumIntersectedTinTerrainsQuadTree = function(frustum
 
 	//if (this.intersectionType === Constant.INTERSECTION_OUTSIDE)
 	//{ return; }
-	
-	// check distance to camera.
-	//var cameraSphere = new Sphere();
-	//cameraSphere.setCenterPoint(camPos.x, camPos.y, camPos.z);
-	//cameraSphere.setRadius(camPos.camElevation/2);
 
 	this.distToCam = camPos.distToSphere(sphereExtentAux);
-	//this.distToCam = cameraSphere.distToSphere(sphereExtentAux);
+
+	if (this.intersectionType === Constant.INTERSECTION_OUTSIDE)
+	{
+		if (this.distToCam < 0.0)
+		{ this.distToCam =1; }
+		
+		this.distToCam *= 100000;
+	}
+
+
 	var distLimit = this.tinTerrainManager.distLimitByDepth[currDepth];
 	
 	if (this.distToCam > distLimit)
@@ -59972,6 +60127,12 @@ TinTerrainManager.prototype.init = function()
 TinTerrainManager.prototype.loadTerrainMeta = function() 
 {
 	var that = this;
+	if (that.terrainType === CODE.magoEarthTerrainType.PLAIN)
+	{
+		that.terrainReady = true;
+		return;
+	}
+
 	if (that.terrainType === CODE.magoEarthTerrainType.ELEVATION && that.terrainValue && !that.terrainReady) 
 	{
 		var infoPath = that.terrainValue + TinTerrainManager.INFO_FILE;
@@ -60028,27 +60189,27 @@ TinTerrainManager.prototype.makeDistanceLimitByDepth = function()
 	{ this.distLimitByDepth = []; }
 		
 	// For each depth, there are a limit distance.***
-	this.distLimitByDepth[0] = 50000000*2.0; 
-	this.distLimitByDepth[1] = 10000000*2.0; 
-	this.distLimitByDepth[2] = 2500000*2.0; 
-	this.distLimitByDepth[3] = 1000000*2.0; 
-	this.distLimitByDepth[4] = 500000*2.0; 
-	this.distLimitByDepth[5] = 250000*2.0; 
-	this.distLimitByDepth[6] = 50000*2.0; 
-	this.distLimitByDepth[7] = 25000*2.0; 
-	this.distLimitByDepth[8] = 18000*2.0; 
-	this.distLimitByDepth[9] = 16000*2.0; 
-	this.distLimitByDepth[10] = 8000*2.0; 
-	this.distLimitByDepth[11] = 6000*2.0; 
-	this.distLimitByDepth[12] = 4000*2.0; 
-	this.distLimitByDepth[13] = 3000*2.0; 
-	this.distLimitByDepth[14] = 2500*2.0; 
-	this.distLimitByDepth[15] = 2000*2.0; 
-	this.distLimitByDepth[16] = 1500*2.0; 
-	this.distLimitByDepth[17] = 1200*2.0; 
-	this.distLimitByDepth[18] = 600*2.0; 
-	this.distLimitByDepth[19] = 400*2.0; 
-	this.distLimitByDepth[20] = 200*2.0; 
+	this.distLimitByDepth[0] = 100000000; 
+	this.distLimitByDepth[1] = 20000000; 
+	this.distLimitByDepth[2] = 10000000; 
+	this.distLimitByDepth[3] = 6000000; 
+	this.distLimitByDepth[4] = 2000000; 
+	this.distLimitByDepth[5] = 1600000; 
+	this.distLimitByDepth[6] = 1000000; 
+	this.distLimitByDepth[7] = 600000; 
+	this.distLimitByDepth[8] = 200000; 
+	this.distLimitByDepth[9] = 100000; 
+	this.distLimitByDepth[10] = 60000; 
+	this.distLimitByDepth[11] = 10000; 
+	this.distLimitByDepth[12] = 12000; 
+	this.distLimitByDepth[13] = 6000; 
+	this.distLimitByDepth[14] = 5000; 
+	this.distLimitByDepth[15] = 1200; 
+	this.distLimitByDepth[16] = 900; 
+	this.distLimitByDepth[17] = 600; 
+	this.distLimitByDepth[18] = 400; 
+	this.distLimitByDepth[19] = 200; 
+	this.distLimitByDepth[20] = 100; 
 	
 };
 
@@ -65784,6 +65945,7 @@ MagoWorld.prototype.mousewheel = function(event)
 	var camera = magoManager.sceneState.camera;
 	var camPos = camera.position;
 	var camDir = camera.direction;
+	var camUp = camera.up;
 	
 	// calculate the direction of the cursor.
 	var nowX = event.clientX;
@@ -65828,21 +65990,12 @@ MagoWorld.prototype.mousewheel = function(event)
 	var angRad = oldCamPos.angleRadToVector(camNewPos);
 	if (angRad === 0 || isNaN(angRad))
 	{ return; }
-
-	if (angRad *180/Math.PI> 180)
-	{ var hola = 0; }
 		
 	var rotMat = new Matrix4();
 	rotMat.rotationAxisAngRad(angRad, rotAxis.x, rotAxis.y, rotAxis.z);
 	camDir = rotMat.transformPoint3D(camDir, camDir);
-	
-	// now, must check the camera's up.
-	var globeNormalCartesian = Globe.normalAtCartesianPointWgs84(camPos.x, camPos.y, camPos.z, undefined);
-	var globeNormal = new Point3D(globeNormalCartesian[0], globeNormalCartesian[1], globeNormalCartesian[2]);
-	
-	var camRight = camDir.crossProduct(globeNormal);
-	camRight.unitary();
-	camera.up = camRight.crossProduct(camDir, camera.up);
+	camUp = rotMat.transformPoint3D(camUp, camUp);
+
 	
 	this.updateModelViewMatrixByCamera(camera);
 };
@@ -66366,6 +66519,16 @@ MagoWorld.prototype.doTest__ExtrudedObject = function(event)
 	}
 };
 
+MagoWorld.prototype.doTest__GoTo = function()
+{
+	var longitude = 127;
+	var latitude = 36;
+	var altitude = 1500;
+	var duration = 3;
+
+	this.goto(longitude, latitude, altitude, duration);
+};
+
 MagoWorld.prototype.doTest__TerrainScanner = function()
 {
 	// create a terrainScanner.
@@ -66577,7 +66740,9 @@ MagoWorld.prototype.keydown = function(event)
 		//this.doTest__TerrainScanner();
 		//this.doTest__MagoRectangle();
 		//this.doTest__MagoPoint();
-		this.doTest__MagoPolyline();
+		//this.doTest__MagoPolyline();
+
+		this.doTest__GoTo();
 	}
 	else if (key === 'p')
 	{
@@ -89275,6 +89440,22 @@ SceneState.prototype.getCamera = function()
 };
 
 /**
+ * Returns the center position of the screen in pixels.
+ */
+SceneState.prototype.getScreenCenterPositionPixels = function(resultScreenPixelPos) 
+{
+	var screenW = this.drawingBufferWidth[0];
+	var screenH = this.drawingBufferHeight[0];
+
+	if (resultScreenPixelPos === undefined)
+	{ resultScreenPixelPos = new Point2D(); }
+
+	resultScreenPixelPos.set(Math.floor(screenW/2), Math.floor(screenH/2));
+
+	return resultScreenPixelPos;
+};
+
+/**
  * Returns the camera.
  */
 SceneState.prototype.setApplySunShadows = function(bApplySunShadows) 
@@ -89692,609 +89873,6 @@ SelectionManager.prototype.TEST__CurrGeneralObjSel = function()
 	{ return false; }
 };
 
-'use strict';
-
-/**
- * Network.
- * IndoorGML의 네트워크를 파싱하고 그리는 데 사용합니다.
- * @alias Network
- * @class Network
- */
-var Network = function(owner) 
-{
-	if (!(this instanceof Network)) 
-	{
-		throw new Error(Messages.CONSTRUCT_ERROR);
-	}
-	
-	this.nodeOwner;
-	if (owner)
-	{ this.nodeOwner = owner; }
-	
-	this.id; // network id.
-	this.nodesArray;
-	this.edgesArray;
-	this.spacesArray;
-	
-	this.attributes;
-	this.edgesVboKeysContainer; // to draw edges with an unique vbo.
-	this.nodesVboKeysContainer; // to draw nodes with an unique vbo.
-	
-	this.renderSpaces = true;
-	this.spacesAlpha = 0.2;
-};
-
-/**
- * 
- */
-Network.prototype.newNode = function()
-{
-	if (this.nodesArray === undefined)
-	{ this.nodesArray = []; }
-	
-	var networkNode = new NetworkNode(this);
-	this.nodesArray.push(networkNode);
-	return networkNode;
-};
-
-/**
- * 
- */
-Network.prototype.newEdge = function()
-{
-	if (this.edgesArray === undefined)
-	{ this.edgesArray = []; }
-	
-	var networkEdge = new NetworkEdge(this);
-	this.edgesArray.push(networkEdge);
-	return networkEdge;
-};
-
-/**
- * 
- */
-Network.prototype.newSpace = function()
-{
-	if (this.spacesArray === undefined)
-	{ this.spacesArray = []; }
-	
-	var networkSpace = new NetworkSpace(this);
-	this.spacesArray.push(networkSpace);
-	return networkSpace;
-};
-
-/**
- * 
- */
-Network.prototype.test__makeVbos = function(magoManager)
-{
-	// Here makes meshes and vbos.
-	// For edges, make an unique vbo for faster rendering.
-	var edgesCount = 0;
-	if (this.edgesArray)
-	{ edgesCount = this.edgesArray.length; }
-	
-	var pointsArray = [];
-	
-	for (var i=0; i<edgesCount; i++)
-	{
-		var edge = this.edgesArray[i];
-		var vtxSegment = edge.vtxSegment;
-		var point1 = vtxSegment.startVertex.point3d;
-		var point2 = vtxSegment.endVertex.point3d;
-		pointsArray.push(point1.x);
-		pointsArray.push(point1.y);
-		pointsArray.push(point1.z);
-		
-		pointsArray.push(point2.x);
-		pointsArray.push(point2.y);
-		pointsArray.push(point2.z);
-	}
-	
-	if (this.edgesVboKeysContainer === undefined)
-	{
-		this.edgesVboKeysContainer = new VBOVertexIdxCacheKeysContainer();
-	}
-	
-	var vboKey = this.edgesVboKeysContainer.newVBOVertexIdxCacheKey();
-	
-	var vboMemManager = magoManager.vboMemoryManager;
-	var pointsCount = edgesCount * 2;
-	var posByteSize = pointsCount * 3;
-	var classifiedPosByteSize = vboMemManager.getClassifiedBufferSize(posByteSize);
-	vboKey.posVboDataArray = new Float32Array(classifiedPosByteSize);
-	vboKey.posVboDataArray.set(pointsArray);
-	vboKey.posArrayByteSize = pointsArray.length;
-	vboKey.segmentsCount = edgesCount;
-	
-};
-
-/**
- * Make triangle from IndoorGML data
- * @param magoManager
- * @param gmlDataContainer 
- * 
- */
-Network.prototype.parseTopologyData = function(magoManager, gmlDataContainer) 
-{
-	// gmlDataContainer.cellSpaceMembers
-	// gmlDataContainer.edges
-	// gmlDataContainer.nodes
-	// cityGML Lower point (78.02094, -82.801873, 18).
-	// cityGML Upper point (152.17466, 19.03087, 39).
-	// cityGML Center point {x=115.09780549999999 y=-31.885501999999999 z=28.500000000000000 ...}
-	
-	var bbox = new BoundingBox();
-	bbox.minX = gmlDataContainer.min_X;
-	bbox.minY = gmlDataContainer.min_Y;
-	bbox.minZ = gmlDataContainer.min_Z;
-	bbox.maxX = gmlDataContainer.max_X;
-	bbox.maxY = gmlDataContainer.max_Y;
-	bbox.maxZ = gmlDataContainer.max_Z;
-	
-	//bbox.maxX = 56.19070816040039;
-	//bbox.maxY = 71.51078033447266;
-	//bbox.maxZ = 10.5;
-	//bbox.minX = -379.18280029296875;
-	//bbox.minY = -142.4878387451172;
-	//bbox.minZ = -46.5;
-	
-	var offsetVector = new Point3D();
-	var zOffset = 0.1;
-	offsetVector.set(-115.0978055, 31.885502, -28.5); // cityGML ORIGINAL Center point inversed.
-	
-	var nodesMap = {};
-	var nodesCount = gmlDataContainer.nodes.length;
-	for (var i=0; i<nodesCount; i++)
-	{
-		var node = gmlDataContainer.nodes[i];
-		var networkNode = this.newNode();
-		networkNode.id = "#" + node.id;
-		
-		networkNode.position = new Point3D(node.coordinates[0], node.coordinates[1], node.coordinates[2]);
-		networkNode.position.addPoint(offsetVector); // rest bbox centerPoint.
-		networkNode.position.add(0.0, 0.0, zOffset); // aditional pos.
-		networkNode.box = new Box(0.6, 0.6, 0.6);
-		
-		nodesMap[networkNode.id] = networkNode;
-	}
-	
-	
-	var cellSpaceMap = {};
-	var cellSpacesCount = gmlDataContainer.cellSpaceMembers.length;
-	for (var i=0; i<cellSpacesCount; i++)
-	{
-		var cellSpace = gmlDataContainer.cellSpaceMembers[i];
-		var id = cellSpace.href;
-		var networkSpace = this.newSpace();
-		var mesh = new Mesh();
-		networkSpace.mesh = mesh; // assign mesh to networkSpace provisionally.
-		var vertexList = mesh.getVertexList();
-		
-		var surfacesMembersCount = cellSpace.surfaceMember.length;
-		for (var j=0; j<surfacesMembersCount; j++)
-		{
-			var surface = mesh.newSurface();
-			var face = surface.newFace();
-			
-			var coordinates = cellSpace.surfaceMember[j].coordinates;
-			var coordinatedCount = coordinates.length;
-			var pointsCount = coordinatedCount/3;
-			
-			for (var k=0; k<pointsCount; k++)
-			{
-				var x = coordinates[k * 3];
-				var y = coordinates[k * 3 + 1];
-				var z = coordinates[k * 3 + 2];
-				
-				var vertex = vertexList.newVertex();
-				vertex.setPosition(x, y, z);
-				vertex.point3d.addPoint(offsetVector); // rest bbox centerPoint.
-				face.addVertex(vertex);
-				
-			}
-			face.solveUroborus(); // Check & solve if the last point is coincident with the 1rst point.
-			face.calculateVerticesNormals();
-		}
-		
-		cellSpaceMap[cellSpace.href] = cellSpace;
-	}
-	
-	var edgesCount = gmlDataContainer.edges.length;
-	for (var i=0; i<edgesCount; i++)
-	{
-		var edge = gmlDataContainer.edges[i];
-		var networkEdge = this.newEdge();
-		
-		var point1 = edge.stateMembers[0].coordinates;
-		var point2 = edge.stateMembers[1].coordinates;
-		var vertex1 = new Vertex();
-		var vertex2 = new Vertex();
-		vertex1.setPosition(point1[0], point1[1], point1[2]);
-		vertex2.setPosition(point2[0], point2[1], point2[2]);
-		vertex1.point3d.addPoint(offsetVector); // rest bbox centerPoint.
-		vertex1.point3d.add(0.0, 0.0, zOffset); // aditional pos.
-		vertex2.point3d.addPoint(offsetVector); // rest bbox centerPoint.
-		vertex2.point3d.add(0.0, 0.0, zOffset); // aditional pos.
-		var vtxSegment = new VtxSegment(vertex1, vertex2);
-		networkEdge.vtxSegment = vtxSegment; // assign vtxSegment to networkEdge provisionally.
-		
-		var connect_1_id = edge.connects[0];
-		var connect_2_id = edge.connects[1];
-		
-		networkEdge.strNodeId = connect_1_id;
-		networkEdge.endNodeId = connect_2_id;
-	}
-	
-	this.test__makeVbos(magoManager);
-};
-
-/**
- * 
- */
-Network.prototype.renderColorCoding = function(magoManager, shader, renderType)
-{
-	// Provisional function.
-	// render nodes & edges.
-	var selectionColor = magoManager.selectionColor;
-	//selectionColor.init(); 
-	
-	// Check if exist selectionFamilies.
-	var selFamilyNameNodes = "networkNodes";
-	var selManager = magoManager.selectionManager;
-	var selCandidateNodes = selManager.getSelectionCandidatesFamily(selFamilyNameNodes);
-	if (selCandidateNodes === undefined)
-	{
-		selCandidateNodes = selManager.newCandidatesFamily(selFamilyNameNodes);
-	}
-	
-	var selFamilyNameEdges = "networkEdges";
-	var selManager = magoManager.selectionManager;
-	var selCandidateEdges = selManager.getSelectionCandidatesFamily(selFamilyNameEdges);
-	if (selCandidateEdges === undefined)
-	{
-		selCandidateEdges = selManager.newCandidatesFamily(selFamilyNameEdges);
-	}
-	
-	var vboMemManager = magoManager.vboMemoryManager;
-	var gl = magoManager.sceneState.gl;
-	var vboKey;
-	
-	shader.disableVertexAttribArray(shader.texCoord2_loc); 
-	shader.enableVertexAttribArray(shader.normal3_loc); 
-	gl.uniform1i(shader.hasTexture_loc, false); //.
-	gl.uniform4fv(shader.oneColor4_loc, [0.8, 0.8, 0.8, 1.0]);
-	
-	if (!shader.last_isAditionalMovedZero)
-	{
-		gl.uniform1i(shader.hasAditionalMov_loc, false);
-		gl.uniform3fv(shader.aditionalMov_loc, [0.0, 0.0, 0.0]); //.
-		shader.last_isAditionalMovedZero = true;
-	}
-	
-	// Nodes.**
-	var nodesCount = 0;
-	if (this.nodesArray)
-	{ nodesCount = this.nodesArray.length; }
-	
-	if (nodesCount > 0 )//&& !magoManager.isCameraMoving)
-	{
-		var refMatrixType = 1; // translation-type.
-		gl.uniform1i(shader.refMatrixType_loc, refMatrixType);
-		//gl.uniform4fv(shader.oneColor4_loc, [0.3, 0.3, 0.9, 1.0]);
-		var nodeMaster = this.nodesArray[0]; // render all with an unique box.
-		for (var i=0; i<nodesCount; i++)
-		{
-			var node = this.nodesArray[i];
-			
-			// nodes has a position, so render a point or a box.
-			gl.uniform3fv(shader.refTranslationVec_loc, [node.position.x, node.position.y, node.position.z]); 
-			
-			var selColor4 = selectionColor.getAvailableColor(undefined); // new.
-			var idxKey = selectionColor.decodeColor3(selColor4.r, selColor4.g, selColor4.b);
-			selManager.setCandidateCustom(idxKey, selFamilyNameNodes, node);
-			gl.uniform4fv(shader.oneColor4_loc, [selColor4.r/255.0, selColor4.g/255.0, selColor4.b/255.0, 1.0]);
-
-			nodeMaster.box.render(magoManager, shader, renderType);
-			
-		}
-	}
-	
-	// Edges.**
-	// Render with a unique vbo.
-	if (this.edgesVboKeysContainer)
-	{
-		var vboKey = this.edgesVboKeysContainer.vboCacheKeysArray[0];
-		if (vboKey.isReadyPositions(gl, vboMemManager))
-		{ 
-			shader.disableVertexAttribArray(shader.texCoord2_loc); 
-			shader.disableVertexAttribArray(shader.normal3_loc); 
-			refMatrixType = 0;
-			gl.uniform1i(shader.refMatrixType_loc, refMatrixType);
-			
-			// Positions.
-			if (vboKey.meshVertexCacheKey !== shader.lastVboKeyBindedMap[shader.position3_loc])
-			{
-				gl.bindBuffer(gl.ARRAY_BUFFER, vboKey.meshVertexCacheKey);
-				gl.vertexAttribPointer(shader.position3_loc, 3, gl.FLOAT, false, 0, 0);
-				shader.lastVboKeyBindedMap[shader.position3_loc] = vboKey.meshVertexCacheKey;
-			}
-				
-			var edgesCount = this.edgesArray.length;
-			for (var i=0; i<edgesCount; i++)
-			{
-				var edge = this.edgesArray[i];
-				var selColor4 = selectionColor.getAvailableColor(undefined); // new.
-				var idxKey = selectionColor.decodeColor3(selColor4.r, selColor4.g, selColor4.b);
-				selManager.setCandidateCustom(idxKey, selFamilyNameEdges, edge);
-				gl.uniform4fv(shader.oneColor4_loc, [selColor4.r/255.0, selColor4.g/255.0, selColor4.b/255.0, 1.0]);
-				gl.drawArrays(gl.LINES, i*2, 2);
-			}
-		}
-	}
-	
-};
-
-/**
- * 
- */
-Network.prototype.render = function(magoManager, shader, renderType)
-{
-	if (renderType === 2)
-	{
-		this.renderColorCoding(magoManager, shader, renderType);
-		return;
-	}
-	
-	// Check if ready smallBox and bigBox.
-	var selectionColor = magoManager.selectionColor;
-	selectionColor.init(); 
-	
-	// Check if exist selectionFamilies.
-	var selFamilyNameNodes = "networkNodes";
-	var selManager = magoManager.selectionManager;
-	var selCandidateNodes = selManager.getSelectionCandidatesFamily(selFamilyNameNodes);
-	if (selCandidateNodes === undefined)
-	{
-		selCandidateNodes = selManager.newCandidatesFamily(selFamilyNameNodes);
-	}
-	
-	var selFamilyNameEdges = "networkEdges";
-	var selManager = magoManager.selectionManager;
-	var selCandidateEdges = selManager.getSelectionCandidatesFamily(selFamilyNameEdges);
-	if (selCandidateEdges === undefined)
-	{
-		selCandidateEdges = selManager.newCandidatesFamily(selFamilyNameEdges);
-	}
-	
-	// Provisional function.
-	// render nodes & edges.
-	var vboMemManager = magoManager.vboMemoryManager;
-	var gl = magoManager.sceneState.gl;
-	var vboKey;
-	
-	shader.disableVertexAttribArray(shader.texCoord2_loc); 
-	shader.enableVertexAttribArray(shader.normal3_loc); 
-	
-	gl.uniform1i(shader.colorType_loc, 0); // 0= oneColor, 1= attribColor, 2= texture.
-	gl.uniform4fv(shader.oneColor4_loc, [0.8, 0.8, 0.8, 1.0]);
-	
-	if (!shader.last_isAditionalMovedZero)
-	{
-		gl.uniform1i(shader.hasAditionalMov_loc, false);
-		gl.uniform3fv(shader.aditionalMov_loc, [0.0, 0.0, 0.0]); //.
-		shader.last_isAditionalMovedZero = true;
-	}
-	
-	// Nodes.**
-	var nodesCount = 0;
-	if (this.nodesArray)
-	{ nodesCount = this.nodesArray.length; }
-	
-	if (nodesCount > 0 )//&& !magoManager.isCameraMoving)
-	{
-		gl.uniform1i(shader.colorType_loc, 0); // 0= oneColor, 1= attribColor, 2= texture.
-		var refMatrixType = 1; // translation-type.
-		gl.uniform1i(shader.refMatrixType_loc, refMatrixType);
-		gl.uniform4fv(shader.oneColor4_loc, [0.3, 0.3, 0.9, 1.0]);
-		var nodeMaster = this.nodesArray[0]; // render all with an unique box.
-		for (var i=0; i<nodesCount; i++)
-		{
-			var node = this.nodesArray[i];
-			
-			// check if is selected.
-			if (node === selCandidateNodes.currentSelected)
-			{
-				gl.uniform4fv(shader.oneColor4_loc, [0.9, 0.5, 0.1, 1.0]);
-			}
-			
-			// nodes has a position, so render a point or a box.
-			gl.uniform3fv(shader.refTranslationVec_loc, [node.position.x, node.position.y, node.position.z]); 
-			nodeMaster.box.render(magoManager, shader, renderType);
-			
-			// restore defaultColor.
-			if (node === selCandidateNodes.currentSelected)
-			{
-				gl.uniform4fv(shader.oneColor4_loc, [0.3, 0.3, 0.9, 1.0]);
-			}
-		}
-	}
-	
-	// Edges.**
-	// Render with a unique vbo.
-	if (this.edgesVboKeysContainer)
-	{
-		var vboKey = this.edgesVboKeysContainer.vboCacheKeysArray[0];
-		if (vboKey.isReadyPositions(gl, vboMemManager))
-		{ 
-			shader.disableVertexAttribArray(shader.texCoord2_loc); 
-			shader.disableVertexAttribArray(shader.normal3_loc); 
-			gl.uniform1i(shader.colorType_loc, 0); // 0= oneColor, 1= attribColor, 2= texture.
-			refMatrixType = 0;
-			gl.uniform1i(shader.refMatrixType_loc, refMatrixType);
-			gl.uniform4fv(shader.oneColor4_loc, [0.1, 0.1, 0.6, 1.0]);
-	
-			// Positions.
-			if (vboKey.meshVertexCacheKey !== shader.lastVboKeyBindedMap[shader.position3_loc])
-			{
-				gl.bindBuffer(gl.ARRAY_BUFFER, vboKey.meshVertexCacheKey);
-				gl.vertexAttribPointer(shader.position3_loc, 3, gl.FLOAT, false, 0, 0);
-				shader.lastVboKeyBindedMap[shader.position3_loc] = vboKey.meshVertexCacheKey;
-			}
-			
-			//gl.drawArrays(gl.LINES, 0, vboKey.segmentsCount*2);
-			
-			var edgesCount = this.edgesArray.length;
-			for (var i=0; i<edgesCount; i++)
-			{
-				var edge = this.edgesArray[i];
-				if (edge === selCandidateEdges.currentSelected)
-				{
-					gl.uniform4fv(shader.oneColor4_loc, [0.0, 1.0, 0.0, 1.0]);
-				}
-				gl.drawArrays(gl.LINES, i*2, 2);
-				
-				// restore default color.
-				if (edge === selCandidateEdges.currentSelected)
-				{
-					gl.uniform4fv(shader.oneColor4_loc, [0.1, 0.1, 0.6, 1.0]);
-				}
-			}
-		}
-	}
-	
-	// Spaces.
-	this.renderSpaces = magoManager.tempSettings.renderSpaces;
-	this.spacesAlpha = magoManager.tempSettings.spacesAlpha;
-	
-	if (renderType === 1)
-	{ shader.enableVertexAttribArray(shader.normal3_loc); } 
-	
-	if (this.renderSpaces)
-	{
-		gl.uniform1i(shader.colorType_loc, 0); // 0= oneColor, 1= attribColor, 2= texture.
-		refMatrixType = 0;
-		gl.uniform1i(shader.refMatrixType_loc, refMatrixType);
-		gl.uniform4fv(shader.oneColor4_loc, [0.8, 0.8, 0.8, this.spacesAlpha]);
-		gl.enable(gl.BLEND);
-		var spacesCount = 0;
-		if (this.spacesArray)
-		{ spacesCount = this.spacesArray.length; }
-		
-		for (var i=0; i<spacesCount; i++)
-		{
-			var space = this.spacesArray[i];
-			space.mesh.render(magoManager, shader);
-		}
-		
-		gl.disable(gl.BLEND);
-	}
-};
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-'use strict';
-
-/**
- * NetworkEdge.
- * 
- * @alias NetworkEdge
- * @class NetworkEdge
- */
-var NetworkEdge = function(owner) 
-{
-	if (!(this instanceof NetworkEdge)) 
-	{
-		throw new Error(Messages.CONSTRUCT_ERROR);
-	}
-	this.networkOwner = owner;
-	this.id;
-	this.strNode;
-	this.endNode;
-	this.sense;
-	this.attributes;
-	
-	// provisionally:
-	this.strNodeId;
-	this.endNodeId;
-};
-'use strict';
-
-/**
- * NetworkNode.
- * 
- * @alias NetworkNode
- * @class NetworkNode
- */
-var NetworkNode = function(owner) 
-{
-	if (!(this instanceof NetworkNode)) 
-	{
-		throw new Error(Messages.CONSTRUCT_ERROR);
-	}
-	this.networkOwner = owner;
-	this.id;
-	this.edgesArray;
-	this.attributes;
-	this.box;
-	//this.mesh; // if display as a box, cilinder, etc.
-};
-'use strict';
-
-/**
- * NetworkSpace.
- * 
- * @alias NetworkSpace
- * @class NetworkSpace
- */
-var NetworkSpace = function(owner) 
-{
-	if (!(this instanceof NetworkSpace)) 
-	{
-		throw new Error(Messages.CONSTRUCT_ERROR);
-	}
-	this.networkOwner = owner;
-	this.id;
-	this.mesh;
-	this.attributes;
-	
-};
 'use strict';
 
 /**
@@ -96841,6 +96419,609 @@ UniformVec4fvDataPair.prototype.bindUniform = function()
 	this.gl.uniform4fv(this.uniformLocation, this.vec4fv);
 };
 
+'use strict';
+
+/**
+ * Network.
+ * IndoorGML의 네트워크를 파싱하고 그리는 데 사용합니다.
+ * @alias Network
+ * @class Network
+ */
+var Network = function(owner) 
+{
+	if (!(this instanceof Network)) 
+	{
+		throw new Error(Messages.CONSTRUCT_ERROR);
+	}
+	
+	this.nodeOwner;
+	if (owner)
+	{ this.nodeOwner = owner; }
+	
+	this.id; // network id.
+	this.nodesArray;
+	this.edgesArray;
+	this.spacesArray;
+	
+	this.attributes;
+	this.edgesVboKeysContainer; // to draw edges with an unique vbo.
+	this.nodesVboKeysContainer; // to draw nodes with an unique vbo.
+	
+	this.renderSpaces = true;
+	this.spacesAlpha = 0.2;
+};
+
+/**
+ * 
+ */
+Network.prototype.newNode = function()
+{
+	if (this.nodesArray === undefined)
+	{ this.nodesArray = []; }
+	
+	var networkNode = new NetworkNode(this);
+	this.nodesArray.push(networkNode);
+	return networkNode;
+};
+
+/**
+ * 
+ */
+Network.prototype.newEdge = function()
+{
+	if (this.edgesArray === undefined)
+	{ this.edgesArray = []; }
+	
+	var networkEdge = new NetworkEdge(this);
+	this.edgesArray.push(networkEdge);
+	return networkEdge;
+};
+
+/**
+ * 
+ */
+Network.prototype.newSpace = function()
+{
+	if (this.spacesArray === undefined)
+	{ this.spacesArray = []; }
+	
+	var networkSpace = new NetworkSpace(this);
+	this.spacesArray.push(networkSpace);
+	return networkSpace;
+};
+
+/**
+ * 
+ */
+Network.prototype.test__makeVbos = function(magoManager)
+{
+	// Here makes meshes and vbos.
+	// For edges, make an unique vbo for faster rendering.
+	var edgesCount = 0;
+	if (this.edgesArray)
+	{ edgesCount = this.edgesArray.length; }
+	
+	var pointsArray = [];
+	
+	for (var i=0; i<edgesCount; i++)
+	{
+		var edge = this.edgesArray[i];
+		var vtxSegment = edge.vtxSegment;
+		var point1 = vtxSegment.startVertex.point3d;
+		var point2 = vtxSegment.endVertex.point3d;
+		pointsArray.push(point1.x);
+		pointsArray.push(point1.y);
+		pointsArray.push(point1.z);
+		
+		pointsArray.push(point2.x);
+		pointsArray.push(point2.y);
+		pointsArray.push(point2.z);
+	}
+	
+	if (this.edgesVboKeysContainer === undefined)
+	{
+		this.edgesVboKeysContainer = new VBOVertexIdxCacheKeysContainer();
+	}
+	
+	var vboKey = this.edgesVboKeysContainer.newVBOVertexIdxCacheKey();
+	
+	var vboMemManager = magoManager.vboMemoryManager;
+	var pointsCount = edgesCount * 2;
+	var posByteSize = pointsCount * 3;
+	var classifiedPosByteSize = vboMemManager.getClassifiedBufferSize(posByteSize);
+	vboKey.posVboDataArray = new Float32Array(classifiedPosByteSize);
+	vboKey.posVboDataArray.set(pointsArray);
+	vboKey.posArrayByteSize = pointsArray.length;
+	vboKey.segmentsCount = edgesCount;
+	
+};
+
+/**
+ * Make triangle from IndoorGML data
+ * @param magoManager
+ * @param gmlDataContainer 
+ * 
+ */
+Network.prototype.parseTopologyData = function(magoManager, gmlDataContainer) 
+{
+	// gmlDataContainer.cellSpaceMembers
+	// gmlDataContainer.edges
+	// gmlDataContainer.nodes
+	// cityGML Lower point (78.02094, -82.801873, 18).
+	// cityGML Upper point (152.17466, 19.03087, 39).
+	// cityGML Center point {x=115.09780549999999 y=-31.885501999999999 z=28.500000000000000 ...}
+	
+	var bbox = new BoundingBox();
+	bbox.minX = gmlDataContainer.min_X;
+	bbox.minY = gmlDataContainer.min_Y;
+	bbox.minZ = gmlDataContainer.min_Z;
+	bbox.maxX = gmlDataContainer.max_X;
+	bbox.maxY = gmlDataContainer.max_Y;
+	bbox.maxZ = gmlDataContainer.max_Z;
+	
+	//bbox.maxX = 56.19070816040039;
+	//bbox.maxY = 71.51078033447266;
+	//bbox.maxZ = 10.5;
+	//bbox.minX = -379.18280029296875;
+	//bbox.minY = -142.4878387451172;
+	//bbox.minZ = -46.5;
+	
+	var offsetVector = new Point3D();
+	var zOffset = 0.1;
+	offsetVector.set(-115.0978055, 31.885502, -28.5); // cityGML ORIGINAL Center point inversed.
+	
+	var nodesMap = {};
+	var nodesCount = gmlDataContainer.nodes.length;
+	for (var i=0; i<nodesCount; i++)
+	{
+		var node = gmlDataContainer.nodes[i];
+		var networkNode = this.newNode();
+		networkNode.id = "#" + node.id;
+		
+		networkNode.position = new Point3D(node.coordinates[0], node.coordinates[1], node.coordinates[2]);
+		networkNode.position.addPoint(offsetVector); // rest bbox centerPoint.
+		networkNode.position.add(0.0, 0.0, zOffset); // aditional pos.
+		networkNode.box = new Box(0.6, 0.6, 0.6);
+		
+		nodesMap[networkNode.id] = networkNode;
+	}
+	
+	
+	var cellSpaceMap = {};
+	var cellSpacesCount = gmlDataContainer.cellSpaceMembers.length;
+	for (var i=0; i<cellSpacesCount; i++)
+	{
+		var cellSpace = gmlDataContainer.cellSpaceMembers[i];
+		var id = cellSpace.href;
+		var networkSpace = this.newSpace();
+		var mesh = new Mesh();
+		networkSpace.mesh = mesh; // assign mesh to networkSpace provisionally.
+		var vertexList = mesh.getVertexList();
+		
+		var surfacesMembersCount = cellSpace.surfaceMember.length;
+		for (var j=0; j<surfacesMembersCount; j++)
+		{
+			var surface = mesh.newSurface();
+			var face = surface.newFace();
+			
+			var coordinates = cellSpace.surfaceMember[j].coordinates;
+			var coordinatedCount = coordinates.length;
+			var pointsCount = coordinatedCount/3;
+			
+			for (var k=0; k<pointsCount; k++)
+			{
+				var x = coordinates[k * 3];
+				var y = coordinates[k * 3 + 1];
+				var z = coordinates[k * 3 + 2];
+				
+				var vertex = vertexList.newVertex();
+				vertex.setPosition(x, y, z);
+				vertex.point3d.addPoint(offsetVector); // rest bbox centerPoint.
+				face.addVertex(vertex);
+				
+			}
+			face.solveUroborus(); // Check & solve if the last point is coincident with the 1rst point.
+			face.calculateVerticesNormals();
+		}
+		
+		cellSpaceMap[cellSpace.href] = cellSpace;
+	}
+	
+	var edgesCount = gmlDataContainer.edges.length;
+	for (var i=0; i<edgesCount; i++)
+	{
+		var edge = gmlDataContainer.edges[i];
+		var networkEdge = this.newEdge();
+		
+		var point1 = edge.stateMembers[0].coordinates;
+		var point2 = edge.stateMembers[1].coordinates;
+		var vertex1 = new Vertex();
+		var vertex2 = new Vertex();
+		vertex1.setPosition(point1[0], point1[1], point1[2]);
+		vertex2.setPosition(point2[0], point2[1], point2[2]);
+		vertex1.point3d.addPoint(offsetVector); // rest bbox centerPoint.
+		vertex1.point3d.add(0.0, 0.0, zOffset); // aditional pos.
+		vertex2.point3d.addPoint(offsetVector); // rest bbox centerPoint.
+		vertex2.point3d.add(0.0, 0.0, zOffset); // aditional pos.
+		var vtxSegment = new VtxSegment(vertex1, vertex2);
+		networkEdge.vtxSegment = vtxSegment; // assign vtxSegment to networkEdge provisionally.
+		
+		var connect_1_id = edge.connects[0];
+		var connect_2_id = edge.connects[1];
+		
+		networkEdge.strNodeId = connect_1_id;
+		networkEdge.endNodeId = connect_2_id;
+	}
+	
+	this.test__makeVbos(magoManager);
+};
+
+/**
+ * 
+ */
+Network.prototype.renderColorCoding = function(magoManager, shader, renderType)
+{
+	// Provisional function.
+	// render nodes & edges.
+	var selectionColor = magoManager.selectionColor;
+	//selectionColor.init(); 
+	
+	// Check if exist selectionFamilies.
+	var selFamilyNameNodes = "networkNodes";
+	var selManager = magoManager.selectionManager;
+	var selCandidateNodes = selManager.getSelectionCandidatesFamily(selFamilyNameNodes);
+	if (selCandidateNodes === undefined)
+	{
+		selCandidateNodes = selManager.newCandidatesFamily(selFamilyNameNodes);
+	}
+	
+	var selFamilyNameEdges = "networkEdges";
+	var selManager = magoManager.selectionManager;
+	var selCandidateEdges = selManager.getSelectionCandidatesFamily(selFamilyNameEdges);
+	if (selCandidateEdges === undefined)
+	{
+		selCandidateEdges = selManager.newCandidatesFamily(selFamilyNameEdges);
+	}
+	
+	var vboMemManager = magoManager.vboMemoryManager;
+	var gl = magoManager.sceneState.gl;
+	var vboKey;
+	
+	shader.disableVertexAttribArray(shader.texCoord2_loc); 
+	shader.enableVertexAttribArray(shader.normal3_loc); 
+	gl.uniform1i(shader.hasTexture_loc, false); //.
+	gl.uniform4fv(shader.oneColor4_loc, [0.8, 0.8, 0.8, 1.0]);
+	
+	if (!shader.last_isAditionalMovedZero)
+	{
+		gl.uniform1i(shader.hasAditionalMov_loc, false);
+		gl.uniform3fv(shader.aditionalMov_loc, [0.0, 0.0, 0.0]); //.
+		shader.last_isAditionalMovedZero = true;
+	}
+	
+	// Nodes.**
+	var nodesCount = 0;
+	if (this.nodesArray)
+	{ nodesCount = this.nodesArray.length; }
+	
+	if (nodesCount > 0 )//&& !magoManager.isCameraMoving)
+	{
+		var refMatrixType = 1; // translation-type.
+		gl.uniform1i(shader.refMatrixType_loc, refMatrixType);
+		//gl.uniform4fv(shader.oneColor4_loc, [0.3, 0.3, 0.9, 1.0]);
+		var nodeMaster = this.nodesArray[0]; // render all with an unique box.
+		for (var i=0; i<nodesCount; i++)
+		{
+			var node = this.nodesArray[i];
+			
+			// nodes has a position, so render a point or a box.
+			gl.uniform3fv(shader.refTranslationVec_loc, [node.position.x, node.position.y, node.position.z]); 
+			
+			var selColor4 = selectionColor.getAvailableColor(undefined); // new.
+			var idxKey = selectionColor.decodeColor3(selColor4.r, selColor4.g, selColor4.b);
+			selManager.setCandidateCustom(idxKey, selFamilyNameNodes, node);
+			gl.uniform4fv(shader.oneColor4_loc, [selColor4.r/255.0, selColor4.g/255.0, selColor4.b/255.0, 1.0]);
+
+			nodeMaster.box.render(magoManager, shader, renderType);
+			
+		}
+	}
+	
+	// Edges.**
+	// Render with a unique vbo.
+	if (this.edgesVboKeysContainer)
+	{
+		var vboKey = this.edgesVboKeysContainer.vboCacheKeysArray[0];
+		if (vboKey.isReadyPositions(gl, vboMemManager))
+		{ 
+			shader.disableVertexAttribArray(shader.texCoord2_loc); 
+			shader.disableVertexAttribArray(shader.normal3_loc); 
+			refMatrixType = 0;
+			gl.uniform1i(shader.refMatrixType_loc, refMatrixType);
+			
+			// Positions.
+			if (vboKey.meshVertexCacheKey !== shader.lastVboKeyBindedMap[shader.position3_loc])
+			{
+				gl.bindBuffer(gl.ARRAY_BUFFER, vboKey.meshVertexCacheKey);
+				gl.vertexAttribPointer(shader.position3_loc, 3, gl.FLOAT, false, 0, 0);
+				shader.lastVboKeyBindedMap[shader.position3_loc] = vboKey.meshVertexCacheKey;
+			}
+				
+			var edgesCount = this.edgesArray.length;
+			for (var i=0; i<edgesCount; i++)
+			{
+				var edge = this.edgesArray[i];
+				var selColor4 = selectionColor.getAvailableColor(undefined); // new.
+				var idxKey = selectionColor.decodeColor3(selColor4.r, selColor4.g, selColor4.b);
+				selManager.setCandidateCustom(idxKey, selFamilyNameEdges, edge);
+				gl.uniform4fv(shader.oneColor4_loc, [selColor4.r/255.0, selColor4.g/255.0, selColor4.b/255.0, 1.0]);
+				gl.drawArrays(gl.LINES, i*2, 2);
+			}
+		}
+	}
+	
+};
+
+/**
+ * 
+ */
+Network.prototype.render = function(magoManager, shader, renderType)
+{
+	if (renderType === 2)
+	{
+		this.renderColorCoding(magoManager, shader, renderType);
+		return;
+	}
+	
+	// Check if ready smallBox and bigBox.
+	var selectionColor = magoManager.selectionColor;
+	selectionColor.init(); 
+	
+	// Check if exist selectionFamilies.
+	var selFamilyNameNodes = "networkNodes";
+	var selManager = magoManager.selectionManager;
+	var selCandidateNodes = selManager.getSelectionCandidatesFamily(selFamilyNameNodes);
+	if (selCandidateNodes === undefined)
+	{
+		selCandidateNodes = selManager.newCandidatesFamily(selFamilyNameNodes);
+	}
+	
+	var selFamilyNameEdges = "networkEdges";
+	var selManager = magoManager.selectionManager;
+	var selCandidateEdges = selManager.getSelectionCandidatesFamily(selFamilyNameEdges);
+	if (selCandidateEdges === undefined)
+	{
+		selCandidateEdges = selManager.newCandidatesFamily(selFamilyNameEdges);
+	}
+	
+	// Provisional function.
+	// render nodes & edges.
+	var vboMemManager = magoManager.vboMemoryManager;
+	var gl = magoManager.sceneState.gl;
+	var vboKey;
+	
+	shader.disableVertexAttribArray(shader.texCoord2_loc); 
+	shader.enableVertexAttribArray(shader.normal3_loc); 
+	
+	gl.uniform1i(shader.colorType_loc, 0); // 0= oneColor, 1= attribColor, 2= texture.
+	gl.uniform4fv(shader.oneColor4_loc, [0.8, 0.8, 0.8, 1.0]);
+	
+	if (!shader.last_isAditionalMovedZero)
+	{
+		gl.uniform1i(shader.hasAditionalMov_loc, false);
+		gl.uniform3fv(shader.aditionalMov_loc, [0.0, 0.0, 0.0]); //.
+		shader.last_isAditionalMovedZero = true;
+	}
+	
+	// Nodes.**
+	var nodesCount = 0;
+	if (this.nodesArray)
+	{ nodesCount = this.nodesArray.length; }
+	
+	if (nodesCount > 0 )//&& !magoManager.isCameraMoving)
+	{
+		gl.uniform1i(shader.colorType_loc, 0); // 0= oneColor, 1= attribColor, 2= texture.
+		var refMatrixType = 1; // translation-type.
+		gl.uniform1i(shader.refMatrixType_loc, refMatrixType);
+		gl.uniform4fv(shader.oneColor4_loc, [0.3, 0.3, 0.9, 1.0]);
+		var nodeMaster = this.nodesArray[0]; // render all with an unique box.
+		for (var i=0; i<nodesCount; i++)
+		{
+			var node = this.nodesArray[i];
+			
+			// check if is selected.
+			if (node === selCandidateNodes.currentSelected)
+			{
+				gl.uniform4fv(shader.oneColor4_loc, [0.9, 0.5, 0.1, 1.0]);
+			}
+			
+			// nodes has a position, so render a point or a box.
+			gl.uniform3fv(shader.refTranslationVec_loc, [node.position.x, node.position.y, node.position.z]); 
+			nodeMaster.box.render(magoManager, shader, renderType);
+			
+			// restore defaultColor.
+			if (node === selCandidateNodes.currentSelected)
+			{
+				gl.uniform4fv(shader.oneColor4_loc, [0.3, 0.3, 0.9, 1.0]);
+			}
+		}
+	}
+	
+	// Edges.**
+	// Render with a unique vbo.
+	if (this.edgesVboKeysContainer)
+	{
+		var vboKey = this.edgesVboKeysContainer.vboCacheKeysArray[0];
+		if (vboKey.isReadyPositions(gl, vboMemManager))
+		{ 
+			shader.disableVertexAttribArray(shader.texCoord2_loc); 
+			shader.disableVertexAttribArray(shader.normal3_loc); 
+			gl.uniform1i(shader.colorType_loc, 0); // 0= oneColor, 1= attribColor, 2= texture.
+			refMatrixType = 0;
+			gl.uniform1i(shader.refMatrixType_loc, refMatrixType);
+			gl.uniform4fv(shader.oneColor4_loc, [0.1, 0.1, 0.6, 1.0]);
+	
+			// Positions.
+			if (vboKey.meshVertexCacheKey !== shader.lastVboKeyBindedMap[shader.position3_loc])
+			{
+				gl.bindBuffer(gl.ARRAY_BUFFER, vboKey.meshVertexCacheKey);
+				gl.vertexAttribPointer(shader.position3_loc, 3, gl.FLOAT, false, 0, 0);
+				shader.lastVboKeyBindedMap[shader.position3_loc] = vboKey.meshVertexCacheKey;
+			}
+			
+			//gl.drawArrays(gl.LINES, 0, vboKey.segmentsCount*2);
+			
+			var edgesCount = this.edgesArray.length;
+			for (var i=0; i<edgesCount; i++)
+			{
+				var edge = this.edgesArray[i];
+				if (edge === selCandidateEdges.currentSelected)
+				{
+					gl.uniform4fv(shader.oneColor4_loc, [0.0, 1.0, 0.0, 1.0]);
+				}
+				gl.drawArrays(gl.LINES, i*2, 2);
+				
+				// restore default color.
+				if (edge === selCandidateEdges.currentSelected)
+				{
+					gl.uniform4fv(shader.oneColor4_loc, [0.1, 0.1, 0.6, 1.0]);
+				}
+			}
+		}
+	}
+	
+	// Spaces.
+	this.renderSpaces = magoManager.tempSettings.renderSpaces;
+	this.spacesAlpha = magoManager.tempSettings.spacesAlpha;
+	
+	if (renderType === 1)
+	{ shader.enableVertexAttribArray(shader.normal3_loc); } 
+	
+	if (this.renderSpaces)
+	{
+		gl.uniform1i(shader.colorType_loc, 0); // 0= oneColor, 1= attribColor, 2= texture.
+		refMatrixType = 0;
+		gl.uniform1i(shader.refMatrixType_loc, refMatrixType);
+		gl.uniform4fv(shader.oneColor4_loc, [0.8, 0.8, 0.8, this.spacesAlpha]);
+		gl.enable(gl.BLEND);
+		var spacesCount = 0;
+		if (this.spacesArray)
+		{ spacesCount = this.spacesArray.length; }
+		
+		for (var i=0; i<spacesCount; i++)
+		{
+			var space = this.spacesArray[i];
+			space.mesh.render(magoManager, shader);
+		}
+		
+		gl.disable(gl.BLEND);
+	}
+};
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+'use strict';
+
+/**
+ * NetworkEdge.
+ * 
+ * @alias NetworkEdge
+ * @class NetworkEdge
+ */
+var NetworkEdge = function(owner) 
+{
+	if (!(this instanceof NetworkEdge)) 
+	{
+		throw new Error(Messages.CONSTRUCT_ERROR);
+	}
+	this.networkOwner = owner;
+	this.id;
+	this.strNode;
+	this.endNode;
+	this.sense;
+	this.attributes;
+	
+	// provisionally:
+	this.strNodeId;
+	this.endNodeId;
+};
+'use strict';
+
+/**
+ * NetworkNode.
+ * 
+ * @alias NetworkNode
+ * @class NetworkNode
+ */
+var NetworkNode = function(owner) 
+{
+	if (!(this instanceof NetworkNode)) 
+	{
+		throw new Error(Messages.CONSTRUCT_ERROR);
+	}
+	this.networkOwner = owner;
+	this.id;
+	this.edgesArray;
+	this.attributes;
+	this.box;
+	//this.mesh; // if display as a box, cilinder, etc.
+};
+'use strict';
+
+/**
+ * NetworkSpace.
+ * 
+ * @alias NetworkSpace
+ * @class NetworkSpace
+ */
+var NetworkSpace = function(owner) 
+{
+	if (!(this instanceof NetworkSpace)) 
+	{
+		throw new Error(Messages.CONSTRUCT_ERROR);
+	}
+	this.networkOwner = owner;
+	this.id;
+	this.mesh;
+	this.attributes;
+	
+};
 'use strict';
 
 function abstract() 
