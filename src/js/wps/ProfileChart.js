@@ -5,7 +5,8 @@ var ProfileChart = (function() {
         var point = _getTargetPoint(e.dataIndex);
         point.setStyle({
             size        : 22,
-            strokeColor : '#00FFFF',
+            strokeSize : 1,
+            strokeColor : '#FFFFFF',
             color       : '#00FFFF',
             opacity     : 0.7
         }, magoManager);
@@ -14,7 +15,8 @@ var ProfileChart = (function() {
         var point = _getTargetPoint(e.dataIndex);
         point.setStyle({
             size        : 12,
-            strokeColor : '#FF0000',
+            strokeSize : 1,
+            strokeColor : '#FFFFFF',
             color       : '#FF0000',
             opacity     : 0.7
         }, magoManager);

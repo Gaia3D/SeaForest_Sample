@@ -23,10 +23,10 @@ var wmsLayer;
  */
 var policy = {
     "basicGlobe": "magoworld", //globe type, fix magoworld
-    "initCameraEnable":true, // 초기 카메라 위치 이동 사용 유무
+    "initCameraEnable":false, // 초기 카메라 위치 이동 사용 유무
     "initLatitude":35.127464,
     "initLongitude":128.915708,
-    "initDuration":1,
+    "initDuration":0,
     "initAltitude":60000,
     "terrainType":"elevation", //terrain type, default plane. 
     "terrainValue":"http://localhost:9090/f4d/terrain/" //terrain file path. When use elevation type, require this param. 
@@ -58,11 +58,28 @@ function magoStart(renderDivId) {
      */
     mago3d = new Mago3D.Mago3d(renderDivId, policy, {loadend : loadEndFunc});
 
+    function calcResolutionForDistance(distance, latitude) {
+        // See the reverse calculation (calcDistanceForResolution) for details
+        const canvas = this.scene_.canvas;
+        const fovy = this.cam_.frustum.fovy;
+        const metersPerUnit = this.view_.getProjection().getMetersPerUnit();
+    
+        const visibleMeters = 2 * distance * Math.tan(fovy / 2);
+        const relativeCircumference = Math.cos(Math.abs(latitude));
+        const visibleMapUnits = visibleMeters / metersPerUnit / relativeCircumference;
+        const resolution = visibleMapUnits / canvas.clientHeight;
+    
+        return resolution;
+    }
+}
+
+function loadEndFunc(e) {
     olmap = new ol.Map({
         view: new ol.View({
-            center: [policy.initLongitude, policy.initLatitude],
-            zoom: 10,
-            projection : 'EPSG:4326'
+            center: [14404752.54246594, 4321487.91290758],//ol.proj.transform([127, 36.5], 'EPSG:4326' ,'EPSG:3857'),
+            zoom: 8,
+            maxResolution: 2445.9849047851562,
+            minResolution: 2.388657133579254 / 2
           }),
           layers: [
             new ol.layer.Tile({
@@ -71,9 +88,14 @@ function magoStart(renderDivId) {
           ],
           target: 'olmap'
     });
-}
 
-function loadEndFunc(e) {
+    olmap.getView().on('change:resolution',function(e){
+        syncByOlHeight();
+    });
+    olmap.getView().on('change:center',function(e){
+        syncByOlCenter();
+    });
+
     magoManager = e.getMagoManager();
     viewer = e.getViewer();
 
@@ -104,8 +126,11 @@ function loadEndFunc(e) {
             return url.replace('{z}',convertZ(coordinate.z))
             .replace('{y}',coordinate.y)
             .replace('{x}',coordinate.x);*/
+            //https://tile.openstreetmap.org/8/216/98.png
 
-            var url = 'https://services.arcgisonline.com/arcgis/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}';
+            //var url = 'https://services.arcgisonline.com/arcgis/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}';
+
+            var url = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
             return url.replace('{z}',coordinate.z)
             .replace('{y}',coordinate.y)
             .replace('{x}',coordinate.x);
@@ -120,57 +145,78 @@ function loadEndFunc(e) {
     }
     
     magoManager.addLayer(baseLayer);
-
-    //wmslayer 생성 후 등록
-    wmsLayer = new Mago3D.WMSLayer({
-        //url: 'http://test.muhanit.kr:41515/geoserver/gwc/service/wms',
-        url: 'http://localhost:8080/geoserver/mago3d/gwc/service/wms', 
-        show: true, 
-        filter:Mago3D.CODE.imageFilter.BATHYMETRY,  
-        //param: {layers: 'SeaForest:5m_image', tiled: true}
-        param: {layers: 'mago3d:15m_susim', tiled: true}
-    });
-    magoManager.addLayer(wmsLayer);
-
-    addJqueryEvent()
+    syncByOlHeight(true);
+    addJqueryEvent();
 }
 
 function addJqueryEvent(){
-    //단면분석,향분석,경사분석 클릭
-    $('ul.nav span.analysis').click(function() {
-        var id = $(this).attr('id');
-        var drawer = (id === 'profile') ? pointDrawer : rectangleDrawer;
-
-        if(!$(this).hasClass('on')) {
-            $('span.analysis.on').removeClass('on');
-            $(this).addClass('on');
-            drawer.setActive(true);
-        } else {
-            $(this).removeClass('on');
-            drawer.setActive(false);
-        }
-    });
-
-    //단면 제거
-    $('#deleteLine').click(function(){
-        var modeler = magoManager.modeler;
-        for(var i in drawedLines) {
-            modeler.removeObject(drawedLines[i]);
-        }
-    });
-
     //초기화면으로 이동
     $('#homeMenu').click(function(){
         viewer.goto(policy.initLongitude, policy.initLatitude, policy.initAltitude, 2);
     });
+}
 
-    $('#toggleWms').click(function(){
-        if(!$(this).hasClass('on')) {
-            $(this).addClass('on');
-            wmsLayer.show = false;
-        } else {
-            $(this).removeClass('on');
-            wmsLayer.show = true;
-        }
-    });
+function syncByOlCenter(){
+    var center = ol.proj.toLonLat(olmap.getView().getCenter());
+
+    var lon = center[0];
+    var lat = center[1];
+
+    var curHeight = Mago3D.ManagerUtils.pointToGeographicCoord(magoManager.sceneState.camera.position).altitude;
+    viewer.goto(lon,lat,curHeight, 0);
+}
+
+function syncByOlHeight() {
+    var center = ol.proj.toLonLat(olmap.getView().getCenter());
+    var resolution = olmap.getView().getResolution();
+
+    var lon = center[0];
+    var lat = center[1];
+
+    var offsetDistance = calcDistanceForResolution(resolution, lat);
+    console.info(offsetDistance);
+    viewer.goto(lon,lat,Math.abs(offsetDistance), 0);
+
+    /*if(!first) {
+        viewer.goto(lon,lat,curHeight, 0);
+        viewer.moveBackward(offsetDistance);
+    } else {
+        viewer.goto(lon,lat,-offsetDistance, 0);
+    }*/
+    
+
+    function calcDistanceForResolution(resolution, latitude) {
+        var sceneState = magoManager.sceneState;
+        var canvas = sceneState.canvas;
+        var fovy = sceneState.camera.frustum.fovyRad;
+
+        console.assert(!isNaN(fovy));
+        var metersPerUnit = olmap.getView().getProjection().getMetersPerUnit();
+    
+        // number of "map units" visible in 2D (vertically)
+        var visibleMapUnits = resolution * canvas.clientHeight;
+    
+        // The metersPerUnit does not take latitude into account, but it should
+        // be lower with increasing latitude -- we have to compensate.
+        // In 3D it is not possible to maintain the resolution at more than one point,
+        // so it only makes sense to use the latitude of the "target" point.
+        var relativeCircumference = Math.cos(Math.abs(latitude));
+    
+        // how many meters should be visible in 3D
+        var visibleMeters = visibleMapUnits * metersPerUnit * relativeCircumference;
+    
+        // distance required to view the calculated length in meters
+        //
+        //  fovy/2
+        //    |\
+        //  x | \
+        //    |--\
+        // visibleMeters/2
+        var requiredDistance = (visibleMeters / 2) / Math.tan(fovy / 2);
+    
+        // NOTE: This calculation is not absolutely precise, because metersPerUnit
+        // is a great simplification. It does not take ellipsoid/terrain into account.
+    
+        return requiredDistance;
+    }
 }
