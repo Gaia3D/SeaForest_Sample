@@ -58,20 +58,6 @@ function magoStart(renderDivId) {
      * @param {object} option 생성자 생성 시 옵션, 
      */
     mago3d = new Mago3D.Mago3d(renderDivId, policy, {loadend : loadEndFunc});
-
-    function calcResolutionForDistance(distance, latitude) {
-        // See the reverse calculation (calcDistanceForResolution) for details
-        const canvas = this.scene_.canvas;
-        const fovy = this.cam_.frustum.fovy;
-        const metersPerUnit = this.view_.getProjection().getMetersPerUnit();
-    
-        const visibleMeters = 2 * distance * Math.tan(fovy / 2);
-        const relativeCircumference = Math.cos(Math.abs(latitude));
-        const visibleMapUnits = visibleMeters / metersPerUnit / relativeCircumference;
-        const resolution = visibleMapUnits / canvas.clientHeight;
-    
-        return resolution;
-    }
 }
 
 function loadEndFunc(e) {
@@ -139,12 +125,8 @@ function loadEndFunc(e) {
     }
     
     magoManager.addLayer(baseLayer);
-
-
     olMagoWorld = new OlMagoWorld({olmap : olmap, magoManager: magoManager});
     
-
-
     addJqueryEvent();
 }
 
@@ -152,5 +134,28 @@ function addJqueryEvent(){
     //초기화면으로 이동
     $('#homeMenu').click(function(){
         viewer.goto(policy.initLongitude, policy.initLatitude, policy.initAltitude, 2);
+    });
+
+    //분할보기 클릭
+    $('#3d').click(function() {
+        if(!$(this).hasClass('on')) {
+            $(this).addClass('on');
+
+            $('#olmap').css({width : '50%', right:'0px'});
+            olmap.updateSize();
+            $('#magoContainer').show();
+            magoManager.updateSize();
+
+            olMagoWorld.setEnabled(true);
+        } else {
+            $(this).removeClass('on');
+
+            $('#olmap').css({width : '100%'});
+            olmap.updateSize();
+            $('#magoContainer').hide();
+            magoManager.updateSize();
+
+            olMagoWorld.setEnabled(false);
+        }
     });
 }

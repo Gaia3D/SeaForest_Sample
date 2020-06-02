@@ -25,18 +25,19 @@ var OlMagoWorld = function(option){
 
     var olView = that.olmap.getView();
 
-    olView.on('change:resolution',function(e){
-        if(that.enabled) that.syncByOl();
+    olView.on('change:resolution',function(){
+        that.syncByOl();
     });
-    olView.on('change:center',function(e){
-        if(that.enabled) that.syncByOl();
+    olView.on('change:center',function(){
+        that.syncByOl();
     });
 
-    that.magoManager.on(Mago3D.MagoManager.EVENT_TYPE.CAMERACHANGED, function(e){
-        if(that.enabled) console.info(e);
+    olView.on('change:rotation',function(){
+        that.syncByOl();
     });
-    that.magoManager.on(Mago3D.MagoManager.EVENT_TYPE.CAMERAMOVEEND, function(e){
-        if(that.enabled) console.info(e);
+
+    that.magoManager.on(Mago3D.MagoManager.EVENT_TYPE.CAMERAMOVEEND, function(){
+        that.syncByMago();
     });
 }
 
@@ -59,21 +60,42 @@ OlMagoWorld.prototype.setEnabled = function(enable) {
 
 
 OlMagoWorld.prototype.syncByOl = function() {
+    if(!this.enabled) return;
+
     var magoManager = this.magoManager;
     var viewer = magoManager.magoWorld;
     var olView = this.olmap.getView();
     var center = ol.proj.toLonLat(olView.getCenter());
     var resolution = olView.getResolution();
+    var rotation = olView.getRotation();
 
+    rotation = rotation * 180 / Math.PI;
+
+    var camera = magoManager.sceneState.camera;
+    var orientation = camera.getOrientation();
+
+    var pitch = orientation.pitchRad;
+    var roll = orientation.rollRad;
+
+    pitch = (isNaN(pitch) || !pitch) ? 0 : (pitch * 180 / Math.PI);
+    roll = (isNaN(roll) || !roll) ? 0 : (roll * 180 / Math.PI);
+    
     var lon = center[0];
     var lat = center[1];
 
     var offsetDistance = calcDistanceForResolution(resolution, lat * Math.PI / 180);
     //viewer.goto(lon,lat,Math.abs(offsetDistance), 0);
 
-    viewer.goto(lon,lat,0, 0);
-    viewer.moveBackward(offsetDistance);
+    viewer.goto(lon,lat,0, 0, true);
+    
+    if(!isNaN(offsetDistance))
+    {
+        viewer.moveBackward(offsetDistance, true);
+    } else {
+        viewer.moveBackward(60000, true);
+    }
 
+    viewer.changeCameraOrientation(rotation, pitch, 0, true);
     function calcDistanceForResolution(resolution, latitude) {
         var sceneState = magoManager.sceneState;
         var canvas = sceneState.canvas;
@@ -106,5 +128,43 @@ OlMagoWorld.prototype.syncByOl = function() {
         // is a great simplification. It does not take ellipsoid/terrain into account.
     
         return requiredDistance;
+    }
+}
+
+OlMagoWorld.prototype.syncByMago = function() {
+    if(!this.enabled) return;
+
+    var magoManager = this.magoManager;
+    var camera = magoManager.sceneState.camera;
+    var olView = this.olmap.getView();
+
+    var bestTarget = camera.getTargetOnTerrain(magoManager);
+    var camPos = camera.position;
+    var dist = bestTarget.distToPoint(camPos);
+    
+    var bestTargetCarto = Mago3D.ManagerUtils.pointToGeographicCoord(bestTarget);
+    var resolution = calcResolutionForDistance(dist, bestTargetCarto.latitude * Math.PI / 180)
+    var orientation = camera.getOrientation();
+
+    var properties = {};
+    properties['center'] = ol.proj.transform([bestTargetCarto.longitude,bestTargetCarto.latitude],'EPSG:4326','EPSG:3857');
+    properties['resolution'] = resolution;
+    properties['rotation'] = orientation.headingRad;
+    olView.setProperties(properties, true);
+    olView.changed();
+
+    function calcResolutionForDistance(distance, latitude) {
+        // See the reverse calculation (calcDistanceForResolution) for details
+        var sceneState = magoManager.sceneState;
+        var canvas = sceneState.canvas;
+        var fovy = sceneState.camera.frustum.fovyRad;
+        var metersPerUnit = olView.getProjection().getMetersPerUnit();
+    
+        var visibleMeters = 2 * distance * Math.tan(fovy / 2);
+        var relativeCircumference = Math.cos(Math.abs(latitude));
+        var visibleMapUnits = visibleMeters / metersPerUnit / relativeCircumference;
+        var resolution = visibleMapUnits / canvas.clientHeight;
+    
+        return resolution;
     }
 }

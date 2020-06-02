@@ -24,17 +24,14 @@
 		<img src="../images/home-icon.png" style="width: 35px; height: 35px; padding-right: 2px;" title="Home" />
 	</li>
 	<li>
-		<span id="3d" class="analysis">3D</span>
-	</li>
-	<li>
-		<span id="2d" class="analysis">2D</span>
+		<span id="3d" class="analysis">분할보기</span>
 	</li>
 </ul>
 
-<div id="magoContainer" style="width:50%;float:left;height: 100%;">
+<div id="magoContainer" style="width:50%;float:left;height: 100%;display:none;">
 	<canvas id="objectLabel"></canvas>
 </div>
-<div id="olmap" style="width:50%;right:0px;position: absolute;height: 100%;">
+<div id="olmap" style="width:100%;position: absolute;height: 100%;">
 </div>
 <script>
 	magoStart('magoContainer');
