@@ -19,11 +19,6 @@ var viewer;
 var rectangleDrawer;
 
 /**
- * @type {Mago3D.PointDrawer} point 그리기 툴, 단면분석 수행 시 두 점을 선택할때 사용
- */
-var pointDrawer;
-
-/**
  * @type {Mago3D.LineDrawer} line 그리기 툴, 마지막점은 우클릭으로.
  */
 var lineDrawer;
@@ -46,7 +41,7 @@ var policy = {
     "initCameraEnable":true, // 초기 카메라 위치 이동 사용 유무
     "initLatitude":35.127464,
     "initLongitude":128.915708,
-    "initDuration":3,
+    "initDuration":0,
     "initAltitude":60000,
     "terrainType":"elevation", //terrain type, default plane. 
     "terrainValue":"http://localhost:9090/f4d/terrain/" //terrain file path. When use elevation type, require this param. 
@@ -99,7 +94,7 @@ function loadEndFunc(e) {
 
     /**
      * @type {Mago3D.XYZLayer} xyz layer
-     * @param {object} xyzOption
+     * @param {xyzOption} xyzOption
      */
     var baseLayer = new Mago3D.XYZLayer({
         
@@ -115,6 +110,7 @@ function loadEndFunc(e) {
             .replace('{x}',coordinate.x);
         }
     });
+    
     function convertZ(z) {
 
         return 'L' + zeroPadder(z);
@@ -124,7 +120,6 @@ function loadEndFunc(e) {
     }
     
     magoManager.addLayer(baseLayer);
-
     //wmslayer 생성 후 등록
     wmsLayer = new Mago3D.WMSLayer({
         //url: 'http://test.muhanit.kr:41515/geoserver/gwc/service/wms',
@@ -191,70 +186,6 @@ function loadEndFunc(e) {
             stopLoading();
         });
     });
-
-    //라인으로 대체
-    pointDrawer = Mago3D.DrawGeometryInteraction.createDrawGeometryInteraction('point');
-    pointDrawer.on(Mago3D.PointDrawer.EVENT_TYPE.DRAWEND, function(e) {
-        if(pointDrawer.result.length === 2) {
-            var pointList = pointDrawer.result;
-            var positons = [];
-            for(var i = 0,len=pointList.length;i<len;i++) {
-                positons.push(pointList[i].geoCoord);
-            }
-
-            var wkt = Mago3D.ManagerUtils.geographicToWkt(positons, 'LINE');
-            startLoading();
-            requestJsonResource(getXmlRasterProfile(20, wkt)).then(function(response){
-                var features = response.features;
-                var array = [];
-
-                //x축은 첫번째 점으로부터의 거리
-                var xAxisValues = [];
-                //y축은 높이
-                var yAxisValues = [];
-                for(var i=0,len=features.length; i<len; i++) {
-                    var feature = features[i];
-                    var prop = feature.properties;
-                    var coordinates = feature.geometry.coordinates;
-                    array.push({
-                        longitude : coordinates[0],
-                        latitude  : coordinates[1],
-                        altitude  : coordinates[2]
-                    });
-                    xAxisValues.push(prop.distance);
-                    yAxisValues.push(prop.value);
-                }
-
-                var position = {
-                    coordinates : array
-                }
-                var style = {
-                    color     : '#ff0000',
-                    thickness : 2.0,
-                    point     : {
-                        size        : 12,
-                        strokeColor : '#FF0000',
-                        color       : '#FF0000',
-                        opacity     : 0.7
-                    }
-                };
-
-                var option = ProfileChart.getBasicAreaOption(xAxisValues,yAxisValues);
-                if (option && typeof option === "object") {
-                    ProfileChart.active(option);
-                }
-    
-                var magoPolyline = new Mago3D.MagoPolyline(position, style);
-                magoManager.modeler.addObject(magoPolyline, 1);    
-                drawedLines.push(magoPolyline);
-                pointDrawer.setActive(false);
-                $('#profile').removeClass('on');
-                stopLoading();
-            });
-        }
-    });
-
-    magoManager.interactions.add(pointDrawer);
 
     rectangleDrawer = Mago3D.DrawGeometryInteraction.createDrawGeometryInteraction('rectangle');
     rectangleDrawer.setStyle({

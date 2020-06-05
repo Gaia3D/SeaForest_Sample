@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+
+<html lang="en">
+<head>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width">
+	<title>Mago3dJS for SeaForest Source: src/mago3d/geometry/MagoPoint.js</title>
+
+	<!--[if lt IE 9]>
+	<script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+	<![endif]-->
+	<link type="text/css" rel="stylesheet" href="styles/sunlight.default.css">
+
+	<link type="text/css" rel="stylesheet" href="styles/site.readable.css">
+
+</head>
+
+<body>
+
+<div class="navbar navbar-default navbar-fixed-top ">
+<div class="container">
+	<div class="navbar-header">
+		<a class="navbar-brand" href="index.html">Mago3dJS for SeaForest</a>
+		<button class="navbar-toggle" type="button" data-toggle="collapse" data-target="#topNavigation">
+			<span class="icon-bar"></span>
+			<span class="icon-bar"></span>
+			<span class="icon-bar"></span>
+        </button>
+	</div>
+	<div class="navbar-collapse collapse" id="topNavigation">
+		<ul class="nav navbar-nav">
+			
+			<li class="dropdown">
+				<a href="classes.list.html" class="dropdown-toggle" data-toggle="dropdown">Classes<b class="caret"></b></a>
+				<ul class="dropdown-menu ">
+					<li><a href="DrawGeometryInteraction.html">DrawGeometryInteraction</a></li><li><a href="InteractionCollection.html">InteractionCollection</a></li><li><a href="LineDrawer.html">LineDrawer</a></li><li><a href="Mago3d.html">Mago3d</a></li><li><a href="MagoGeometry.html">MagoGeometry</a></li><li><a href="MagoManager.html">MagoManager</a></li><li><a href="MagoPoint.html">MagoPoint</a></li><li><a href="MagoPolyline.html">MagoPolyline</a></li><li><a href="MagoRectangle.html">MagoRectangle</a></li><li><a href="MagoWorld.html">MagoWorld</a></li><li><a href="Modeler.html">Modeler</a></li><li><a href="OlMagoWorld.html">OlMagoWorld</a></li><li><a href="PointDrawer.html">PointDrawer</a></li><li><a href="RectangleDrawer.html">RectangleDrawer</a></li>
+				</ul>
+			</li>
+			
+		</ul>
+        
+            <div class="col-sm-3 col-md-3">
+                <form class="navbar-form" role="search">
+                    <div class="input-group">
+                        <input type="text" class="form-control" placeholder="Search" name="q" id="search-input">
+                        <div class="input-group-btn">
+                            <button class="btn btn-default" id="search-submit"><i class="glyphicon glyphicon-search"></i></button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        
+	</div>
+
+</div>
+</div>
+
+
+<div class="container" id="toc-content">
+<div class="row">
+
+	
+	<div class="col-md-12">
+	
+		<div id="main">
+			
+
+		<h1 class="page-title">Source: src/mago3d/geometry/MagoPoint.js</h1>
+    
+<section>
+    <article>
+        <pre
+            class="sunlight-highlight-javascript linenums">'use strict';
+/**
+ * 
+ * @typedef {object} MagoPoint~Coordinate MagoPoint coordinate scheme.
+ * @property {number} longitude 
+ * @property {number} latitude 
+ * @property {number} altitude 
+ */
+ /** 
+ * @typedef {object} MagoPoint~MagoPointStyle MagoPoint style 옵션.
+ * @property {number} size point size.
+ * @property {number} opacity range 0-1. default is 1.
+ * @property {string} color html color code.
+ * @property {string} strokeColor point stroke color. html color code.
+ */
+/**
+ * 폴리라인을 표현하는 클래스
+ * @exception {Error} Messages.CONSTRUCT_ERROR
+ * 
+ * @constructor
+ * @class MagoPoint
+ * @param {MagoPoint~Coordinate} position position info. coordinate. required.
+ * @param {MagoPoint~MagoPointStyle} style point style. optional.
+ *  
+ * @extends MagoGeometry
+ * 
+ * @example
+ * var position = {longitude : 0, latitude : 0, altitude : 1};
+ * var style = {color:'ff0000',thickness:0.8};
+ * 
+ * var magoPoint = new MagoPoint(position, style);
+ */
+var MagoPoint = function(position, style) 
+{
+	
+	if (!(this instanceof MagoPoint)) 
+	{
+		throw new Error(Messages.CONSTRUCT_ERROR);
+	}
+
+	/**
+	 * Minimum coord of this rectangle
+	 * @type {GeographicCoord}
+	 */
+	this.geoCoord;
+	
+	MagoGeometry.call(this, position, style);
+
+	// Calculate geoLocationData.
+	var geoLocDataManager = new GeoLocationDataManager();
+	var geoLocData = geoLocDataManager.newGeoLocationData();
+	geoLocData = ManagerUtils.calculateGeoLocationData(this.geoCoord.longitude, this.geoCoord.latitude, this.geoCoord.altitude, undefined, undefined, undefined, geoLocData);
+	// set the geoLocDataManager of the terrainScanner.
+	this.geoLocDataManager = geoLocDataManager;
+};
+
+MagoPoint.prototype = Object.create(MagoGeometry.prototype);
+MagoPoint.prototype.constructor = MagoPoint;
+
+/**
+ * set position
+ * @param {MagoPoint~Coordinate} position
+ */
+MagoPoint.prototype.setPosition = function(position) 
+{
+	if (!position)
+	{ return; } // error.
+
+	this.geoCoord = new GeographicCoord(position.longitude, position.latitude, position.altitude);
+
+};
+
+/**
+ * Makes the geometry mesh.
+ * @private
+ */
+MagoPoint.prototype.makeMesh = function(magoManager)
+{
+	// there are no mesh to make.
+	var vboKeyContainer = new VBOVertexIdxCacheKeysContainer();
+	var vboKey = vboKeyContainer.newVBOVertexIdxCacheKey();
+	var vboMemManager = magoManager.vboMemoryManager;
+	
+	// Positions.
+	var positions = new Float32Array([0.0, 0.0, 0.0]);
+	vboKey.setDataArrayPos(positions, vboMemManager);
+
+	var options = this.style;
+	var pointMesh = new PointMesh(options);
+	pointMesh.vboKeysContainer = vboKeyContainer;
+    
+	// Finally put the mesh into magoRenderables-objectsArray.
+	this.objectsArray.push(pointMesh);
+    
+	this.setDirty(false);
+};</pre>
+    </article>
+</section>
+
+
+
+
+
+		</div>
+	</div>
+
+	<div class="clearfix"></div>
+
+	
+
+</div>
+</div>
+
+
+    <div class="modal fade" id="searchResults">
+      <div class="modal-dialog">
+        <div class="modal-content">
+          <div class="modal-header">
+            <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+            <h4 class="modal-title">Search results</h4>
+          </div>
+          <div class="modal-body"></div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
+          </div>
+        </div><!-- /.modal-content -->
+      </div><!-- /.modal-dialog -->
+    </div>
+
+
+<footer>
+
+
+<span class="jsdoc-message">
+	Documentation generated by <a href="https://github.com/jsdoc3/jsdoc">JSDoc 3.6.3</a>
+	
+		on 2020, June 5th 4:58:17 pm
+	
+	using the <a href="https://github.com/docstrap/docstrap">DocStrap template</a>.
+</span>
+</footer>
+
+<script src="scripts/docstrap.lib.js"></script>
+<script src="scripts/toc.js"></script>
+
+    <script type="text/javascript" src="scripts/fulltext-search-ui.js"></script>
+
+
+<script>
+$( function () {
+	$( "[id*='$']" ).each( function () {
+		var $this = $( this );
+
+		$this.attr( "id", $this.attr( "id" ).replace( "$", "__" ) );
+	} );
+
+	$( ".tutorial-section pre, .readme-section pre, pre.prettyprint.source" ).each( function () {
+		var $this = $( this );
+
+		var example = $this.find( "code" );
+		exampleText = example.html();
+		var lang = /{@lang (.*?)}/.exec( exampleText );
+		if ( lang && lang[1] ) {
+			exampleText = exampleText.replace( lang[0], "" );
+			example.html( exampleText );
+			lang = lang[1];
+		} else {
+			var langClassMatch = example.parent()[0].className.match(/lang\-(\S+)/);
+			lang = langClassMatch ? langClassMatch[1] : "javascript";
+		}
+
+		if ( lang ) {
+
+			$this
+			.addClass( "sunlight-highlight-" + lang )
+			.addClass( "linenums" )
+			.html( example.html() );
+
+		}
+	} );
+
+	Sunlight.highlightAll( {
+		lineNumbers : true,
+		showMenu : true,
+		enableDoclinks : true
+	} );
+
+	$.catchAnchorLinks( {
+        navbarOffset: 10
+	} );
+	$( "#toc" ).toc( {
+		anchorName  : function ( i, heading, prefix ) {
+			return $( heading ).attr( "id" ) || ( prefix + i );
+		},
+		selectors   : "#toc-content h1,#toc-content h2,#toc-content h3,#toc-content h4",
+		showAndHide : false,
+		smoothScrolling: true
+	} );
+
+	$( "#main span[id^='toc']" ).addClass( "toc-shim" );
+	$( '.dropdown-toggle' ).dropdown();
+
+    $( "table" ).each( function () {
+      var $this = $( this );
+      $this.addClass('table');
+    } );
+
+} );
+</script>
+
+
+
+<!--Navigation and Symbol Display-->
+
+
+<!--Google Analytics-->
+
+
+
+    <script type="text/javascript">
+        $(document).ready(function() {
+            SearcherDisplay.init();
+        });
+    </script>
+
+
+</body>
+</html>

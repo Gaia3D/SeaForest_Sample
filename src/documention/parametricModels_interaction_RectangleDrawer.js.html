@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+
+<html lang="en">
+<head>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width">
+	<title>Mago3dJS for SeaForest Source: parametricModels/interaction/RectangleDrawer.js</title>
+
+	<!--[if lt IE 9]>
+	<script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+	<![endif]-->
+	<link type="text/css" rel="stylesheet" href="styles/sunlight.default.css">
+
+	<link type="text/css" rel="stylesheet" href="styles/site.readable.css">
+
+</head>
+
+<body>
+
+<div class="navbar navbar-default navbar-fixed-top ">
+<div class="container">
+	<div class="navbar-header">
+		<a class="navbar-brand" href="index.html">Mago3dJS for SeaForest</a>
+		<button class="navbar-toggle" type="button" data-toggle="collapse" data-target="#topNavigation">
+			<span class="icon-bar"></span>
+			<span class="icon-bar"></span>
+			<span class="icon-bar"></span>
+        </button>
+	</div>
+	<div class="navbar-collapse collapse" id="topNavigation">
+		<ul class="nav navbar-nav">
+			
+			<li class="dropdown">
+				<a href="classes.list.html" class="dropdown-toggle" data-toggle="dropdown">Classes<b class="caret"></b></a>
+				<ul class="dropdown-menu ">
+					<li><a href="DrawGeometryInteraction.html">DrawGeometryInteraction</a></li><li><a href="InteractionCollection.html">InteractionCollection</a></li><li><a href="LineDrawer.html">LineDrawer</a></li><li><a href="Mago3d.html">Mago3d</a></li><li><a href="MagoGeometry.html">MagoGeometry</a></li><li><a href="MagoManager.html">MagoManager</a></li><li><a href="MagoPoint.html">MagoPoint</a></li><li><a href="MagoPolyline.html">MagoPolyline</a></li><li><a href="MagoRectangle.html">MagoRectangle</a></li><li><a href="MagoWorld.html">MagoWorld</a></li><li><a href="Modeler.html">Modeler</a></li><li><a href="PointDrawer.html">PointDrawer</a></li><li><a href="RectangleDrawer.html">RectangleDrawer</a></li>
+				</ul>
+			</li>
+			
+		</ul>
+        
+            <div class="col-sm-3 col-md-3">
+                <form class="navbar-form" role="search">
+                    <div class="input-group">
+                        <input type="text" class="form-control" placeholder="Search" name="q" id="search-input">
+                        <div class="input-group-btn">
+                            <button class="btn btn-default" id="search-submit"><i class="glyphicon glyphicon-search"></i></button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        
+	</div>
+
+</div>
+</div>
+
+
+<div class="container" id="toc-content">
+<div class="row">
+
+	
+	<div class="col-md-12">
+	
+		<div id="main">
+			
+
+		<h1 class="page-title">Source: parametricModels/interaction/RectangleDrawer.js</h1>
+    
+<section>
+    <article>
+        <pre
+            class="sunlight-highlight-javascript linenums">'use strict';
+
+/**
+ * This is the interaction for draw rectangle.
+ * @class RectangleDrawer
+ * 
+ * @param {MagoRectangle~MagoRectangleStyle} style style object.
+ * @extends {DrawGeometryInteraction}
+ */
+var RectangleDrawer = function(style) 
+{
+	if (!(this instanceof RectangleDrawer)) 
+	{
+		throw new Error(Messages.CONSTRUCT_ERROR);
+	}
+	DrawGeometryInteraction.call(this, style);
+    
+	this.startDraw = false;
+	this.dragging = false;
+	this.startPoint;
+	this.endPoint;
+	this.height = 200;
+
+	this.tempRectangle;
+	this.result = [];
+};
+RectangleDrawer.prototype = Object.create(DrawGeometryInteraction.prototype);
+RectangleDrawer.prototype.constructor = RectangleDrawer;
+
+RectangleDrawer.EVENT_TYPE = {
+	'DRAWEND': 'drawend'
+};
+/**
+ * @private
+ */
+RectangleDrawer.prototype.setHeight = function(height) 
+{
+	this.height = height;
+};
+/**
+ * @private
+ */
+RectangleDrawer.prototype.getHeight = function() 
+{
+	return this.height;
+};
+/**
+ * @private
+ */
+RectangleDrawer.prototype.init = function() 
+{
+	this.startDraw = false;
+	this.dragging = false;
+	this.startPoint = undefined;
+	this.endPoint = undefined;
+	this.tempRectangle = undefined;
+	this.manager.magoWorld.cameraMovable = true;
+};
+/**
+ * @private
+ */
+RectangleDrawer.prototype.clear = function() 
+{
+	this.init();
+	var modeler = this.manager.modeler;
+	var result = this.result;
+	for (var i=0, len=result.length;i &lt; len; i++) 
+	{
+		var rec = result[i];
+		modeler.removeObject(rec);
+	}
+	this.result.length = 0;
+};
+/**
+ * @private
+ */
+RectangleDrawer.prototype.start = function() 
+{
+	if (!this.manager || !(this.manager instanceof MagoManager)) 
+	{
+		throw new Error(Messages.REQUIRED_EMPTY_ERROR('MagoManager'));
+	}
+	
+	var that = this;
+	var manager = that.manager;
+
+	manager.on(MagoManager.EVENT_TYPE.LEFTDOWN, function(e)
+	{
+		if (!that.getActive()) { return; }
+		if (!that.startDraw) 
+		{
+			manager.magoWorld.cameraMovable = false;
+			that.startDraw = true;
+			that.startPoint = e.point.geographicCoordinate;
+		}
+	});
+    
+	manager.on(MagoManager.EVENT_TYPE.MOUSEMOVE, function(e)
+	{
+		if (!that.getActive()) { return; }
+		if (that.startDraw &amp;&amp; that.startPoint) 
+		{
+			that.dragging = true;
+            
+			var auxPoint = e.endEvent.geographicCoordinate;
+			var minLon = (that.startPoint.longitude &lt; auxPoint.longitude) ? that.startPoint.longitude : auxPoint.longitude;
+			var minLat = (that.startPoint.latitude &lt; auxPoint.latitude) ? that.startPoint.latitude : auxPoint.latitude;
+			var maxLon = (that.startPoint.longitude &lt; auxPoint.longitude) ? auxPoint.longitude : that.startPoint.longitude;
+			var maxLat = (that.startPoint.latitude &lt; auxPoint.latitude) ? auxPoint.latitude : that.startPoint.latitude;
+
+			var position = {
+				minLongitude : minLon,
+				minLatitude  : minLat,
+				maxLongitude : maxLon,
+				maxLatitude  : maxLat,
+				altitude     : that.height
+			};
+
+			if (!that.tempRectangle)
+			{
+				if (Object.keys(that.style).length &lt; 1) 
+				{
+					that.style = {
+						fillColor: '#ff0000'
+					};
+				}
+				
+				that.tempRectangle = new MagoRectangle(position, that.style);
+				manager.modeler.magoRectangle = that.tempRectangle;
+			}
+			else 
+			{
+				that.tempRectangle.init(manager);
+				that.tempRectangle.setPosition(position);
+			}
+		}
+	});
+    
+	manager.on(MagoManager.EVENT_TYPE.LEFTUP, function(e)
+	{
+		if (!that.getActive()) { return; }
+		if (that.dragging) 
+		{
+			that.endPoint = e.point;
+			that.end();
+		}
+	});
+};
+/**
+ * @private
+ */
+RectangleDrawer.prototype.end = function()
+{
+	this.manager.magoWorld.cameraMovable = true;
+
+	this.result.push(this.tempRectangle);
+
+	this.manager.modeler.addObject(this.tempRectangle, 1);
+
+	this.emit(RectangleDrawer.EVENT_TYPE.DRAWEND, this.tempRectangle);
+	this.init();
+};</pre>
+    </article>
+</section>
+
+
+
+
+
+		</div>
+	</div>
+
+	<div class="clearfix"></div>
+
+	
+
+</div>
+</div>
+
+
+    <div class="modal fade" id="searchResults">
+      <div class="modal-dialog">
+        <div class="modal-content">
+          <div class="modal-header">
+            <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+            <h4 class="modal-title">Search results</h4>
+          </div>
+          <div class="modal-body"></div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
+          </div>
+        </div><!-- /.modal-content -->
+      </div><!-- /.modal-dialog -->
+    </div>
+
+
+<footer>
+
+
+<span class="jsdoc-message">
+	Documentation generated by <a href="https://github.com/jsdoc3/jsdoc">JSDoc 3.6.3</a>
+	
+		on 2020, June 5th 3:49:07 pm
+	
+	using the <a href="https://github.com/docstrap/docstrap">DocStrap template</a>.
+</span>
+</footer>
+
+<script src="scripts/docstrap.lib.js"></script>
+<script src="scripts/toc.js"></script>
+
+    <script type="text/javascript" src="scripts/fulltext-search-ui.js"></script>
+
+
+<script>
+$( function () {
+	$( "[id*='$']" ).each( function () {
+		var $this = $( this );
+
+		$this.attr( "id", $this.attr( "id" ).replace( "$", "__" ) );
+	} );
+
+	$( ".tutorial-section pre, .readme-section pre, pre.prettyprint.source" ).each( function () {
+		var $this = $( this );
+
+		var example = $this.find( "code" );
+		exampleText = example.html();
+		var lang = /{@lang (.*?)}/.exec( exampleText );
+		if ( lang && lang[1] ) {
+			exampleText = exampleText.replace( lang[0], "" );
+			example.html( exampleText );
+			lang = lang[1];
+		} else {
+			var langClassMatch = example.parent()[0].className.match(/lang\-(\S+)/);
+			lang = langClassMatch ? langClassMatch[1] : "javascript";
+		}
+
+		if ( lang ) {
+
+			$this
+			.addClass( "sunlight-highlight-" + lang )
+			.addClass( "linenums" )
+			.html( example.html() );
+
+		}
+	} );
+
+	Sunlight.highlightAll( {
+		lineNumbers : true,
+		showMenu : true,
+		enableDoclinks : true
+	} );
+
+	$.catchAnchorLinks( {
+        navbarOffset: 10
+	} );
+	$( "#toc" ).toc( {
+		anchorName  : function ( i, heading, prefix ) {
+			return $( heading ).attr( "id" ) || ( prefix + i );
+		},
+		selectors   : "#toc-content h1,#toc-content h2,#toc-content h3,#toc-content h4",
+		showAndHide : false,
+		smoothScrolling: true
+	} );
+
+	$( "#main span[id^='toc']" ).addClass( "toc-shim" );
+	$( '.dropdown-toggle' ).dropdown();
+
+    $( "table" ).each( function () {
+      var $this = $( this );
+      $this.addClass('table');
+    } );
+
+} );
+</script>
+
+
+
+<!--Navigation and Symbol Display-->
+
+
+<!--Google Analytics-->
+
+
+
+    <script type="text/javascript">
+        $(document).ready(function() {
+            SearcherDisplay.init();
+        });
+    </script>
+
+
+</body>
+</html>

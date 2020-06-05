@@ -1,0 +1,684 @@
+<!DOCTYPE html>
+
+<html lang="en">
+<head>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width">
+	<title>Mago3dJS for SeaForest Source: geometry/Modeler.js</title>
+
+	<!--[if lt IE 9]>
+	<script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+	<![endif]-->
+	<link type="text/css" rel="stylesheet" href="styles/sunlight.default.css">
+
+	<link type="text/css" rel="stylesheet" href="styles/site.readable.css">
+
+</head>
+
+<body>
+
+<div class="navbar navbar-default navbar-fixed-top ">
+<div class="container">
+	<div class="navbar-header">
+		<a class="navbar-brand" href="index.html">Mago3dJS for SeaForest</a>
+		<button class="navbar-toggle" type="button" data-toggle="collapse" data-target="#topNavigation">
+			<span class="icon-bar"></span>
+			<span class="icon-bar"></span>
+			<span class="icon-bar"></span>
+        </button>
+	</div>
+	<div class="navbar-collapse collapse" id="topNavigation">
+		<ul class="nav navbar-nav">
+			
+			<li class="dropdown">
+				<a href="classes.list.html" class="dropdown-toggle" data-toggle="dropdown">Classes<b class="caret"></b></a>
+				<ul class="dropdown-menu ">
+					<li><a href="DrawGeometryInteraction.html">DrawGeometryInteraction</a></li><li><a href="InteractionCollection.html">InteractionCollection</a></li><li><a href="LineDrawer.html">LineDrawer</a></li><li><a href="Mago3d.html">Mago3d</a></li><li><a href="MagoGeometry.html">MagoGeometry</a></li><li><a href="MagoManager.html">MagoManager</a></li><li><a href="MagoPoint.html">MagoPoint</a></li><li><a href="MagoPolyline.html">MagoPolyline</a></li><li><a href="MagoRectangle.html">MagoRectangle</a></li><li><a href="MagoWorld.html">MagoWorld</a></li><li><a href="Modeler.html">Modeler</a></li><li><a href="PointDrawer.html">PointDrawer</a></li><li><a href="RectangleDrawer.html">RectangleDrawer</a></li>
+				</ul>
+			</li>
+			
+		</ul>
+        
+            <div class="col-sm-3 col-md-3">
+                <form class="navbar-form" role="search">
+                    <div class="input-group">
+                        <input type="text" class="form-control" placeholder="Search" name="q" id="search-input">
+                        <div class="input-group-btn">
+                            <button class="btn btn-default" id="search-submit"><i class="glyphicon glyphicon-search"></i></button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        
+	</div>
+
+</div>
+</div>
+
+
+<div class="container" id="toc-content">
+<div class="row">
+
+	
+	<div class="col-md-12">
+	
+		<div id="main">
+			
+
+		<h1 class="page-title">Source: geometry/Modeler.js</h1>
+    
+<section>
+    <article>
+        <pre
+            class="sunlight-highlight-javascript linenums">
+'use strict';
+
+
+/**
+ * 파라미터로 이루어진 데이터를 표출하기 위해 관리하는 클래스.
+ * @class Modeler
+ * @constructor
+ */
+var Modeler = function(magoManager) 
+{
+	if (!(this instanceof Modeler)) 
+	{
+		throw new Error(Messages.CONSTRUCT_ERROR);
+	}
+	
+	this.magoManager = magoManager;
+	
+	/*
+	 * Current modeler's mode. 
+	 * @type {Enumeration}
+	 * @default CODE.modelerMode.INACTIVE
+	 */
+	this.mode = CODE.modelerMode.INACTIVE; // test for the moment.
+	this.drawingState = CODE.modelerDrawingState.NO_STARTED; // test for the moment.
+	this.drawingElement = CODE.modelerDrawingElement.NOTHING; // test for the moment.
+	
+	// Test objects.***
+	this.planeGrid; // sketch plane.
+	this.polyLine2d; // current polyline2D to sketch.
+	this.geoCoordsList; // class: GeographicCoordsList. geographic polyline.
+	this.excavation; // class : Excavation.
+	this.tunnel; // class : Tunnel.
+	this.bSplineCubic3d;
+	this.sphere; // class : Sphere.
+	this.clippingBox;
+	this.magoRectangle;
+	
+	this.testObjectsArray;
+	
+	this.objectsArray; // put here all objects.***
+	this.vectorsArray; // put here vector objects (lines, polylines, etc.).***
+	this.currentVisibleObjectsArray;
+};
+
+Modeler.prototype.extractObjectsByClassName = function(className, resultObjectsArray) 
+{
+	if (this.objectsArray === undefined)
+	{ return resultObjectsArray; }
+	
+	if (resultObjectsArray === undefined)
+	{ resultObjectsArray = []; }
+	
+	var objectsCount = this.objectsArray.length;
+	for (var i=0; i&lt;objectsCount; i++)
+	{
+		var object = this.objectsArray[i];
+		if (object.constructor.name === className)
+		{
+			resultObjectsArray.push(object);
+		}
+	}
+	
+	return resultObjectsArray;
+};
+
+Modeler.prototype.newPipe = function(options) 
+{
+	var interiorRadius = options.interiorRadius;
+	var exteriorRadius = options.exteriorRadius;
+	var height = options.height;
+	
+	var pipe = new Pipe(interiorRadius, exteriorRadius, height, options);
+	
+	if (this.objectsArray === undefined)
+	{ this.objectsArray = []; }
+	
+	this.objectsArray.push(pipe);
+	return pipe;
+};
+
+Modeler.prototype.newTube = function(options) 
+{
+	var interiorRadius = options.interiorRadius;
+	var exteriorRadius = options.exteriorRadius;
+	var height = options.height;
+	
+	var tube = new Tube(interiorRadius, exteriorRadius, height, options);
+	
+	if (this.objectsArray === undefined)
+	{ this.objectsArray = []; }
+	
+	this.objectsArray.push(tube);
+	return tube;
+};
+
+/**
+ * 모델러에 그려야할 객체 추가
+ * @param {MagoRenderable} object
+ * @param {number} depth Optional. 설정 시 해당 depth로 targetDepth 설정, targetDepth부터 화면에 나타남.
+ */
+Modeler.prototype.addObject = function(object, depth) 
+{
+	if (this.objectsArray === undefined)
+	{ this.objectsArray = []; }
+
+	this.objectsArray.push(object);
+	
+	var smartTileManager = this.magoManager.smartTileManager;
+	// Note: the targetDepth must be calculated by the objects bbox size.
+	var targetDepth = depth ? depth : 16;
+	smartTileManager.putObject(targetDepth, object, this.magoManager);
+};
+
+/**
+ * 모델러에 등록된 객체 삭제
+ * @param {Object}
+ */
+Modeler.prototype.removeObject = function(target) 
+{
+	if (target === undefined)
+	{ return false; }
+
+	target.deleteObjects(this.magoManager.vboMemoryManager);
+
+	var tile = target.smartTileOwner;
+
+	tile.nativeObjects.opaquesArray = tile.nativeObjects.opaquesArray.filter(function(opaq)
+	{
+		return opaq !== target;
+	});
+	
+	tile.nativeObjects.transparentsArray = tile.nativeObjects.transparentsArray.filter(function(t)
+	{
+		return t !== target;
+	});
+	
+	this.objectsArray = this.objectsArray.filter(function(object)
+	{
+		return object !== target;
+	});
+};
+
+Modeler.prototype.newPerson = function(options) 
+{
+	if (this.testObjectsArray === undefined)
+	{ this.testObjectsArray = []; }
+	
+	var person = new AnimatedPerson();
+	this.testObjectsArray.push(person);
+	return person;
+};
+
+Modeler.prototype.newBasicFactory = function(factoryWidth, factoryLength, factoryHeight, options) 
+{
+	// set material for the roof of the factory.
+	var magoManager = this.magoManager;
+	var materialsManager = magoManager.materialsManager;
+	var materialName = "basicFactoryRoof";
+	var material = materialsManager.getOrNewMaterial(materialName);
+	if (material.diffuseTexture === undefined)
+	{ 
+		material.diffuseTexture = new Texture(); 
+		material.diffuseTexture.textureTypeName = "diffuse";
+		material.diffuseTexture.textureImageFileName = "factoryRoof.jpg"; // Gaia3dLogo.png
+		var imagesPath = materialsManager.imagesPath + "//" + material.diffuseTexture.textureImageFileName;
+		var flipYTexCoord = true;
+		TexturesManager.loadTexture(imagesPath, material.diffuseTexture, magoManager, flipYTexCoord);
+	}
+	
+	// add options.
+	if (options === undefined)
+	{ options = {}; }
+	
+	options.roof = {
+		"material": material
+	};
+	
+	
+	var basicFactory = new BasicFactory(factoryWidth, factoryLength, factoryHeight, options);
+	basicFactory.bHasGround = true;
+	
+	if (this.objectsArray === undefined)
+	{ this.objectsArray = []; }
+	
+	this.objectsArray.push(basicFactory);
+	
+	return basicFactory;
+};
+
+Modeler.getExtrudedSolidMesh = function(profile2d, extrusionDist, extrudeSegmentsCount, extrusionVector, bIncludeBottomCap, bIncludeTopCap, resultMesh) 
+{
+	if (profile2d === undefined || extrusionDist === undefined)
+	{ return undefined; }
+	
+	var vtxProfilesList = new VtxProfilesList();
+	
+	// if want caps in the extruded mesh, must calculate "ConvexFacesIndicesData" of the profile2d before creating vtxProfiles.
+	vtxProfilesList.convexFacesIndicesData = profile2d.getConvexFacesIndicesData(undefined);
+	
+	// create vtxProfiles.
+	// make the base-vtxProfile.
+	var baseVtxProfile = vtxProfilesList.newVtxProfile();
+	baseVtxProfile.makeByProfile2D(profile2d);
+	
+	if (extrusionVector === undefined)
+	{ extrusionVector = new Point3D(0, 0, 1); }
+	
+	var increDist = extrusionDist/extrudeSegmentsCount;
+	for (var i=0; i&lt;extrudeSegmentsCount; i++)
+	{
+		// test with a 1 segment extrusion.
+		var nextVtxProfile = vtxProfilesList.newVtxProfile();
+		nextVtxProfile.copyFrom(baseVtxProfile);
+		nextVtxProfile.translate(0, 0, increDist*(i+1));
+	}
+	
+	// must separate vbo groups by surfaces.
+	resultMesh = vtxProfilesList.getMesh(resultMesh, bIncludeBottomCap, bIncludeTopCap);
+	resultMesh.calculateVerticesNormals();
+	
+	return resultMesh;
+};
+
+Modeler.getExtrudedMesh = function(profile2d, extrusionDist, extrudeSegmentsCount, extrusionVector, bIncludeBottomCap, bIncludeTopCap, resultMesh) 
+{
+	if (profile2d === undefined || extrusionDist === undefined)
+	{ return undefined; }
+
+	var solidMesh = Modeler.getExtrudedSolidMesh(profile2d, extrusionDist, extrudeSegmentsCount, extrusionVector, undefined);
+	resultMesh = solidMesh.getCopySurfaceIndependentMesh(resultMesh);
+	resultMesh.calculateVerticesNormals();
+	
+	return resultMesh;
+};
+
+Modeler.getRevolvedSolidMesh = function(profile2d, revolveAngDeg, revolveSegmentsCount, revolveSegment2d, bIncludeBottomCap, bIncludeTopCap, resultMesh) 
+{
+	// Note: move this function into "VtxProfilesList" class.
+	if (profile2d === undefined)
+	{ return undefined; }
+
+	var vtxProfilesList = new VtxProfilesList(); 
+	
+	// if want caps in the extruded mesh, must calculate "ConvexFacesIndicesData" of the profile2d before creating vtxProfiles.
+	vtxProfilesList.convexFacesIndicesData = profile2d.getConvexFacesIndicesData(undefined);
+	//profile2d.checkNormals();
+	// create vtxProfiles.
+	// make the base-vtxProfile.
+	var baseVtxProfile = vtxProfilesList.newVtxProfile();
+	baseVtxProfile.makeByProfile2D(profile2d);
+	
+	var increAngDeg = revolveAngDeg/revolveSegmentsCount;
+	
+	// calculate the translation.
+	var line2d = revolveSegment2d.getLine();
+	var origin2d = new Point2D(0, 0);
+	var translationVector = line2d.getProjectedPoint(origin2d);
+	translationVector.inverse();
+	
+	var rotMat = new Matrix4();
+	var quaternion = new Quaternion();
+	var rotAxis2d = revolveSegment2d.getDirection();
+	var rotAxis = new Point3D(rotAxis2d.x, rotAxis2d.y, 0);
+	rotAxis.unitary();
+	
+	for (var i=0; i&lt;revolveSegmentsCount; i++)
+	{
+		// calculate rotation.
+		quaternion.rotationAngDeg(increAngDeg*(i+1), rotAxis.x, rotAxis.y, rotAxis.z);
+		rotMat.rotationByQuaternion(quaternion);
+		
+		// test top profile.
+		var nextVtxProfile = vtxProfilesList.newVtxProfile();
+		nextVtxProfile.copyFrom(baseVtxProfile);
+		nextVtxProfile.translate(translationVector.x, translationVector.y, 0);
+		nextVtxProfile.transformPointsByMatrix4(rotMat);
+		nextVtxProfile.translate(-translationVector.x, -translationVector.y, 0);
+	}
+	
+	resultMesh = vtxProfilesList.getMesh(resultMesh, bIncludeBottomCap, bIncludeTopCap);
+	resultMesh.calculateVerticesNormals();
+	
+	return resultMesh;
+};
+
+Modeler.getPoints3DList_fromPoints3dArray = function(points3dArray, resultPoints3dList, options) 
+{
+	// 1rst, calculate the center point of the array.
+	var bbox = new BoundingBox();
+	bbox.init(points3dArray[0]);
+	bbox.addPointsArray(points3dArray);
+	
+	// calculate the centerPos.
+	var centerPos = bbox.getCenterPoint();
+	
+	// calculate geoLocationData.
+	var geoLocData;
+	
+	// check options.
+	if (options !== undefined &amp;&amp; options.geoLocationData !== undefined)
+	{
+		// use the existent geoLocationData.
+		geoLocData = options.geoLocationData;
+	}
+	else
+	{
+		// calculate geoLocationData by the centerPos of bbox.
+		var geoCoord = ManagerUtils.pointToGeographicCoord(centerPos, undefined);
+		geoLocData = ManagerUtils.calculateGeoLocationData(geoCoord.longitude, geoCoord.latitude, geoCoord.altitude, 0, 0, 0, undefined);
+	}
+	
+	// calculate points3d relatives to the geoLocData.
+	var relPoitsArray = geoLocData.getTransformedRelativePositionsArray(points3dArray, undefined);
+	
+	if (resultPoints3dList === undefined)
+	{ resultPoints3dList = new Point3DList(); }
+	
+	resultPoints3dList.pointsArray = relPoitsArray;
+	
+	if (resultPoints3dList.geoLocDataManager === undefined)
+	{ resultPoints3dList.geoLocDataManager = new GeoLocationDataManager(); }
+	
+	resultPoints3dList.geoLocDataManager.addGeoLocationData(geoLocData);
+	return resultPoints3dList;
+};
+
+Modeler.prototype.getGeographicCoordsList = function() 
+{
+	if (this.geoCoordsList === undefined)
+	{ this.geoCoordsList = new GeographicCoordsList(); }
+	
+	return this.geoCoordsList;
+};
+
+Modeler.prototype.getExcavation = function() 
+{
+	//if (this.excavation === undefined)
+	//{ this.excavation = new Excavation(); }
+	
+	return this.excavation;
+};
+
+Modeler.prototype.getTunnel = function() 
+{
+	//if (this.tunnel === undefined)
+	//{ this.tunnel = new Tunnel(); }
+	
+	return this.tunnel;
+};
+
+Modeler.prototype.addPointToPolyline = function(point2d) 
+{
+	if (this.polyLine2d === undefined)
+	{ this.polyLine2d = new PolyLine2D(); }
+	
+	this.polyLine2d.newPoint2d(point2d.x, point2d.y);
+};
+
+
+Modeler.prototype.render = function(magoManager, shader, renderType, glPrimitive) 
+{
+	// Generic objects.***
+	// The generic objects are into smartTiles, so is rendered when smartTile is visible on camera.
+	
+	// Render test objects.
+	if (this.testObjectsArray !== undefined)
+	{
+		var testObjectsCount = this.testObjectsArray.length;
+		for (var i=0; i&lt;testObjectsCount; i++)
+		{
+			var testObject = this.testObjectsArray[i];
+			testObject.render(magoManager);
+		}
+	}
+	
+	// 1rst, render the planeGrid if exist.
+	if (this.planeGrid !== undefined)
+	{
+		this.planeGrid.render(magoManager, shader);
+	}
+	
+	if (this.geoCoordsList !== undefined &amp;&amp; renderType === 1)
+	{
+		// Provisionally render geographicPoints.
+		if (this.geoCoordsList.points3dList !== undefined &amp;&amp; this.geoCoordsList.points3dList.vboKeysContainer !== undefined)
+		{
+			//magoManager.clearCanvas2D();
+			
+			var bEnableDepth = true;
+			var options = {};
+			var thickLineShader = magoManager.postFxShadersManager.getShader("thickLine"); 
+			thickLineShader.useProgram();
+			
+			// bind building geoLocationData.
+			
+			
+			var gl = this.magoManager.getGl();
+			var sceneState = this.magoManager.sceneState;
+			gl.uniform4fv(thickLineShader.oneColor4_loc, [0.9, 0.5, 0.3, 1.0]);
+			gl.uniform2fv(thickLineShader.viewport_loc, [sceneState.drawingBufferWidth, sceneState.drawingBufferHeight]);
+			gl.uniform1f(thickLineShader.thickness_loc, 5.0);
+			this.geoCoordsList.points3dList.renderThickLines(magoManager, thickLineShader, renderType, bEnableDepth, options);
+			
+			shader.useProgram();
+		}
+		this.geoCoordsList.renderPoints(magoManager, shader, renderType);
+	}
+	
+	if (this.excavation !== undefined)
+	{
+		this.excavation.renderPoints(magoManager, shader, renderType);
+	}
+	
+	if (this.tunnel !== undefined)
+	{
+		this.tunnel.renderPoints(magoManager, shader, renderType);
+	}
+		
+	if (renderType === 1 || renderType === 2)
+	{
+		if (this.clippingBox !== undefined)
+		{
+			var glPrimitive = undefined;
+			var bIsSelected = false;
+			this.clippingBox.render(magoManager, shader, renderType, glPrimitive, bIsSelected);
+		}
+	}
+	
+	if (this.bSplineCubic3d !== undefined)
+	{
+		if (renderType === 0)
+		{
+			shader = magoManager.postFxShadersManager.getShader("pointsCloudDepth");
+			shader.useProgram();
+			shader.disableVertexAttribArrayAll();
+			shader.resetLastBuffersBinded();
+			shader.enableVertexAttribArray(shader.position3_loc);
+			shader.bindUniformGenerals();
+		
+			//gl.uniform1i(shader.bPositionCompressed_loc, false);
+		}
+		this.bSplineCubic3d.render(magoManager, shader, renderType);
+	}
+	
+	if (this.sphere !== undefined)
+	{
+		this.sphere.render(magoManager, shader, renderType);
+	}
+	
+	if (renderType === 0)
+	{ return; }
+	
+	if (this.magoRectangle) 
+	{
+		this.magoRectangle.render(magoManager, shader, renderType, glPrimitive, bIsSelected);
+	}
+	
+};
+
+Modeler.prototype.createPlaneGrid = function(width, height, numCols, numRows) 
+{
+	// Test function.
+	if (width === undefined)
+	{ width = 500.0; }
+	
+	if (height === undefined)
+	{ height = 500.0; }
+	
+	if (numCols === undefined)
+	{ numCols = 50; }
+	
+	if (numRows === undefined)
+	{ numRows = 50; }
+	
+	if (this.planeGrid === undefined)
+	{
+		this.planeGrid = new PlaneGrid(width, height, numCols, numRows);
+	}
+};</pre>
+    </article>
+</section>
+
+
+
+
+
+		</div>
+	</div>
+
+	<div class="clearfix"></div>
+
+	
+
+</div>
+</div>
+
+
+    <div class="modal fade" id="searchResults">
+      <div class="modal-dialog">
+        <div class="modal-content">
+          <div class="modal-header">
+            <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+            <h4 class="modal-title">Search results</h4>
+          </div>
+          <div class="modal-body"></div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
+          </div>
+        </div><!-- /.modal-content -->
+      </div><!-- /.modal-dialog -->
+    </div>
+
+
+<footer>
+
+
+<span class="jsdoc-message">
+	Documentation generated by <a href="https://github.com/jsdoc3/jsdoc">JSDoc 3.6.3</a>
+	
+		on 2020, June 5th 3:49:07 pm
+	
+	using the <a href="https://github.com/docstrap/docstrap">DocStrap template</a>.
+</span>
+</footer>
+
+<script src="scripts/docstrap.lib.js"></script>
+<script src="scripts/toc.js"></script>
+
+    <script type="text/javascript" src="scripts/fulltext-search-ui.js"></script>
+
+
+<script>
+$( function () {
+	$( "[id*='$']" ).each( function () {
+		var $this = $( this );
+
+		$this.attr( "id", $this.attr( "id" ).replace( "$", "__" ) );
+	} );
+
+	$( ".tutorial-section pre, .readme-section pre, pre.prettyprint.source" ).each( function () {
+		var $this = $( this );
+
+		var example = $this.find( "code" );
+		exampleText = example.html();
+		var lang = /{@lang (.*?)}/.exec( exampleText );
+		if ( lang && lang[1] ) {
+			exampleText = exampleText.replace( lang[0], "" );
+			example.html( exampleText );
+			lang = lang[1];
+		} else {
+			var langClassMatch = example.parent()[0].className.match(/lang\-(\S+)/);
+			lang = langClassMatch ? langClassMatch[1] : "javascript";
+		}
+
+		if ( lang ) {
+
+			$this
+			.addClass( "sunlight-highlight-" + lang )
+			.addClass( "linenums" )
+			.html( example.html() );
+
+		}
+	} );
+
+	Sunlight.highlightAll( {
+		lineNumbers : true,
+		showMenu : true,
+		enableDoclinks : true
+	} );
+
+	$.catchAnchorLinks( {
+        navbarOffset: 10
+	} );
+	$( "#toc" ).toc( {
+		anchorName  : function ( i, heading, prefix ) {
+			return $( heading ).attr( "id" ) || ( prefix + i );
+		},
+		selectors   : "#toc-content h1,#toc-content h2,#toc-content h3,#toc-content h4",
+		showAndHide : false,
+		smoothScrolling: true
+	} );
+
+	$( "#main span[id^='toc']" ).addClass( "toc-shim" );
+	$( '.dropdown-toggle' ).dropdown();
+
+    $( "table" ).each( function () {
+      var $this = $( this );
+      $this.addClass('table');
+    } );
+
+} );
+</script>
+
+
+
+<!--Navigation and Symbol Display-->
+
+
+<!--Google Analytics-->
+
+
+
+    <script type="text/javascript">
+        $(document).ready(function() {
+            SearcherDisplay.init();
+        });
+    </script>
+
+
+</body>
+</html>

@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+
+<html lang="en">
+<head>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width">
+	<title>Mago3dJS for SeaForest Source: core/Mago3d.js</title>
+
+	<!--[if lt IE 9]>
+	<script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+	<![endif]-->
+	<link type="text/css" rel="stylesheet" href="styles/sunlight.default.css">
+
+	<link type="text/css" rel="stylesheet" href="styles/site.readable.css">
+
+</head>
+
+<body>
+
+<div class="navbar navbar-default navbar-fixed-top ">
+<div class="container">
+	<div class="navbar-header">
+		<a class="navbar-brand" href="index.html">Mago3dJS for SeaForest</a>
+		<button class="navbar-toggle" type="button" data-toggle="collapse" data-target="#topNavigation">
+			<span class="icon-bar"></span>
+			<span class="icon-bar"></span>
+			<span class="icon-bar"></span>
+        </button>
+	</div>
+	<div class="navbar-collapse collapse" id="topNavigation">
+		<ul class="nav navbar-nav">
+			
+			<li class="dropdown">
+				<a href="classes.list.html" class="dropdown-toggle" data-toggle="dropdown">Classes<b class="caret"></b></a>
+				<ul class="dropdown-menu ">
+					<li><a href="DrawGeometryInteraction.html">DrawGeometryInteraction</a></li><li><a href="InteractionCollection.html">InteractionCollection</a></li><li><a href="LineDrawer.html">LineDrawer</a></li><li><a href="Mago3d.html">Mago3d</a></li><li><a href="MagoGeometry.html">MagoGeometry</a></li><li><a href="MagoManager.html">MagoManager</a></li><li><a href="MagoPoint.html">MagoPoint</a></li><li><a href="MagoPolyline.html">MagoPolyline</a></li><li><a href="MagoRectangle.html">MagoRectangle</a></li><li><a href="MagoWorld.html">MagoWorld</a></li><li><a href="Modeler.html">Modeler</a></li><li><a href="PointDrawer.html">PointDrawer</a></li><li><a href="RectangleDrawer.html">RectangleDrawer</a></li>
+				</ul>
+			</li>
+			
+		</ul>
+        
+            <div class="col-sm-3 col-md-3">
+                <form class="navbar-form" role="search">
+                    <div class="input-group">
+                        <input type="text" class="form-control" placeholder="Search" name="q" id="search-input">
+                        <div class="input-group-btn">
+                            <button class="btn btn-default" id="search-submit"><i class="glyphicon glyphicon-search"></i></button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        
+	</div>
+
+</div>
+</div>
+
+
+<div class="container" id="toc-content">
+<div class="row">
+
+	
+	<div class="col-md-12">
+	
+		<div id="main">
+			
+
+		<h1 class="page-title">Source: core/Mago3d.js</h1>
+    
+<section>
+    <article>
+        <pre
+            class="sunlight-highlight-javascript linenums">'use strict';
+/**
+ * Mago3D return object
+ * @typedef {object} Mago3d~returnObj
+ * @property {function()} callAPI function. 
+ * @property {function()} getViewer function. get this map viewr. Cesium.Viewer or Mago3d.MagoWorld
+ * @property {function()} getMagoManagerState function. get magoManager starte
+ * @property {function()} getMagoManager function. get magoManager
+ * @property {function(string)} setBaseUrl function. set F4d Date base url.
+ */
+
+/**
+ * callback parameter info 
+ * @typedef {object} Mago3d~callback
+ * @property {function()} loadstart Optional. when mago3d load start trigger. return magostate.
+ * @property {function(Mago3d~returnObj)} loadend Optional. when mago3d load end trigger. return magostate.
+ */
+
+/**
+ * This is mago3d entrypoint.
+ * @class Mago3d
+ * 
+ * @param {Stirng} containerId container div id. required.
+ * @param {object} serverPolicy mage3d geopolicy
+ * @param {Mago3d~callback} callback loadstart callback, loadend callback.
+ * @param {object} options Cesium viewer parameter.
+ * @param {Cesium.Viewer} legacyViewer 타 시스템과의 연동의 경우 view 객체가 생성되어서 넘어 오는 경우가 있음
+ * 
+ * @return {Mago3d~returnObj} 
+ */
+var Mago3d = function(containerId, serverPolicy, callback, options, legacyViewer) 
+{
+	if (!(this instanceof Mago3d)) 
+	{
+		throw new Error(Messages.CONSTRUCT_ERROR);
+	}
+    
+	if (!containerId || !document.getElementById(containerId)) 
+	{
+		throw new Error('containerId is required.');
+	}
+	Emitter.call(this);
+
+	var viewer = null;
+	var magoManager = null;
+
+	if (callback) 
+	{
+		if (callback.loadstart &amp;&amp; typeof callback.loadstart === "function") 
+		{
+			this.on('loadstart', callback.loadstart);
+		}
+		
+		if (callback.loadend &amp;&amp; typeof callback.loadend === "function") 
+		{
+			this.on('loadend', callback.loadend);
+		}
+	}
+
+	var magoManagerState = CODE.magoManagerState.INIT;
+	//this.emit('loadstart', this);
+
+	serverPolicy = validPolicy(serverPolicy);
+	var viewerInitializer;
+
+	if (serverPolicy.basicGlobe === Constant.CESIUM) 
+	{
+		viewerInitializer = new CesiumViewerInit(containerId, serverPolicy, options, legacyViewer);
+	}
+	else 
+	{
+		viewerInitializer = new MagoEarthViewerInit(containerId, serverPolicy, options);
+	}
+
+	viewer = viewerInitializer.viewer;
+	magoManager = viewerInitializer.magoManager;
+	//magoManager.magoPolicy.imagePath = imagePath;
+
+	var returnObj = {
+		// api gateway 역할
+		callAPI: function(api) 
+		{
+		    if (api.getReturnable()) 
+			{
+		        return magoManager.callAPI(api);
+			}
+			else 
+			{
+				magoManager.callAPI(api);
+			}
+		},
+		getViewer: function()
+		{
+			return viewer;
+		},
+		getMagoManagerState: function() 
+		{
+			return magoManagerState;
+		},
+		getMagoManager: function() 
+		{
+			return magoManager;
+		},
+		setBaseUrl: function(baseUrl) 
+		{
+			if (!magoManager) 
+			{
+				throw new Error('Mago3d is no ready');
+			}
+			magoManager.readerWriter.geometryDataPath = baseUrl;
+		},
+		getF4dController: function()
+		{
+			return magoManager.f4dController;
+		}
+	};
+
+	magoManagerState = CODE.magoManagerState.READY;
+	//init position
+	viewerInitializer.initPosition();
+	viewerInitializer.setEventHandler();
+
+	this.emit('loadend', returnObj);
+
+	return returnObj;
+
+	function validPolicy(policy) 
+	{
+		var defaultPolicy = {};
+		defaultPolicy.basicGlobe = Constant.CESIUM;
+		defaultPolicy.online = true;
+		defaultPolicy.lod0 = 15;
+		defaultPolicy.lod1 = 60;
+		defaultPolicy.lod2 = 90;
+		defaultPolicy.lod3 = 200;
+		defaultPolicy.lod4 = 1000;
+		defaultPolicy.lod5 = 50000;
+		defaultPolicy.ssaoRadius = 0.15;
+		defaultPolicy.initDefaultFov = 1;
+		defaultPolicy.maxPartitionsLod0 = 8;
+		defaultPolicy.maxPartitionsLod1 = 4;
+		defaultPolicy.maxPartitionsLod2OrLess = 2;
+		defaultPolicy.maxRatioPointsDist0m = 1.0;
+		defaultPolicy.maxRatioPointsDist100m = 10.0;
+		defaultPolicy.maxRatioPointsDist200m = 20.0;
+		defaultPolicy.maxRatioPointsDist400m = 40.0;
+		defaultPolicy.maxRatioPointsDist800m = 80.0;
+		defaultPolicy.maxRatioPointsDist1600m = 160.0;
+		defaultPolicy.maxRatioPointsDistOver1600m = 320.0;
+		defaultPolicy.maxPointSizeForPc = 10.0;
+		defaultPolicy.minPointSizeForPc = 2.0;
+		defaultPolicy.pendentPointSizeForPc = 60.0;
+		defaultPolicy.minHeight_rainbow_loc = 0.0;
+		defaultPolicy.maxHeight_rainbow_loc = 100.0;
+
+		return Object.assign({}, defaultPolicy, policy||{});
+	}
+};
+Mago3d.prototype = Object.create(Emitter.prototype);
+Mago3d.prototype.constructor = Mago3d;
+</pre>
+    </article>
+</section>
+
+
+
+
+
+		</div>
+	</div>
+
+	<div class="clearfix"></div>
+
+	
+
+</div>
+</div>
+
+
+    <div class="modal fade" id="searchResults">
+      <div class="modal-dialog">
+        <div class="modal-content">
+          <div class="modal-header">
+            <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+            <h4 class="modal-title">Search results</h4>
+          </div>
+          <div class="modal-body"></div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
+          </div>
+        </div><!-- /.modal-content -->
+      </div><!-- /.modal-dialog -->
+    </div>
+
+
+<footer>
+
+
+<span class="jsdoc-message">
+	Documentation generated by <a href="https://github.com/jsdoc3/jsdoc">JSDoc 3.6.3</a>
+	
+		on 2020, June 5th 3:49:07 pm
+	
+	using the <a href="https://github.com/docstrap/docstrap">DocStrap template</a>.
+</span>
+</footer>
+
+<script src="scripts/docstrap.lib.js"></script>
+<script src="scripts/toc.js"></script>
+
+    <script type="text/javascript" src="scripts/fulltext-search-ui.js"></script>
+
+
+<script>
+$( function () {
+	$( "[id*='$']" ).each( function () {
+		var $this = $( this );
+
+		$this.attr( "id", $this.attr( "id" ).replace( "$", "__" ) );
+	} );
+
+	$( ".tutorial-section pre, .readme-section pre, pre.prettyprint.source" ).each( function () {
+		var $this = $( this );
+
+		var example = $this.find( "code" );
+		exampleText = example.html();
+		var lang = /{@lang (.*?)}/.exec( exampleText );
+		if ( lang && lang[1] ) {
+			exampleText = exampleText.replace( lang[0], "" );
+			example.html( exampleText );
+			lang = lang[1];
+		} else {
+			var langClassMatch = example.parent()[0].className.match(/lang\-(\S+)/);
+			lang = langClassMatch ? langClassMatch[1] : "javascript";
+		}
+
+		if ( lang ) {
+
+			$this
+			.addClass( "sunlight-highlight-" + lang )
+			.addClass( "linenums" )
+			.html( example.html() );
+
+		}
+	} );
+
+	Sunlight.highlightAll( {
+		lineNumbers : true,
+		showMenu : true,
+		enableDoclinks : true
+	} );
+
+	$.catchAnchorLinks( {
+        navbarOffset: 10
+	} );
+	$( "#toc" ).toc( {
+		anchorName  : function ( i, heading, prefix ) {
+			return $( heading ).attr( "id" ) || ( prefix + i );
+		},
+		selectors   : "#toc-content h1,#toc-content h2,#toc-content h3,#toc-content h4",
+		showAndHide : false,
+		smoothScrolling: true
+	} );
+
+	$( "#main span[id^='toc']" ).addClass( "toc-shim" );
+	$( '.dropdown-toggle' ).dropdown();
+
+    $( "table" ).each( function () {
+      var $this = $( this );
+      $this.addClass('table');
+    } );
+
+} );
+</script>
+
+
+
+<!--Navigation and Symbol Display-->
+
+
+<!--Google Analytics-->
+
+
+
+    <script type="text/javascript">
+        $(document).ready(function() {
+            SearcherDisplay.init();
+        });
+    </script>
+
+
+</body>
+</html>
