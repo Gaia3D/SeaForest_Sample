@@ -4,7 +4,7 @@
 <head>
 	<meta charset="utf-8">
 	<meta name="viewport" content="width=device-width">
-	<title>Mago3dJS for SeaForest Class: MagoGeometry</title>
+	<title>Mago3dJS for SeaForest Source: src/mago3d/core/XYZLayer.js</title>
 
 	<!--[if lt IE 9]>
 	<script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
@@ -60,478 +60,105 @@
 <div class="row">
 
 	
-	<div class="col-md-8">
+	<div class="col-md-12">
 	
 		<div id="main">
 			
 
-	<h1 class="page-title">Class: MagoGeometry</h1>
+		<h1 class="page-title">Source: src/mago3d/core/XYZLayer.js</h1>
+    
 <section>
+    <article>
+        <pre
+            class="sunlight-highlight-javascript linenums">'use strict';
 
-<header>
-    
-        <h2>
-        MagoGeometry
-        </h2>
-        
-            <div class="class-description"><p>MagoGeometry. abstract class</p></div>
-        
-    
-</header>
+/**
+ * @typedef {TextureLayer~option} XYZLayer~option
+ * @property {string} url xyz url. If urlFunction undefined, url is required.
+ * @property {function(tileCoord)} urlFunction xyz url function. If url undefined, urlFunction is required.
+ */
+/**
+ * @constructor
+ * @class this layer is imager service class for tile map service (TMS, XYZ).
+ * @extends TextureLayer
+ * 
+ * @param {XYZLayer~option} options 
+ * 
+ * @example
+ * // use url.
+ * var options = {maxZoom : 18, minZoom : 0, opacity : 0.5, url : 'https://tile.openstreetmap.org/{z}/{x}/{y}.png'};
+ * var xyzLayer = new Mago3D.XYZLayer(options);
+ * 
+ * // use urlFunction
+ * var baseLayer = new Mago3D.XYZLayer({
+ * 		// coordinate = {x, y ,z}
+ *       urlFunction : function(coordinate) {
+ *           var url = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
+ *           return url.replace('{z}',coordinate.z)
+ *           .replace('{y}',coordinate.y)
+ *           .replace('{x}',coordinate.x);
+ *       }
+ * });
+ */
+var XYZLayer = function(options) 
+{
+	if (!(this instanceof XYZLayer)) 
+	{
+		throw new Error(Messages.CONSTRUCT_ERROR);
+	}
 
+	TextureLayer.call(this, options);
 
-<article>
-    <div class="container-overview">
-    
-        
-<hr>
-<dt>
-    <h4 class="name" id="MagoGeometry"><span class="type-signature">&lt;abstract> </span>new MagoGeometry()</h4>
-    
-    
-</dt>
-<dd>
+	var url = options.url;
+	var urlFunction = options.urlFunction;
+	if (isEmpty(url) &amp;&amp; isEmpty(urlFunction)) 
+	{
+		throw new Error(Messages.REQUIRED_EMPTY_ERROR('url or urlFunction'));
+	}
 
-    
-
-    
-
-    
-
-    
-    
-
-    
-<dl class="details">
-    
-
+	this.url = url;
+	this.reg = /{[^}]+}/g;
+	this.urlFunction = defaultValue(urlFunction, undefined);
 	
-
-	
-
-	
-
-    
-
-    
-
-    
-
-    
-
-	
-
-	
-
-	
-
-	
-
-	
-
-
-
-	
-	<dt class="tag-source method-doc-label method-doc-details-label">Source:</dt>
-	<dd class="tag-source">
-		<ul class="dummy">
-			<li>
-				<a href="src_mago3d_geometry_MagoGeometry.js.html">src/mago3d/geometry/MagoGeometry.js</a>,
-				 <a href="src_mago3d_geometry_MagoGeometry.js.html#sunlight-1-line-12">line 12</a>
-			</li>
-		</ul>
-	</dd>
-	
-
-	
-
-	
-
-	
-</dl>
-
-
-    
-
-    
-
-    
-
-    
-
-    
-    <h5>Throws:</h5>
-    
-            
-
-<dl>
-    <dt>
-        <div class="param-desc">
-        <p>Messages.CONSTRUCT_ERROR</p>
-        </div>
-    </dt>
-    <dt>
-        <dl>
-            <dt>
-                Type
-            </dt>
-            <dd>
-                
-<span class="param-type">Error</span>
-
-
-
-            </dd>
-        </dl>
-    </dt>
-</dl>
-
-
-        
-
-    
-
-    
-</dd>
-
-    
-    </div>
-
-    
-        <h3 class="subsection-title">Extends</h3>
-
-        
-
-
-    <ul>
-        <li>MagoRenderable</li>
-    </ul>
-
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-        <h3 class="subsection-title">Methods</h3>
-
-        <dl>
-            
-<hr>
-<dt>
-    <h4 class="name" id="setPosition"><span class="type-signature">&lt;abstract> </span>setPosition(position)</h4>
-    
-    
-</dt>
-<dd>
-
-    
-    <div class="description">
-        <p>set geometry position</p>
-    </div>
-    
-
-    
-
-    
-
-    
-    
-        <h5>Parameters:</h5>
-        
-
-<table class="params table table-striped">
-    <thead>
-    <tr>
-        
-        <th>Name</th>
-        
-
-        <th>Type</th>
-
-        
-
-        
-
-        <th class="last">Description</th>
-    </tr>
-    </thead>
-
-    <tbody>
-    
-
-        <tr>
-            
-                <td class="name"><code>position</code></td>
-            
-
-            <td class="type">
-            
-                
-<span class="param-type">MagoGeometry~MagoGeometryPosition</span>
-
-
-
-            
-            </td>
-
-            
-
-            
-
-            <td class="description last"></td>
-        </tr>
-
-    
-    </tbody>
-</table>
-
-    
-
-    
-<dl class="details">
-    
-
-	
-
-	
-
-	
-
-    
-
-    
-
-    
-
-    
-
-	
-
-	
-
-	
-
-	
-
-	
-
-
-
-	
-	<dt class="tag-source method-doc-label method-doc-details-label">Source:</dt>
-	<dd class="tag-source">
-		<ul class="dummy">
-			<li>
-				<a href="src_mago3d_geometry_MagoGeometry.js.html">src/mago3d/geometry/MagoGeometry.js</a>,
-				 <a href="src_mago3d_geometry_MagoGeometry.js.html#sunlight-1-line-35">line 35</a>
-			</li>
-		</ul>
-	</dd>
-	
-
-	
-
-	
-
-	
-</dl>
-
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-</dd>
-
-        
-            
-<hr>
-<dt>
-    <h4 class="name" id="setStyle"><span class="type-signature"></span>setStyle(style, magoManager)</h4>
-    
-    
-</dt>
-<dd>
-
-    
-    <div class="description">
-        <p>set geometry style, if this geometry has been renderd, init use magomanager.</p>
-    </div>
-    
-
-    
-
-    
-
-    
-    
-        <h5>Parameters:</h5>
-        
-
-<table class="params table table-striped">
-    <thead>
-    <tr>
-        
-        <th>Name</th>
-        
-
-        <th>Type</th>
-
-        
-
-        
-
-        <th class="last">Description</th>
-    </tr>
-    </thead>
-
-    <tbody>
-    
-
-        <tr>
-            
-                <td class="name"><code>style</code></td>
-            
-
-            <td class="type">
-            
-                
-<span class="param-type">MagoGeometryStyle</span>
-
-
-
-            
-            </td>
-
-            
-
-            
-
-            <td class="description last"></td>
-        </tr>
-
-    
-
-        <tr>
-            
-                <td class="name"><code>magoManager</code></td>
-            
-
-            <td class="type">
-            
-                
-<span class="param-type"><a href="MagoManager.html">MagoManager</a></span>
-
-
-
-            
-            </td>
-
-            
-
-            
-
-            <td class="description last"></td>
-        </tr>
-
-    
-    </tbody>
-</table>
-
-    
-
-    
-<dl class="details">
-    
-
-	
-
-	
-
-	
-
-    
-
-    
-
-    
-
-    
-
-	
-
-	
-
-	
-
-	
-
-	
-
-
-
-	
-	<dt class="tag-source method-doc-label method-doc-details-label">Source:</dt>
-	<dd class="tag-source">
-		<ul class="dummy">
-			<li>
-				<a href="src_mago3d_geometry_MagoGeometry.js.html">src/mago3d/geometry/MagoGeometry.js</a>,
-				 <a href="src_mago3d_geometry_MagoGeometry.js.html#sunlight-1-line-45">line 45</a>
-			</li>
-		</ul>
-	</dd>
-	
-
-	
-
-	
-
-	
-</dl>
-
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-</dd>
-
-        </dl>
-    
-
-    
-
-    
-</article>
-
+	if (!this.urlFunction) 
+	{
+		this._setDefaultUrlFunction();
+	}
+};
+XYZLayer.prototype = Object.create(TextureLayer.prototype);
+XYZLayer.prototype.constructor = XYZLayer;
+
+/**
+ * @private
+ */
+XYZLayer.prototype.getUrl = function(info) 
+{	
+	return this.urlFunction.call(this, info);
+};
+/**
+ * @private
+ */
+XYZLayer.prototype._setDefaultUrlFunction = function()
+{
+	var that = this;
+	var urlFunction = function(info)
+	{
+		var matchs = that.url.match(that.reg);
+		var auxUrl = that.url;
+		for (var i=0, len=matchs.length;i&lt;len;i++) 
+		{
+			var match = matchs[i];
+			var key = match.substring(1, match.length - 1);
+			var value = info[key.toLowerCase()];
+			auxUrl = auxUrl.replace(match, value);
+		}
+		return auxUrl;
+	};
+	that.urlFunction = urlFunction;
+};</pre>
+    </article>
 </section>
+
 
 
 
@@ -541,10 +168,6 @@
 
 	<div class="clearfix"></div>
 
-	
-		<div class="col-md-3">
-			<div id="toc" class="col-md-3 hidden-xs hidden-sm hidden-md"></div>
-		</div>
 	
 
 </div>

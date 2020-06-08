@@ -4,7 +4,7 @@
 <head>
 	<meta charset="utf-8">
 	<meta name="viewport" content="width=device-width">
-	<title>Mago3dJS for SeaForest Class: OlMagoWorld</title>
+	<title>Mago3dJS for SeaForest Class: TextureLayer</title>
 
 	<!--[if lt IE 9]>
 	<script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
@@ -65,16 +65,16 @@
 		<div id="main">
 			
 
-	<h1 class="page-title">Class: OlMagoWorld</h1>
+	<h1 class="page-title">Class: TextureLayer</h1>
 <section>
 
 <header>
     
         <h2>
-        OlMagoWorld
+        TextureLayer
         </h2>
         
-            <div class="class-description"><p>OlMagoWorld</p></div>
+            <div class="class-description"><p>2d image layer abstract class, drawed on gl texture.</p></div>
         
     
 </header>
@@ -86,16 +86,12 @@
         
 <hr>
 <dt>
-    <h4 class="name" id="OlMagoWorld"><span class="type-signature"></span>new OlMagoWorld(option)</h4>
+    <h4 class="name" id="TextureLayer"><span class="type-signature">&lt;abstract> </span>new TextureLayer(options)</h4>
     
     
 </dt>
 <dd>
 
-    
-    <div class="description">
-        <p>openlayers 'View' and MagoWorld 'Camera' position, orientation syncronizer</p>
-    </div>
     
 
     
@@ -129,13 +125,13 @@
 
         <tr>
             
-                <td class="name"><code>option</code></td>
+                <td class="name"><code>options</code></td>
             
 
             <td class="type">
             
                 
-<span class="param-type"><a href="OlMagoWorld.html#~option">OlMagoWorld~option</a></span>
+<span class="param-type"><a href="TextureLayer.html#~option">TextureLayer~option</a></span>
 
 
 
@@ -190,8 +186,8 @@
 	<dd class="tag-source">
 		<ul class="dummy">
 			<li>
-				<a href="ol-magoworld.js.html">ol-magoworld.js</a>,
-				 <a href="ol-magoworld.js.html#sunlight-1-line-15">line 15</a>
+				<a href="src_mago3d_core_TextureLayer.js.html">src/mago3d/core/TextureLayer.js</a>,
+				 <a href="src_mago3d_core_TextureLayer.js.html#sunlight-1-line-18">line 18</a>
 			</li>
 		</ul>
 	</dd>
@@ -235,256 +231,6 @@
 
     
 
-    
-        <h3 class="subsection-title">Methods</h3>
-
-        <dl>
-            
-<hr>
-<dt>
-    <h4 class="name" id="getEnabled"><span class="type-signature"></span>getEnabled()</h4>
-    
-    
-</dt>
-<dd>
-
-    
-    <div class="description">
-        <p>get enable</p>
-    </div>
-    
-
-    
-
-    
-
-    
-    
-
-    
-<dl class="details">
-    
-
-	
-
-	
-
-	
-
-    
-
-    
-
-    
-
-    
-
-	
-
-	
-
-	
-
-	
-
-	
-
-
-
-	
-	<dt class="tag-source method-doc-label method-doc-details-label">Source:</dt>
-	<dd class="tag-source">
-		<ul class="dummy">
-			<li>
-				<a href="ol-magoworld.js.html">ol-magoworld.js</a>,
-				 <a href="ol-magoworld.js.html#sunlight-1-line-58">line 58</a>
-			</li>
-		</ul>
-	</dd>
-	
-
-	
-
-	
-
-	
-</dl>
-
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-    <h5>Returns:</h5>
-    
-            
-
-
-<dl>
-    <dt>
-        Type
-    </dt>
-    <dd>
-        
-<span class="param-type">boolean</span>
-
-
-
-    </dd>
-</dl>
-
-
-        
-
-    
-</dd>
-
-        
-            
-<hr>
-<dt>
-    <h4 class="name" id="setEnabled"><span class="type-signature"></span>setEnabled(enable)</h4>
-    
-    
-</dt>
-<dd>
-
-    
-    <div class="description">
-        <p>set enable. set true, olmap and mago3d sync start.</p>
-    </div>
-    
-
-    
-
-    
-
-    
-    
-        <h5>Parameters:</h5>
-        
-
-<table class="params table table-striped">
-    <thead>
-    <tr>
-        
-        <th>Name</th>
-        
-
-        <th>Type</th>
-
-        
-
-        
-
-        <th class="last">Description</th>
-    </tr>
-    </thead>
-
-    <tbody>
-    
-
-        <tr>
-            
-                <td class="name"><code>enable</code></td>
-            
-
-            <td class="type">
-            
-                
-<span class="param-type">boolean</span>
-
-
-
-            
-            </td>
-
-            
-
-            
-
-            <td class="description last"></td>
-        </tr>
-
-    
-    </tbody>
-</table>
-
-    
-
-    
-<dl class="details">
-    
-
-	
-
-	
-
-	
-
-    
-
-    
-
-    
-
-    
-
-	
-
-	
-
-	
-
-	
-
-	
-
-
-
-	
-	<dt class="tag-source method-doc-label method-doc-details-label">Source:</dt>
-	<dd class="tag-source">
-		<ul class="dummy">
-			<li>
-				<a href="ol-magoworld.js.html">ol-magoworld.js</a>,
-				 <a href="ol-magoworld.js.html#sunlight-1-line-66">line 66</a>
-			</li>
-		</ul>
-	</dd>
-	
-
-	
-
-	
-
-	
-</dl>
-
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-</dd>
-
-        </dl>
     
 
     
@@ -544,13 +290,13 @@
 
         <tr>
             
-                <td class="name"><code>magoManager</code></td>
+                <td class="name"><code>maxZoom</code></td>
             
 
             <td class="type">
             
                 
-<span class="param-type"><a href="MagoManager.html">MagoManager</a></span>
+<span class="param-type">number</span>
 
 
 
@@ -561,20 +307,20 @@
 
             
 
-            <td class="description last"><p>Require. mago3d magomanager instance.</p></td>
+            <td class="description last"><p>The max level of this layer. This value can't change after constructed. default is 18.</p></td>
         </tr>
 
     
 
         <tr>
             
-                <td class="name"><code>olmap</code></td>
+                <td class="name"><code>minZoom</code></td>
             
 
             <td class="type">
             
                 
-<span class="param-type">ol.Map</span>
+<span class="param-type">number</span>
 
 
 
@@ -585,7 +331,55 @@
 
             
 
-            <td class="description last"><p>Require. openlayers map instance.</p></td>
+            <td class="description last"><p>The min level of this layer. This value can't change after constructed. default is 0.</p></td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>show</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">boolean</span>
+
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last"><p>True if the layer is shown; otherwise, false. default is true.</p></td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>opacity</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">number</span>
+
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last"><p>The opacity value, from 0.0 to 1.0. default is 1.0.</p></td>
         </tr>
 
     
@@ -626,8 +420,8 @@
 	<dd class="tag-source">
 		<ul class="dummy">
 			<li>
-				<a href="ol-magoworld.js.html">ol-magoworld.js</a>,
-				 <a href="ol-magoworld.js.html#sunlight-1-line-1">line 1</a>
+				<a href="src_mago3d_core_TextureLayer.js.html">src/mago3d/core/TextureLayer.js</a>,
+				 <a href="src_mago3d_core_TextureLayer.js.html#sunlight-1-line-2">line 2</a>
 			</li>
 		</ul>
 	</dd>

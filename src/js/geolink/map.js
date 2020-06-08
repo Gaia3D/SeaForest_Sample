@@ -99,7 +99,7 @@ function loadEndFunc(e) {
      * @type {Mago3D.XYZLayer} xyz layer
      * @param {object} xyzOption
      */
-    var baseLayer = new Mago3D.XYZLayer({
+    var basewLayer = new Mago3D.XYZLayer({
         
         urlFunction : function(coordinate) {
             /*var url = 'http://test.muhanit.kr:37080/seaForest/tile/oceanmap/street/baseMap.do?z={z}&x={x}&y={y}';

@@ -227,7 +227,7 @@ function loadEndFunc(e) {
 
     magoManager.interactions.add(rectangleDrawer);
 
-    addJqueryEvent()
+    addJqueryEvent();
 }
 
 function addJqueryEvent(){

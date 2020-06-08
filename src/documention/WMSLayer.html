@@ -4,7 +4,7 @@
 <head>
 	<meta charset="utf-8">
 	<meta name="viewport" content="width=device-width">
-	<title>Mago3dJS for SeaForest Class: OlMagoWorld</title>
+	<title>Mago3dJS for SeaForest Class: WMSLayer</title>
 
 	<!--[if lt IE 9]>
 	<script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
@@ -65,16 +65,16 @@
 		<div id="main">
 			
 
-	<h1 class="page-title">Class: OlMagoWorld</h1>
+	<h1 class="page-title">Class: WMSLayer</h1>
 <section>
 
 <header>
     
         <h2>
-        OlMagoWorld
+        WMSLayer
         </h2>
         
-            <div class="class-description"><p>OlMagoWorld</p></div>
+            <div class="class-description"><p>this layer is imager service class for web map service (WMS).</p></div>
         
     
 </header>
@@ -86,16 +86,12 @@
         
 <hr>
 <dt>
-    <h4 class="name" id="OlMagoWorld"><span class="type-signature"></span>new OlMagoWorld(option)</h4>
+    <h4 class="name" id="WMSLayer"><span class="type-signature"></span>new WMSLayer(options)</h4>
     
     
 </dt>
 <dd>
 
-    
-    <div class="description">
-        <p>openlayers 'View' and MagoWorld 'Camera' position, orientation syncronizer</p>
-    </div>
     
 
     
@@ -129,13 +125,13 @@
 
         <tr>
             
-                <td class="name"><code>option</code></td>
+                <td class="name"><code>options</code></td>
             
 
             <td class="type">
             
                 
-<span class="param-type"><a href="OlMagoWorld.html#~option">OlMagoWorld~option</a></span>
+<span class="param-type"><a href="WMSLayer.html#~option">WMSLayer~option</a></span>
 
 
 
@@ -190,8 +186,8 @@
 	<dd class="tag-source">
 		<ul class="dummy">
 			<li>
-				<a href="ol-magoworld.js.html">ol-magoworld.js</a>,
-				 <a href="ol-magoworld.js.html#sunlight-1-line-15">line 15</a>
+				<a href="src_mago3d_core_WMSLayer.js.html">src/mago3d/core/WMSLayer.js</a>,
+				 <a href="src_mago3d_core_WMSLayer.js.html#sunlight-1-line-15">line 15</a>
 			</li>
 		</ul>
 	</dd>
@@ -224,6 +220,15 @@
     </div>
 
     
+        <h3 class="subsection-title">Extends</h3>
+
+        
+
+
+    <ul>
+        <li><a href="TextureLayer.html">TextureLayer</a></li>
+    </ul>
+
 
     
 
@@ -236,186 +241,22 @@
     
 
     
-        <h3 class="subsection-title">Methods</h3>
+        <h3 class="subsection-title">Members</h3>
 
         <dl>
             
 <hr>
-<dt>
-    <h4 class="name" id="getEnabled"><span class="type-signature"></span>getEnabled()</h4>
-    
+<dt class="name" id=".DEAFULT_PARAM">
+    <h4 id=".DEAFULT_PARAM"><span class="type-signature">&lt;static> </span>DEAFULT_PARAM<span class="type-signature"></span></h4>
+
     
 </dt>
 <dd>
-
     
     <div class="description">
-        <p>get enable</p>
+        <p>DEFAULT WMS REQUEST PARAMETER.</p>
     </div>
     
-
-    
-
-    
-
-    
-    
-
-    
-<dl class="details">
-    
-
-	
-
-	
-
-	
-
-    
-
-    
-
-    
-
-    
-
-	
-
-	
-
-	
-
-	
-
-	
-
-
-
-	
-	<dt class="tag-source method-doc-label method-doc-details-label">Source:</dt>
-	<dd class="tag-source">
-		<ul class="dummy">
-			<li>
-				<a href="ol-magoworld.js.html">ol-magoworld.js</a>,
-				 <a href="ol-magoworld.js.html#sunlight-1-line-58">line 58</a>
-			</li>
-		</ul>
-	</dd>
-	
-
-	
-
-	
-
-	
-</dl>
-
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-    <h5>Returns:</h5>
-    
-            
-
-
-<dl>
-    <dt>
-        Type
-    </dt>
-    <dd>
-        
-<span class="param-type">boolean</span>
-
-
-
-    </dd>
-</dl>
-
-
-        
-
-    
-</dd>
-
-        
-            
-<hr>
-<dt>
-    <h4 class="name" id="setEnabled"><span class="type-signature"></span>setEnabled(enable)</h4>
-    
-    
-</dt>
-<dd>
-
-    
-    <div class="description">
-        <p>set enable. set true, olmap and mago3d sync start.</p>
-    </div>
-    
-
-    
-
-    
-
-    
-    
-        <h5>Parameters:</h5>
-        
-
-<table class="params table table-striped">
-    <thead>
-    <tr>
-        
-        <th>Name</th>
-        
-
-        <th>Type</th>
-
-        
-
-        
-
-        <th class="last">Description</th>
-    </tr>
-    </thead>
-
-    <tbody>
-    
-
-        <tr>
-            
-                <td class="name"><code>enable</code></td>
-            
-
-            <td class="type">
-            
-                
-<span class="param-type">boolean</span>
-
-
-
-            
-            </td>
-
-            
-
-            
-
-            <td class="description last"></td>
-        </tr>
-
-    
-    </tbody>
-</table>
 
     
 
@@ -454,8 +295,8 @@
 	<dd class="tag-source">
 		<ul class="dummy">
 			<li>
-				<a href="ol-magoworld.js.html">ol-magoworld.js</a>,
-				 <a href="ol-magoworld.js.html#sunlight-1-line-66">line 66</a>
+				<a href="src_mago3d_core_WMSLayer.js.html">src/mago3d/core/WMSLayer.js</a>,
+				 <a href="src_mago3d_core_WMSLayer.js.html#sunlight-1-line-44">line 44</a>
 			</li>
 		</ul>
 	</dd>
@@ -468,23 +309,13 @@
 	
 </dl>
 
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
 
     
 </dd>
 
         </dl>
+    
+
     
 
     
@@ -506,7 +337,7 @@
         <ul>
             <li>
                 
-<span class="param-type">object</span>
+<span class="param-type"><a href="TextureLayer.html#~option">TextureLayer~option</a></span>
 
 
 
@@ -544,13 +375,13 @@
 
         <tr>
             
-                <td class="name"><code>magoManager</code></td>
+                <td class="name"><code>url</code></td>
             
 
             <td class="type">
             
                 
-<span class="param-type"><a href="MagoManager.html">MagoManager</a></span>
+<span class="param-type">string</span>
 
 
 
@@ -561,20 +392,20 @@
 
             
 
-            <td class="description last"><p>Require. mago3d magomanager instance.</p></td>
+            <td class="description last"><p>wms request url. required.</p></td>
         </tr>
 
     
 
         <tr>
             
-                <td class="name"><code>olmap</code></td>
+                <td class="name"><code>param</code></td>
             
 
             <td class="type">
             
                 
-<span class="param-type">ol.Map</span>
+<span class="param-type">string</span>
 
 
 
@@ -585,7 +416,31 @@
 
             
 
-            <td class="description last"><p>Require. openlayers map instance.</p></td>
+            <td class="description last"><p>wms GetMap paramter. Optional.</p></td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>filter</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">string</span>
+
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last"><p>Optional. we can support only BATHYMETRY, when call dem data.</p></td>
         </tr>
 
     
@@ -626,8 +481,8 @@
 	<dd class="tag-source">
 		<ul class="dummy">
 			<li>
-				<a href="ol-magoworld.js.html">ol-magoworld.js</a>,
-				 <a href="ol-magoworld.js.html#sunlight-1-line-1">line 1</a>
+				<a href="src_mago3d_core_WMSLayer.js.html">src/mago3d/core/WMSLayer.js</a>,
+				 <a href="src_mago3d_core_WMSLayer.js.html#sunlight-1-line-2">line 2</a>
 			</li>
 		</ul>
 	</dd>

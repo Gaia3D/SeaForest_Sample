@@ -4,7 +4,7 @@
 <head>
 	<meta charset="utf-8">
 	<meta name="viewport" content="width=device-width">
-	<title>Mago3dJS for SeaForest Class: OlMagoWorld</title>
+	<title>Mago3dJS for SeaForest Class: XYZLayer</title>
 
 	<!--[if lt IE 9]>
 	<script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
@@ -65,16 +65,16 @@
 		<div id="main">
 			
 
-	<h1 class="page-title">Class: OlMagoWorld</h1>
+	<h1 class="page-title">Class: XYZLayer</h1>
 <section>
 
 <header>
     
         <h2>
-        OlMagoWorld
+        XYZLayer
         </h2>
         
-            <div class="class-description"><p>OlMagoWorld</p></div>
+            <div class="class-description"><p>this layer is imager service class for tile map service (TMS, XYZ).</p></div>
         
     
 </header>
@@ -86,16 +86,12 @@
         
 <hr>
 <dt>
-    <h4 class="name" id="OlMagoWorld"><span class="type-signature"></span>new OlMagoWorld(option)</h4>
+    <h4 class="name" id="XYZLayer"><span class="type-signature"></span>new XYZLayer(options)</h4>
     
     
 </dt>
 <dd>
 
-    
-    <div class="description">
-        <p>openlayers 'View' and MagoWorld 'Camera' position, orientation syncronizer</p>
-    </div>
     
 
     
@@ -129,13 +125,13 @@
 
         <tr>
             
-                <td class="name"><code>option</code></td>
+                <td class="name"><code>options</code></td>
             
 
             <td class="type">
             
                 
-<span class="param-type"><a href="OlMagoWorld.html#~option">OlMagoWorld~option</a></span>
+<span class="param-type"><a href="XYZLayer.html#~option">XYZLayer~option</a></span>
 
 
 
@@ -190,8 +186,8 @@
 	<dd class="tag-source">
 		<ul class="dummy">
 			<li>
-				<a href="ol-magoworld.js.html">ol-magoworld.js</a>,
-				 <a href="ol-magoworld.js.html#sunlight-1-line-15">line 15</a>
+				<a href="src_mago3d_core_XYZLayer.js.html">src/mago3d/core/XYZLayer.js</a>,
+				 <a href="src_mago3d_core_XYZLayer.js.html#sunlight-1-line-31">line 31</a>
 			</li>
 		</ul>
 	</dd>
@@ -218,255 +214,39 @@
     
 
     
+        <h5>Example</h5>
+        
+    <pre class="sunlight-highlight-javascript">// use url.
+var options = {maxZoom : 18, minZoom : 0, opacity : 0.5, url : &#x27;https://tile.openstreetmap.org/{z}/{x}/{y}.png&#x27;};
+var xyzLayer = new Mago3D.XYZLayer(options);
+
+// use urlFunction
+var baseLayer = new Mago3D.XYZLayer({
+		// coordinate = {x, y ,z}
+      urlFunction : function(coordinate) {
+          var url = &#x27;https://tile.openstreetmap.org/{z}/{x}/{y}.png&#x27;;
+          return url.replace(&#x27;{z}&#x27;,coordinate.z)
+          .replace(&#x27;{y}&#x27;,coordinate.y)
+          .replace(&#x27;{x}&#x27;,coordinate.x);
+      }
+});</pre>
+
+
+    
 </dd>
 
     
     </div>
 
     
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-        <h3 class="subsection-title">Methods</h3>
-
-        <dl>
-            
-<hr>
-<dt>
-    <h4 class="name" id="getEnabled"><span class="type-signature"></span>getEnabled()</h4>
-    
-    
-</dt>
-<dd>
-
-    
-    <div class="description">
-        <p>get enable</p>
-    </div>
-    
-
-    
-
-    
-
-    
-    
-
-    
-<dl class="details">
-    
-
-	
-
-	
-
-	
-
-    
-
-    
-
-    
-
-    
-
-	
-
-	
-
-	
-
-	
-
-	
-
-
-
-	
-	<dt class="tag-source method-doc-label method-doc-details-label">Source:</dt>
-	<dd class="tag-source">
-		<ul class="dummy">
-			<li>
-				<a href="ol-magoworld.js.html">ol-magoworld.js</a>,
-				 <a href="ol-magoworld.js.html#sunlight-1-line-58">line 58</a>
-			</li>
-		</ul>
-	</dd>
-	
-
-	
-
-	
-
-	
-</dl>
-
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-    <h5>Returns:</h5>
-    
-            
-
-
-<dl>
-    <dt>
-        Type
-    </dt>
-    <dd>
-        
-<span class="param-type">boolean</span>
-
-
-
-    </dd>
-</dl>
-
+        <h3 class="subsection-title">Extends</h3>
 
         
 
-    
-</dd>
 
-        
-            
-<hr>
-<dt>
-    <h4 class="name" id="setEnabled"><span class="type-signature"></span>setEnabled(enable)</h4>
-    
-    
-</dt>
-<dd>
-
-    
-    <div class="description">
-        <p>set enable. set true, olmap and mago3d sync start.</p>
-    </div>
-    
-
-    
-
-    
-
-    
-    
-        <h5>Parameters:</h5>
-        
-
-<table class="params table table-striped">
-    <thead>
-    <tr>
-        
-        <th>Name</th>
-        
-
-        <th>Type</th>
-
-        
-
-        
-
-        <th class="last">Description</th>
-    </tr>
-    </thead>
-
-    <tbody>
-    
-
-        <tr>
-            
-                <td class="name"><code>enable</code></td>
-            
-
-            <td class="type">
-            
-                
-<span class="param-type">boolean</span>
-
-
-
-            
-            </td>
-
-            
-
-            
-
-            <td class="description last"></td>
-        </tr>
-
-    
-    </tbody>
-</table>
-
-    
-
-    
-<dl class="details">
-    
-
-	
-
-	
-
-	
-
-    
-
-    
-
-    
-
-    
-
-	
-
-	
-
-	
-
-	
-
-	
-
-
-
-	
-	<dt class="tag-source method-doc-label method-doc-details-label">Source:</dt>
-	<dd class="tag-source">
-		<ul class="dummy">
-			<li>
-				<a href="ol-magoworld.js.html">ol-magoworld.js</a>,
-				 <a href="ol-magoworld.js.html#sunlight-1-line-66">line 66</a>
-			</li>
-		</ul>
-	</dd>
-	
-
-	
-
-	
-
-	
-</dl>
+    <ul>
+        <li><a href="TextureLayer.html">TextureLayer</a></li>
+    </ul>
 
 
     
@@ -481,10 +261,6 @@
 
     
 
-    
-</dd>
-
-        </dl>
     
 
     
@@ -506,7 +282,7 @@
         <ul>
             <li>
                 
-<span class="param-type">object</span>
+<span class="param-type"><a href="TextureLayer.html#~option">TextureLayer~option</a></span>
 
 
 
@@ -544,13 +320,13 @@
 
         <tr>
             
-                <td class="name"><code>magoManager</code></td>
+                <td class="name"><code>url</code></td>
             
 
             <td class="type">
             
                 
-<span class="param-type"><a href="MagoManager.html">MagoManager</a></span>
+<span class="param-type">string</span>
 
 
 
@@ -561,20 +337,20 @@
 
             
 
-            <td class="description last"><p>Require. mago3d magomanager instance.</p></td>
+            <td class="description last"><p>xyz url. If urlFunction undefined, url is required.</p></td>
         </tr>
 
     
 
         <tr>
             
-                <td class="name"><code>olmap</code></td>
+                <td class="name"><code>urlFunction</code></td>
             
 
             <td class="type">
             
                 
-<span class="param-type">ol.Map</span>
+<span class="param-type">function</span>
 
 
 
@@ -585,7 +361,7 @@
 
             
 
-            <td class="description last"><p>Require. openlayers map instance.</p></td>
+            <td class="description last"><p>xyz url function. If url undefined, urlFunction is required.</p></td>
         </tr>
 
     
@@ -626,8 +402,8 @@
 	<dd class="tag-source">
 		<ul class="dummy">
 			<li>
-				<a href="ol-magoworld.js.html">ol-magoworld.js</a>,
-				 <a href="ol-magoworld.js.html#sunlight-1-line-1">line 1</a>
+				<a href="src_mago3d_core_XYZLayer.js.html">src/mago3d/core/XYZLayer.js</a>,
+				 <a href="src_mago3d_core_XYZLayer.js.html#sunlight-1-line-3">line 3</a>
 			</li>
 		</ul>
 	</dd>
