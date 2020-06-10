@@ -33,6 +33,8 @@ var wmsLayer;
  */
 var drawedLines = [];
 
+var drawedRectangle;
+
 /**
  * @type {object}} mago3d 정책, Mago3D 객체 생성 시 사용.
  */
@@ -69,7 +71,7 @@ function magoStart(renderDivId) {
      * @param {object} callback loadstart callback, loadend callback.
      * @param {object} option 생성자 생성 시 옵션, 
      */
-    mago3d = new Mago3D.Mago3d(renderDivId, policy, {loadend : loadEndFunc});
+    mago3d = new Mago3D.Mago3d(renderDivId, policy, {loadend : loadEndFunc}, {terrainSelectable : false});
 }
 
 function loadEndFunc(e) {
@@ -110,7 +112,7 @@ function loadEndFunc(e) {
             .replace('{x}',coordinate.x);
         }
     });
-    
+
     function convertZ(z) {
 
         return 'L' + zeroPadder(z);
@@ -122,16 +124,21 @@ function loadEndFunc(e) {
     magoManager.addLayer(baseLayer);
     //wmslayer 생성 후 등록
     wmsLayer = new Mago3D.WMSLayer({
-        //url: 'http://test.muhanit.kr:41515/geoserver/gwc/service/wms',
+        //url: 'http://test.muhanit.kr:13032/geoserver_seaforest/gwc/service/wms',
         url: 'http://localhost:8080/geoserver/mago3d/gwc/service/wms', 
-        show: true, 
-        filter:Mago3D.CODE.imageFilter.BATHYMETRY,  
+        //show: false,
+        opacity : 0.5,
+        //filter:Mago3D.CODE.imageFilter.BATHYMETRY,  
         //param: {layers: 'SeaForest:5m_image', tiled: true}
         param: {layers: 'mago3d:15m_susim', tiled: true}
     });
     magoManager.addLayer(wmsLayer);
-
+    
     lineDrawer = Mago3D.DrawGeometryInteraction.createDrawGeometryInteraction('line');
+    lineDrawer.setStyle({
+        thickness:2,
+        color:'#ff88ff'
+    });
     magoManager.interactions.add(lineDrawer);
     lineDrawer.on(Mago3D.LineDrawer.EVENT_TYPE.DRAWEND, function(e) {
         var positons = e.knotGeoCoordsArray;
@@ -194,40 +201,62 @@ function loadEndFunc(e) {
         strokeWidth : 3,
         opacity : 0.5
     });
+
+    rectangleDrawer.on(Mago3D.RectangleDrawer.EVENT_TYPE.ACTIVE, function(d) {
+        closeAnalysis()
+    });
     rectangleDrawer.on(Mago3D.RectangleDrawer.EVENT_TYPE.DRAWEND, function(e){
         var rectangle = e;
-        var xml = '';
 
-        var type = $('span.analysis.on').attr('id');
-        if(type === 'slope') {
-            var zFactor = getZfactor(rectangle);
-            xml = getXmlRasterSlope(rectangle.minGeographicCoord, rectangle.maxGeographicCoord, zFactor);
-        } else {
-            xml = getXmlRasterAspect(rectangle.minGeographicCoord, rectangle.maxGeographicCoord);
-        }
+        var zFactor = getZfactor(rectangle);
+        var slopeAnalXml = getXmlRasterSlope(rectangle.minGeographicCoord, rectangle.maxGeographicCoord, zFactor);
+        var slopeStyleXml = getSlopeStyle();
+    
+        var aspecAnaltXml = getXmlRasterAspect(rectangle.minGeographicCoord, rectangle.maxGeographicCoord);
+        var aspectStyleXml = getAspectStyle();
+        
+        slopeXml = getImage(rectangle.minGeographicCoord, rectangle.maxGeographicCoord, slopeAnalXml, slopeStyleXml);
+        aspectXml = getImage(rectangle.minGeographicCoord, rectangle.maxGeographicCoord, aspecAnaltXml, aspectStyleXml);
+
         startLoading();
-        requestBlobResource(xml).then(function(response){
-            var blob = response;
-            
-            var reader = new FileReader();
-            reader.readAsDataURL(blob); 
-            reader.onloadend = function() {
-                var base64data = reader.result;   
-                
-                rectangle.setStyle({
-                    imageUrl : base64data,
-                    strokeColor : '#349feb',
-                    strokeWidth : 3,
-                    opacity : 1
-                }, magoManager);
-                stopLoading();
-            }
+        $.when(requestBlobResource(slopeXml),requestBlobResource(aspectXml)).done(function(r1,r2){
+            drawedRectangle = rectangle.clone();
+            magoManager.modeler.addObject(drawedRectangle, 1);
+            rectangleDrawer.setActive(false);
+            $('span.analysis.on').removeClass('on');
+
+            setImg(r2,'aspect', true);
+            setImg(r1,'slope');
+
+            $('#analysisArea').show();
+            $('#aspectImg').trigger('click');
+        }).fail(function(e){
+            magoManager.modeler.removeObject(drawedRectangle);
+            alert('parse error');
+        }).always(function(e){
+            stopLoading();
         });
     });
 
     magoManager.interactions.add(rectangleDrawer);
 
     addJqueryEvent();
+}
+
+function closeAnalysis() {
+    if(drawedRectangle) {
+        magoManager.modeler.removeObject(drawedRectangle);
+        $('#analysisArea').hide();
+    }
+}
+
+function setImg(res, type, active) {
+    var reader = new FileReader();
+    reader.readAsDataURL(res[0]);
+    reader.onloadend = function() {
+        var base64data = reader.result;   
+        $('#' + type + 'Img').attr('src',base64data).trigger(active?'click':'');
+    }
 }
 
 function addJqueryEvent(){
@@ -268,5 +297,21 @@ function addJqueryEvent(){
             $(this).removeClass('on');
             wmsLayer.show = true;
         }
+    });
+
+    $('.analysisImg').click(function() {
+        var src = $(this).attr('src');
+        
+        drawedRectangle.minGeographicCoord.altitude = 2000;
+        drawedRectangle.setStyle({
+            imageUrl : src,
+            strokeColor : '#349feb',
+            strokeWidth : 3,
+            opacity : 1
+        }, magoManager);
+    });
+
+    $('#closeAnalysis').click(function(){
+        closeAnalysis();
     });
 }

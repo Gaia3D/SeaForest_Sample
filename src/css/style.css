@@ -103,3 +103,42 @@ bottom: 0px;
 z-index: 10000;
 display: none;
 }
+
+#analysisArea {
+position: absolute;
+width: 600px;
+height: 95%;
+left: 65px;
+z-index: 10000;
+background-color: #fff;
+display: none;
+}
+#analysisArea .areaHead {
+text-align: center;
+height: 4%;
+background-color: #393946;
+color: #fff;
+font-size: 20px;
+}
+
+#analysisArea .resultArea {
+border:1px solid black;
+width:100%;
+height:48%;
+}
+#analysisArea .resultArea p{
+text-align: center;
+font-size: 17px;
+font-weight : bolder;
+border-bottom : 1px solid black;
+}
+#analysisArea .analysisImg{
+width: 90%;
+height: 95%;
+border: 1px solid black;
+}
+#analysisArea .legendImg{
+width: calc(10% - 2px);
+height: 95%;
+float: right;
+}
