@@ -144,7 +144,21 @@ function loadEndFunc(e) {
         var positons = e.knotGeoCoordsArray;
         var wkt = Mago3D.ManagerUtils.geographicToWkt(positons, 'LINE');
         startLoading();
-        requestJsonResource(getXmlRasterProfile(20, wkt)).then(function(response){
+        requestJsonResource(getXmlRasterProfile(20, wkt)).then(
+        /**
+         * @param {object} response geojson
+         */
+        function(response){
+            /**
+             * @typedef {object} rasterProfileResult
+             * @property {object} geometry geojson geometry 형식
+             * @property {string} id
+             * @property {object} properties distance : 첫번째 점으로부터의 거리, value : 해당 위치의 높이.
+             * @property {string} type
+             */
+            /**
+             * @type {Array<rasterProfileResult>} 
+             */
             var features = response.features;
             var array = [];
 
@@ -152,6 +166,8 @@ function loadEndFunc(e) {
             var xAxisValues = [];
             //y축은 높이
             var yAxisValues = [];
+
+
             for(var i=0,len=features.length; i<len; i++) {
                 var feature = features[i];
                 var prop = feature.properties;
@@ -207,8 +223,9 @@ function loadEndFunc(e) {
     });
     rectangleDrawer.on(Mago3D.RectangleDrawer.EVENT_TYPE.DRAWEND, function(e){
         var rectangle = e;
+        var a = rectangle.getArea();
 
-        if(rectangle.getArea() / 1000000000 > 1)
+        if(a / 1000000000 > 1)
         {
             alert('Too much area.');
             rectangleDrawer.cancle();
@@ -362,6 +379,7 @@ function addJqueryEvent(){
         viewer.goto(policy.initLongitude, policy.initLatitude, policy.initAltitude, 2);
     });
 
+    //wms 토글
     $('#toggleWms').click(function(){
         if(!$(this).hasClass('on')) {
             $(this).addClass('on');
@@ -372,15 +390,18 @@ function addJqueryEvent(){
         }
     });
 
+    //항경사분석 결과 창 이미지 클릭 시
     $('.analysisImg').click(function() {
         var src = $(this).attr('src');
         setImageOnMap(src);
     });
 
+    //항경사분석 결과 창 닫기
     $('#closeAnalysis').click(function(){
         closeAnalysis();
     });
 
+    //항경사분석 결과 원본 사이즈 이미지 조회
     $('.showOrgImg').click(function(){
         var $img = $(this).parent().siblings('.analysisImg');
         var imgElem = $img.get(0);
@@ -391,10 +412,12 @@ function addJqueryEvent(){
         });
     });
 
+    //항경사분석 결과 원본 사이즈 이미지 조회 화면 닫기
     $('#orgImg').click(function(){
         $(this).hide();
     });
 
+    //지도 상의 사각형 픽셀 크기와 동일한 이미지로 재요청 및 표출
     $('.onMapImgRefresh').click(function() {
         if(!drawedRectangle) return;
 

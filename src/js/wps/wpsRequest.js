@@ -1,6 +1,10 @@
 
 var WPS_URL = 'http://localhost:8080/geoserver/wps';
-
+/**
+ * 연직분석 요청 xml 생성 후 리턴
+ * @param {number} interval 라인의 시작점과 끝점사이의 점이 개수.
+ * @param {string} userLine LineString 형태의 wkt
+ */
 function getXmlRasterProfile(interval, userLine) {
 	var xml = '';
 	xml += requestWPSPostHeader();
@@ -44,10 +48,12 @@ function getXmlRasterProfile(interval, userLine) {
 	xml += '</wps:Execute>';
 	return xml;
 }
-
+/**
+ * wps 요청 공통 헤더 생성 후 리턴
+ * @return {param}
+ */
 function requestWPSPostHeader() {
 	var header = '';
-//	header += '<?xml version="1.0" encoding="UTF-8"?>';
 	header += '<wps:Execute version="1.0.0" service="WPS" '
 	header += '	xsi:schemaLocation="http://www.opengis.net/wps/1.0.0 http://schemas.opengis.net/wps/1.0.0/wpsAll.xsd" ';
 	header += '	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" ';
@@ -94,7 +100,12 @@ function requestJsonResource(xml) {
 
 	return resource;
 }
-
+/**
+ * RasterAspect 요청을 위한 xml 생성후 리턴
+ * @param {object} minCoord 
+ * @param {object} maxCoord 
+ * @param {string}
+ */
 function getXmlRasterAspect(minCoord, maxCoord) {
 	var xml = '';
 
@@ -128,7 +139,13 @@ function getXmlRasterAspect(minCoord, maxCoord) {
 
 	return xml;
 }
-
+/**
+ * RasterSlope 요청을 위한 xml 생성후 리턴
+ * @param {object} minCoord 
+ * @param {object} maxCoord 
+ * @param {object} zFactor 
+ * @param {string}
+ */
 function getXmlRasterSlope(minCoord, maxCoord, zFactor) {
 	var xml = '';
 
@@ -174,7 +191,11 @@ function getXmlRasterSlope(minCoord, maxCoord, zFactor) {
 
 	return xml;
 }	
-
+/**
+ * slope 분석 시 필요한 factor 계산 후 리턴
+ * @param {MagoRectangle} rec 
+ * @return {number}
+ */
 function getZfactor(rec) {
 	var zFactorReference = {
 		0      :    0.00000898,
@@ -203,7 +224,14 @@ function getZfactor(rec) {
 
 	return a * midLat + b;
 }
-
+/**
+ * 분석결과를 스타일을 적용하여 이미지로 만들어 주는 xml 리턴
+ * @param {object} minCoord 
+ * @param {object} maxCoord 
+ * @param {string} analisys string형태의 xml. 분석요청에 대한 xml.
+ * @param {string} style 분석 결과 표출을 위한 style xml
+ * @return {string}
+ */
 function getImage(minCoord, maxCoord, analisys, style) {
 	var minWC = Mago3D.ManagerUtils.geographicCoordToWorldPoint(minCoord.longitude, minCoord.latitude, minCoord.altitude);
 	var maxWC = Mago3D.ManagerUtils.geographicCoordToWorldPoint(maxCoord.longitude, maxCoord.latitude, maxCoord.altitude);
@@ -211,12 +239,12 @@ function getImage(minCoord, maxCoord, analisys, style) {
 	var minSC = Mago3D.ManagerUtils.calculateWorldPositionToScreenCoord(undefined, minWC.x, minWC.y, minWC.z, minSC, magoManager);
 	var maxSC = Mago3D.ManagerUtils.calculateWorldPositionToScreenCoord(undefined, maxWC.x, maxWC.y, maxWC.z, maxSC, magoManager);
 
-	
 	var width = Math.floor(Math.abs(maxSC.x - minSC.x));
 	var height = Math.floor(Math.abs(maxSC.y - minSC.y));
 
 	var xml = '';
-	xml += '<?xml version="1.0" encoding="UTF-8"?><wps:Execute version="1.0.0" service="WPS" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns="http://www.opengis.net/wps/1.0.0" xmlns:wfs="http://www.opengis.net/wfs" xmlns:wps="http://www.opengis.net/wps/1.0.0" xmlns:ows="http://www.opengis.net/ows/1.1" xmlns:gml="http://www.opengis.net/gml" xmlns:ogc="http://www.opengis.net/ogc" xmlns:wcs="http://www.opengis.net/wcs/1.1.1" xmlns:xlink="http://www.w3.org/1999/xlink" xsi:schemaLocation="http://www.opengis.net/wps/1.0.0 http://schemas.opengis.net/wps/1.0.0/wpsAll.xsd">';
+	xml += '<?xml version="1.0" encoding="UTF-8"?>';
+	xml += requestWPSPostHeader();
 	xml += '<ows:Identifier>statistics:RasterToImage</ows:Identifier>';
 	xml += '<wps:DataInputs>';
 	xml += '<wps:Input>';
@@ -264,7 +292,10 @@ function getImage(minCoord, maxCoord, analisys, style) {
 
 	return xml;
 }
-
+/**
+ * aspect sld for wps
+ * @return {string}
+ */
 function getAspectStyle() {
 	var xml = '';
 	xml += '<ows:Identifier>style</ows:Identifier>';
@@ -299,7 +330,10 @@ function getAspectStyle() {
 
 	return xml;
 }
-
+/**
+ * slope sld for wps
+ * @return {string}
+ */
 function getSlopeStyle() {
 	var xml = '';
 	xml += '<ows:Identifier>style</ows:Identifier>';
