@@ -25,15 +25,26 @@
 		<p id="closeAnalysis" style="width: 4%;float:right;cursor:pointer;">X</p>
 	</div>
 	<div id="aspectArea" class="resultArea">
-		<p style="height: 5%;">향분석</p>
+		<p style="width:60%;height: 5%; display:inline-block;">향분석</p>
+		<div style="width:38%;height: 5%; float:right;">
+			<span class="showOrgImg">원본보기</span>
+			<span class="onMapImgRefresh" data-type="aspect" title="지도 상의 사각형 픽셀 크기와 동일한 이미지로 새로고침">이미지 새로고침</span>
+		</div>
 		<img id="aspectImg" class="analysisImg"/>
 		<img id="aspectLegendImg" class="legendImg" src="http://localhost:8080/geoserver/wms?REQUEST=GetLegendGraphic&VERSION=1.0.0&FORMAT=image/png&LAYER=mago3d:dummy&style=aspect&LEGEND_OPTIONS=forceLabels:on;fontAntiAliasing:false;forceTitles:on;fontName:Times%20New%20Roman;fontAntiAliasing:true;fontColor:0x000033;fontSize:14;bgColor:0xFFFFEE;"/>
 	</div>
 	<div id="slopeArea" class="resultArea">
-		<p style="height: 5%;">경사분석</p>
+		<p style="width:60%;height: 5%; display:inline-block;">경사분석</p>
+		<div style="width:38%;height: 5%; float:right;">
+			<span class="showOrgImg">원본보기</span>
+			<span class="onMapImgRefresh" data-type="slope" title="지도 상의 사각형 픽셀 크기와 동일한 이미지로 새로고침">이미지 새로고침</span>
+		</div>
 		<img id="slopeImg" class="analysisImg"/>
 		<img id="slopeLegendImg" class="legendImg" src="http://localhost:8080/geoserver/wms?REQUEST=GetLegendGraphic&VERSION=1.0.0&FORMAT=image/png&LAYER=mago3d:dummy&style=slope&LEGEND_OPTIONS=forceLabels:on;fontAntiAliasing:false;forceTitles:on;fontName:Times%20New%20Roman;fontAntiAliasing:true;fontColor:0x000033;fontSize:14;bgColor:0xFFFFEE;"/>
 	</div>
+</div>
+<div id="orgImg" style="width:100%;height:100%;display:none;opacity: 1;background-color:#808080;position: absolute;z-index: 200000;">
+	<img style="right: 40%;top: 30%;position: absolute;"/>
 </div>
 <ul class="nav">
 	<li id="homeMenu" class="home">

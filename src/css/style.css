@@ -132,6 +132,14 @@ font-size: 17px;
 font-weight : bolder;
 border-bottom : 1px solid black;
 }
+#analysisArea .resultArea .showOrgImg{
+border-right:1px solid black;
+padding-right: 10px;
+cursor:pointer;
+}
+#analysisArea .resultArea .onMapImgRefresh{
+cursor:pointer;
+}
 #analysisArea .analysisImg{
 width: 90%;
 height: 95%;
@@ -139,6 +147,6 @@ border: 1px solid black;
 }
 #analysisArea .legendImg{
 width: calc(10% - 2px);
-height: 95%;
+height: calc(95% - 1px);;
 float: right;
 }

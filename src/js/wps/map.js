@@ -124,13 +124,13 @@ function loadEndFunc(e) {
     magoManager.addLayer(baseLayer);
     //wmslayer 생성 후 등록
     wmsLayer = new Mago3D.WMSLayer({
-        //url: 'http://test.muhanit.kr:13032/geoserver_seaforest/gwc/service/wms',
-        url: 'http://localhost:8080/geoserver/mago3d/gwc/service/wms', 
+        url: 'http://test.muhanit.kr:13032/geoserver_seaforest/gwc/service/wms',
+        //url: 'http://localhost:8080/geoserver/mago3d/gwc/service/wms', 
         //show: false,
-        opacity : 0.5,
+        opacity : 0.3,
         //filter:Mago3D.CODE.imageFilter.BATHYMETRY,  
-        //param: {layers: 'SeaForest:5m_image', tiled: true}
-        param: {layers: 'mago3d:15m_susim', tiled: true}
+        param: {layers: 'SeaForest:5m_image', tiled: true}
+        //param: {layers: 'mago3d:15m_susim', tiled: true}
     });
     magoManager.addLayer(wmsLayer);
     
@@ -203,44 +203,91 @@ function loadEndFunc(e) {
     });
 
     rectangleDrawer.on(Mago3D.RectangleDrawer.EVENT_TYPE.ACTIVE, function(d) {
-        closeAnalysis()
+        closeAnalysis();
     });
     rectangleDrawer.on(Mago3D.RectangleDrawer.EVENT_TYPE.DRAWEND, function(e){
         var rectangle = e;
 
-        var zFactor = getZfactor(rectangle);
-        var slopeAnalXml = getXmlRasterSlope(rectangle.minGeographicCoord, rectangle.maxGeographicCoord, zFactor);
-        var slopeStyleXml = getSlopeStyle();
-    
-        var aspecAnaltXml = getXmlRasterAspect(rectangle.minGeographicCoord, rectangle.maxGeographicCoord);
-        var aspectStyleXml = getAspectStyle();
+        if(rectangle.getArea() / 1000000000 > 1)
+        {
+            alert('Too much area.');
+            rectangleDrawer.cancle();
+            return;
+        }        
         
-        slopeXml = getImage(rectangle.minGeographicCoord, rectangle.maxGeographicCoord, slopeAnalXml, slopeStyleXml);
-        aspectXml = getImage(rectangle.minGeographicCoord, rectangle.maxGeographicCoord, aspecAnaltXml, aspectStyleXml);
-
-        startLoading();
-        $.when(requestBlobResource(slopeXml),requestBlobResource(aspectXml)).done(function(r1,r2){
+        var promises = getRasterAnalysisPromises(rectangle, 'all');
+        
+        analysisResultProcess(promises, function(r1,r2){
             drawedRectangle = rectangle.clone();
             magoManager.modeler.addObject(drawedRectangle, 1);
             rectangleDrawer.setActive(false);
             $('span.analysis.on').removeClass('on');
-
-            setImg(r2,'aspect', true);
-            setImg(r1,'slope');
-
+    
+            responseToImage(r1, function(e, reader){
+                var base64data = reader.result;   
+                $('#aspectImg').attr('src',base64data).trigger('click');
+            });
+            responseToImage(r2, function(e, reader){
+                var base64data = reader.result;   
+                $('#slopeImg').attr('src',base64data);
+            });
+    
             $('#analysisArea').show();
             $('#aspectImg').trigger('click');
-        }).fail(function(e){
-            magoManager.modeler.removeObject(drawedRectangle);
-            alert('parse error');
-        }).always(function(e){
-            stopLoading();
         });
     });
 
     magoManager.interactions.add(rectangleDrawer);
 
     addJqueryEvent();
+}
+
+function analysisResultProcess (promises, callback)
+{
+    startLoading();
+        
+    $.when.apply( $, promises).done(callback)
+    .fail(function(e){
+        magoManager.modeler.removeObject(drawedRectangle);
+        alert('parse error');
+    }).always(function(e){
+        stopLoading();
+    });
+}
+
+function getRasterAnalysisRqXml (rectangle, mode)
+{
+    var xmls = [];
+    if(mode === 'aspect') {
+        xmls.push(getAspectXml(rectangle));
+    } else if(mode === 'slope') {
+        xmls.push(getSlopeXml(rectangle));
+    } else {
+        xmls.push(getAspectXml(rectangle));
+        xmls.push(getSlopeXml(rectangle));
+    }
+
+    return xmls;
+
+    function getSlopeXml(rectangle)
+    {
+        var zFactor = getZfactor(rectangle);
+        var slopeAnalXml = getXmlRasterSlope(rectangle.minGeographicCoord, rectangle.maxGeographicCoord, zFactor);
+        var slopeStyleXml = getSlopeStyle();
+        return getImage(rectangle.minGeographicCoord, rectangle.maxGeographicCoord, slopeAnalXml, slopeStyleXml);
+    }
+
+    function getAspectXml(rectangle)
+    {
+        var aspecAnaltXml = getXmlRasterAspect(rectangle.minGeographicCoord, rectangle.maxGeographicCoord);
+        var aspectStyleXml = getAspectStyle();
+        return getImage(rectangle.minGeographicCoord, rectangle.maxGeographicCoord, aspecAnaltXml, aspectStyleXml);
+    }
+}
+
+function getRasterAnalysisPromises(rectangle, mode)
+{
+    return getRasterAnalysisRqXml(rectangle, mode).map(xml => requestBlobResource(xml));
 }
 
 function closeAnalysis() {
@@ -250,13 +297,39 @@ function closeAnalysis() {
     }
 }
 
-function setImg(res, type, active) {
-    var reader = new FileReader();
-    reader.readAsDataURL(res[0]);
-    reader.onloadend = function() {
-        var base64data = reader.result;   
-        $('#' + type + 'Img').attr('src',base64data).trigger(active?'click':'');
+function responseToImage(response, callback) {
+    var blob;
+    if(Array.isArray(response)) {
+        for(var i in response) {
+            var item = response[i];
+            if(item instanceof Blob) {
+                blob = item;
+                break;
+            }
+        }
+    }else {
+        blob = response instanceof Blob ? response : undefined;
     }
+
+    if(!blob) throw new Error('Invalid response');
+
+    var reader = new FileReader();
+    reader.readAsDataURL(blob);
+    reader.onloadend = function(e) {
+        callback.call(this, e, reader);
+    }
+}
+
+function setImageOnMap(imgSrc) {
+    if(!drawedRectangle) return;
+
+    drawedRectangle.minGeographicCoord.altitude = 2000;
+    drawedRectangle.setStyle({
+        imageUrl : imgSrc,
+        strokeColor : '#349feb',
+        strokeWidth : 3,
+        opacity : 1
+    }, magoManager);
 }
 
 function addJqueryEvent(){
@@ -301,17 +374,37 @@ function addJqueryEvent(){
 
     $('.analysisImg').click(function() {
         var src = $(this).attr('src');
-        
-        drawedRectangle.minGeographicCoord.altitude = 2000;
-        drawedRectangle.setStyle({
-            imageUrl : src,
-            strokeColor : '#349feb',
-            strokeWidth : 3,
-            opacity : 1
-        }, magoManager);
+        setImageOnMap(src);
     });
 
     $('#closeAnalysis').click(function(){
         closeAnalysis();
+    });
+
+    $('.showOrgImg').click(function(){
+        var $img = $(this).parent().siblings('.analysisImg');
+        var imgElem = $img.get(0);
+
+        $('#orgImg').show().find('img').attr('src',$img.attr('src')).css({
+            right : 'calc(50% - ' + imgElem.naturalWidth/2 + 'px)',
+            top : 'calc(50% - ' + imgElem.naturalHeight/2 + 'px)',
+        });
+    });
+
+    $('#orgImg').click(function(){
+        $(this).hide();
+    });
+
+    $('.onMapImgRefresh').click(function() {
+        if(!drawedRectangle) return;
+
+        var $img = $(this).parent().siblings('.analysisImg');
+        analysisResultProcess(getRasterAnalysisPromises(drawedRectangle, $(this).data('type')), function(response){
+            responseToImage(response, function(e, reader){
+                var base64data = reader.result;   
+                setImageOnMap(base64data);
+                $img.attr('src', base64data);
+            });
+        });
     });
 }
