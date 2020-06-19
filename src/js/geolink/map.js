@@ -70,7 +70,9 @@ function loadEndFunc(e) {
           }),
           layers: [
             new ol.layer.Tile({
-              source: new ol.source.OSM()
+              source: new ol.source.XYZ({
+                  url : 'https://services.arcgisonline.com/arcgis/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'
+              })
             })
           ],
           target: 'olmap'
@@ -99,7 +101,7 @@ function loadEndFunc(e) {
      * @type {Mago3D.XYZLayer} xyz layer
      * @param {object} xyzOption
      */
-    var basewLayer = new Mago3D.XYZLayer({
+    var baseLayer = new Mago3D.XYZLayer({
         
         urlFunction : function(coordinate) {
             /*var url = 'http://test.muhanit.kr:37080/seaForest/tile/oceanmap/street/baseMap.do?z={z}&x={x}&y={y}';
@@ -108,9 +110,9 @@ function loadEndFunc(e) {
             .replace('{x}',coordinate.x);*/
             //https://tile.openstreetmap.org/8/216/98.png
 
-            //var url = 'https://services.arcgisonline.com/arcgis/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}';
+            var url = 'https://services.arcgisonline.com/arcgis/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}';
 
-            var url = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
+            //var url = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
             return url.replace('{z}',coordinate.z)
             .replace('{y}',coordinate.y)
             .replace('{x}',coordinate.x);

@@ -215,7 +215,8 @@ function loadEndFunc(e) {
         fillColor : '#34e8eb',
         strokeColor : '#349feb',
         strokeWidth : 3,
-        opacity : 0.5
+        opacity : 0.5,
+        clampToTerrain : false
     });
 
     rectangleDrawer.on(Mago3D.RectangleDrawer.EVENT_TYPE.ACTIVE, function(d) {
@@ -236,6 +237,10 @@ function loadEndFunc(e) {
         
         analysisResultProcess(promises, function(r1,r2){
             drawedRectangle = rectangle.clone();
+            drawedRectangle.setStyle({
+                clampToTerrain : true
+            }, magoManager);
+
             magoManager.modeler.addObject(drawedRectangle, 1);
             rectangleDrawer.setActive(false);
             $('span.analysis.on').removeClass('on');
@@ -250,7 +255,6 @@ function loadEndFunc(e) {
             });
     
             $('#analysisArea').show();
-            $('#aspectImg').trigger('click');
         });
     });
 
@@ -310,6 +314,7 @@ function getRasterAnalysisPromises(rectangle, mode)
 function closeAnalysis() {
     if(drawedRectangle) {
         magoManager.modeler.removeObject(drawedRectangle);
+        drawedRectangle = undefined;
         $('#analysisArea').hide();
     }
 }
@@ -340,12 +345,8 @@ function responseToImage(response, callback) {
 function setImageOnMap(imgSrc) {
     if(!drawedRectangle) return;
 
-    drawedRectangle.minGeographicCoord.altitude = 2000;
     drawedRectangle.setStyle({
-        imageUrl : imgSrc,
-        strokeColor : '#349feb',
-        strokeWidth : 3,
-        opacity : 1
+        imageUrl : imgSrc
     }, magoManager);
 }
 

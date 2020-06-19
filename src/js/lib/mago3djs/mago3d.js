@@ -14666,6 +14666,8 @@ MagoRenderable.prototype.init = function(magoManager)
 
 MagoRenderable.prototype.deleteObjects = function(vboMemManager) 
 {
+	if (this.texture) { this.texture.deleteObjects(vboMemManager.gl); } 
+	
 	var objectsCount = this.objectsArray.length;
 	for (var i=0; i<objectsCount; i++)
 	{
@@ -15111,6 +15113,2180 @@ ViewerInit.prototype.initPosition = function()
 		if (isNaN(duration)) { duration = 3; }
 		this.magoManager.flyTo(lon, lat, height, duration);
 	}
+};
+'use strict';
+
+/**
+ * color 처리 관련 도메인
+ * @class ColorAPI
+ */
+var ColorAPI = {};
+
+ColorAPI.changeColor = function(api, magoManager) 
+{
+	var projectId = api.getProjectId();
+	var dataKey = api.getDataKey();
+	var objectIds = api.getObjectIds();
+	var property = api.getProperty();
+	var propertyKey = null;
+	var propertyValue = null;
+	if (property !== null && property !== "") 
+	{
+		var properties = property.split("=");
+		propertyKey = properties[0];
+		propertyValue = properties[1];
+	}
+	var colorString = api.getColor();
+	if (colorString === undefined || colorString === 0)
+	{ return; }
+	
+	var color = api.getColor().split(",");
+	var colorsValueCount = color.length;
+	var alpha = 255.0;
+	if (colorsValueCount === 4)
+	{
+		alpha = color[3]/255;
+	}
+	
+	var rgbaColor = [ color[0]/255, color[1]/255, color[2]/255, alpha ] ;
+	
+	var isExistObjectIds = false;
+	if (objectIds !== null && objectIds.length !== 0) 
+	{
+		isExistObjectIds = true;
+	}
+	
+	var changeHistorys = [];
+	if (isExistObjectIds) 
+	{
+		for (var i=0, objectCount = objectIds.length; i<objectCount; i++) 
+		{
+			var changeHistory = new ChangeHistory();
+			changeHistory.setProjectId(projectId);
+			changeHistory.setDataKey(dataKey);
+			changeHistory.setObjectId(objectIds[i]);
+			changeHistory.setProperty(property);
+			changeHistory.setPropertyKey(propertyKey);
+			changeHistory.setPropertyValue(propertyValue);
+			//changeHistory.setRgbColor(rgbColor);
+			changeHistory.setColor(rgbaColor);
+			
+			changeHistorys.push(changeHistory);
+		}
+	}
+	else 
+	{
+		var changeHistory = new ChangeHistory();
+		changeHistory.setProjectId(projectId);
+		changeHistory.setDataKey(dataKey);
+		changeHistory.setObjectId(null);
+		changeHistory.setProperty(property);
+		changeHistory.setPropertyKey(propertyKey);
+		changeHistory.setPropertyValue(propertyValue);
+		//changeHistory.setRgbColor(rgbColor);
+		changeHistory.setColor(rgbaColor);
+		changeHistorys.push(changeHistory);
+	}
+
+	var changeHistory;
+	var historiesCount = changeHistorys.length;
+	for (var i=0; i<historiesCount; i++)
+	{
+		changeHistory = changeHistorys[i];
+		MagoConfig.saveColorHistory(projectId, dataKey, changeHistory.getObjectId(), changeHistory);
+	}
+};
+'use strict';
+
+/**
+ * Draw 관련 API를 담당하는 클래스
+ * 원래는 이렇게 만들려고 한게 아니지만, legacy 파일이랑 이름, function 등이 중복되서 이렇게 만들었음
+ * @class DrawAPI
+ */
+var DrawAPI = {};
+
+DrawAPI.drawAppendData = function(api, magoManager) 
+{
+	magoManager.getObjectIndexFile(api.getProjectId(), api.getProjectDataFolder());
+};
+
+DrawAPI.drawInsertIssueImage = function(api, magoManager) 
+{
+	// pin 을 표시
+	if (magoManager.objMarkerSC === undefined || api.getDrawType() === 0) 
+	{
+		magoManager.objMarkerSC = new ObjectMarker();
+		magoManager.objMarkerSC.geoLocationData.geographicCoord = new GeographicCoord();
+		ManagerUtils.calculateGeoLocationData(parseFloat(api.getLongitude()), parseFloat(api.getLatitude()), parseFloat(api.getElevation()), 
+			undefined, undefined, undefined, magoManager.objMarkerSC.geoLocationData, magoManager);
+	}
+	
+	var objMarker = magoManager.objMarkerManager.newObjectMarker({
+		imageFilePath : 'defaultRed',
+		sizeX         : 64,
+		sizeY         : 64
+	});
+	
+	magoManager.objMarkerSC.issue_id = api.getIssueId();
+	magoManager.objMarkerSC.issue_type = api.getIssueType();
+	magoManager.objMarkerSC.geoLocationData.geographicCoord.setLonLatAlt(parseFloat(api.getLongitude()), parseFloat(api.getLatitude()), parseFloat(api.getElevation()));
+	
+	objMarker.copyFrom(magoManager.objMarkerSC);
+	magoManager.objMarkerSC = undefined;
+};
+'use strict';
+
+/**
+ * 변환 행렬 API
+ * @class LocationAndRotationAPI
+ */
+var LocationAndRotationAPI = {};
+
+LocationAndRotationAPI.changeLocationAndRotation = function(api, magoManager) 
+{
+//	var buildingId = api.getDataKey();
+//	var buildingType = "structure";
+//	var building = this.getNeoBuildingByTypeId(buildingType, buildingId);
+
+	var changeHistory = new ChangeHistory();
+	changeHistory.setProjectId(api.getProjectId());
+	changeHistory.setDataKey(api.getDataKey());
+	changeHistory.setLatitude(parseFloat(api.getLatitude()));
+	changeHistory.setLongitude(parseFloat(api.getLongitude()));
+	changeHistory.setElevation(parseFloat(api.getElevation()));
+	changeHistory.setHeading(parseFloat(api.getHeading()));
+	changeHistory.setPitch(parseFloat(api.getPitch()));
+	changeHistory.setRoll(parseFloat(api.getRoll()));
+	
+	var lat = api.getLatitude();
+	var lon = api.getLongitude();
+	var elevation = api.getElevation();
+	var heading = api.getHeading();
+	var pitch = api.getPitch();
+	var roll = api.getRoll();
+
+
+	magoManager.changeLocationAndRotation(	api.getProjectId(),
+		api.getDataKey(),
+		lat,
+		lon,
+		elevation,
+		heading,
+		pitch,
+		roll,
+		api.getAnimationOption()
+	);
+	
+	// MagoConfig에 저장......?
+};
+'use strict';
+
+/**
+ * lod 처리 관련 도메인
+ * @class LodAPI
+ */
+var LodAPI = {};
+
+LodAPI.changeLod = function(api, magoManager) 
+{
+	if (api.getLod0DistInMeters() !== null && api.getLod0DistInMeters() !== "") { magoManager.magoPolicy.setLod0DistInMeters(api.getLod0DistInMeters()); }
+	if (api.getLod1DistInMeters() !== null && api.getLod1DistInMeters() !== "") { magoManager.magoPolicy.setLod1DistInMeters(api.getLod1DistInMeters()); }
+	if (api.getLod2DistInMeters() !== null && api.getLod2DistInMeters() !== "") { magoManager.magoPolicy.setLod2DistInMeters(api.getLod2DistInMeters()); }
+	if (api.getLod3DistInMeters() !== null && api.getLod3DistInMeters() !== "") { magoManager.magoPolicy.setLod3DistInMeters(api.getLod3DistInMeters()); }
+	if (api.getLod4DistInMeters() !== null && api.getLod4DistInMeters() !== "") { magoManager.magoPolicy.setLod4DistInMeters(api.getLod4DistInMeters()); }
+	if (api.getLod5DistInMeters() !== null && api.getLod5DistInMeters() !== "") { magoManager.magoPolicy.setLod5DistInMeters(api.getLod5DistInMeters()); }
+};
+'use strict';
+
+/**
+ * mago3djs API
+ * 
+ * @alias API
+ * @class API
+ * @constructor
+ * 
+ * @param {any} apiName api이름
+ */
+function API(apiName)
+{
+	if (!(this instanceof API)) 
+	{
+		throw new Error(Messages.CONSTRUCT_ERROR);
+	}
+
+	// mago3d 활성화/비활성화 여부
+	this.magoEnable = true;
+	// return
+	this.returnable = false;
+
+	// api 이름
+	this.apiName = apiName;
+	
+	// project id
+	this.projectId = null;
+	this.projectDataFolder = null;
+	// objectIds
+	this.objectIds = null;
+	// data_key
+	this.dataKey = null;
+	// issueId
+	this.issueId = null;
+	// issueType
+	this.issueType = null;
+	// drawType 이미지를 그리는 유형 0 : DB, 1 : 이슈등록
+	this.drawType = 0;
+
+	// 위도
+	this.latitude = 0;
+	// 경도
+	this.longitude = 0;
+	// 높이
+	this.elevation = 0;
+	// heading
+	this.heading = 0;
+	// pitch
+	this.pitch = 0;
+	// roll
+	this.roll = 0;
+	// duration
+	this.duration = 0;
+
+	// 속성
+	this.property = null;
+	// 색깔
+	this.color = 0;
+	// structs = MSP, outfitting = MOP
+	this.blockType = null;
+	// outfitting 표시/비표시
+	this.showOutFitting = false;
+	// label 표시/비표시
+	this.showLabelInfo = true;
+	// origin 표시/비표시
+	this.showOrigin = false;
+	// boundingBox 표시/비표시
+	this.showBoundingBox = false;
+	// 그림자 표시/비표시
+	this.showShadow = false;
+	// frustum culling 가시 거리(M단위)
+	this.frustumFarDistance = 0;
+	// move mode 
+	this.objectMoveMode = CODE.moveMode.NONE;
+	// 이슈 등록 표시
+	this.issueInsertEnable = false;
+	// object 정보 표시
+	this.objectInfoViewEnable = false;
+	// 이슈 목록 표시
+	this.nearGeoIssueListEnable = false;
+	// occlusion culling
+	this.occlusionCullingEnable = false;
+	//
+	this.insertIssueState = 0;
+	
+	// LOD1
+	this.lod0DistInMeters = null;
+	this.lod1DistInMeters = null;
+	this.lod2DistInMeters = null;
+	this.lod3DistInMeters = null;
+	this.lod4DistInMeters = null;
+	this.lod5DistInMeters = null;
+	
+	// Lighting
+	this.ambientReflectionCoef = null;
+	this.diffuseReflectionCoef = null;
+	this.specularReflectionCoef = null;
+	this.ambientColor = null;
+	this.specularColor = null;
+	
+	this.ssaoRadius = null;
+	//
+	this.FPVMode = false;
+
+	// input x, y, z
+	this.inputPoint = null;
+	// result x, y, z
+	this.resultPoint = null;
+	
+	// General magoMode.
+	this.magoMode = CODE.magoMode.NORMAL;
+
+	//position unit
+	this.unit = CODE.units.DEGREE;
+
+	//for staticModel instantiate
+	this.instantiateObj = null;
+
+	//for staticModel add
+	this.staticModelAttributeObj = null;
+
+	//animation option. 
+	this.animationOption = null;
+
+	/**
+	 * @type {trackOption}
+	 */
+	this.trackOption = null;
+
+	/**
+	 * @type {nodeAttribute}
+	 */
+	this.nodeAttribute = null;
+};
+
+API.prototype.getMagoEnable = function() 
+{
+	return this.magoEnable;
+};
+API.prototype.setMagoEnable = function(magoEnable) 
+{
+	this.magoEnable = magoEnable;
+};
+
+API.prototype.getReturnable = function()
+{
+	return this.returnable;
+};
+API.prototype.setReturnable = function(returnable)
+{
+	this.returnable = returnable;
+};
+
+API.prototype.getAPIName = function() 
+{
+	return this.apiName;
+};
+
+API.prototype.getProjectId = function() 
+{
+	return this.projectId;
+};
+API.prototype.setProjectId = function(projectId) 
+{
+	this.projectId = projectId;
+};
+
+API.prototype.getProjectDataFolder = function() 
+{
+	return this.projectDataFolder;
+};
+API.prototype.setProjectDataFolder = function(projectDataFolder) 
+{
+	this.projectDataFolder = projectDataFolder;
+};
+
+API.prototype.getObjectIds = function() 
+{
+	return this.objectIds;
+};
+API.prototype.setObjectIds = function(objectIds) 
+{
+	this.objectIds = objectIds;
+};
+
+API.prototype.getIssueId = function() 
+{
+	return this.issueId;
+};
+API.prototype.setIssueId = function(issueId) 
+{
+	this.issueId = issueId;
+};
+API.prototype.getIssueType = function() 
+{
+	return this.issueType;
+};
+API.prototype.setIssueType = function(issueType) 
+{
+	this.issueId = issueType;
+};
+
+API.prototype.getDataKey = function() 
+{
+	return this.dataKey;
+};
+API.prototype.setDataKey = function(dataKey) 
+{
+	this.dataKey = dataKey;
+};
+
+API.prototype.getLatitude = function() 
+{
+	return this.latitude;
+};
+API.prototype.setLatitude = function(latitude) 
+{
+	this.latitude = latitude;
+};
+
+API.prototype.getLongitude = function() 
+{
+	return this.longitude;
+};
+API.prototype.setLongitude = function(longitude) 
+{
+	this.longitude = longitude;
+};
+
+API.prototype.getElevation = function() 
+{
+	return this.elevation;
+};
+API.prototype.setElevation = function(elevation) 
+{
+	this.elevation = elevation;
+};
+
+API.prototype.getHeading = function() 
+{
+	return this.heading;
+};
+API.prototype.setHeading = function(heading) 
+{
+	this.heading = heading;
+};
+
+API.prototype.getPitch = function() 
+{
+	return this.pitch;
+};
+API.prototype.setPitch = function(pitch) 
+{
+	this.pitch = pitch;
+};
+
+API.prototype.getRoll = function() 
+{
+	return this.roll;
+};
+API.prototype.setRoll = function(roll) 
+{
+	this.roll = roll;
+};
+
+API.prototype.getProperty = function() 
+{
+	return this.property;
+};
+API.prototype.setProperty = function(property) 
+{
+	this.property = property;
+};
+
+API.prototype.getColor = function() 
+{
+	return this.color;
+};
+API.prototype.setColor = function(color) 
+{
+	this.color = color;
+};
+
+API.prototype.getBlockType = function() 
+{
+	return this.blockType;
+};
+API.prototype.setBlockType = function(blockType) 
+{
+	this.blockType = blockType;
+};
+
+API.prototype.getShowOutFitting = function() 
+{
+	return this.showOutFitting;
+};
+API.prototype.setShowOutFitting = function(showOutFitting) 
+{
+	this.showOutFitting = showOutFitting;
+};
+
+
+API.prototype.getShowLabelInfo = function() 
+{
+	return this.showLabelInfo;
+};
+API.prototype.setShowLabelInfo = function(showLabelInfo) 
+{
+	this.showLabelInfo = showLabelInfo;
+};
+
+API.prototype.getShowOrigin = function()
+{
+	return this.showOrigin;
+};
+API.prototype.setShowOrigin = function(showOrigin)
+{
+	this.showOrigin = showOrigin;
+};
+
+API.prototype.getShowBoundingBox = function() 
+{
+	return this.showBoundingBox;
+};
+API.prototype.setShowBoundingBox = function(showBoundingBox) 
+{
+	this.showBoundingBox = showBoundingBox;
+};
+
+API.prototype.getShowShadow = function() 
+{
+	return this.showShadow;
+};
+API.prototype.setShowShadow = function(showShadow) 
+{
+	this.showShadow = showShadow;
+};
+
+API.prototype.getFrustumFarDistance = function() 
+{
+	return this.frustumFarDistance;
+};
+API.prototype.setFrustumFarDistance = function(frustumFarDistance) 
+{
+	this.frustumFarDistance = frustumFarDistance;
+};
+
+API.prototype.getObjectMoveMode = function() 
+{
+	return this.objectMoveMode;
+};
+API.prototype.setObjectMoveMode = function(objectMoveMode) 
+{
+	this.objectMoveMode = objectMoveMode;
+};
+
+API.prototype.getIssueInsertEnable = function() 
+{
+	return this.issueInsertEnable;
+};
+API.prototype.setIssueInsertEnable = function(issueInsertEnable) 
+{
+	this.issueInsertEnable = issueInsertEnable;
+};
+API.prototype.getObjectInfoViewEnable = function() 
+{
+	return this.objectInfoViewEnable;
+};
+API.prototype.setObjectInfoViewEnable = function(objectInfoViewEnable) 
+{
+	this.objectInfoViewEnable = objectInfoViewEnable;
+};
+API.prototype.getOcclusionCullingEnable = function() 
+{
+	return this.occlusionCullingEnable;
+};
+API.prototype.setOcclusionCullingEnable = function(occlusionCullingEnable) 
+{
+	this.occlusionCullingEnable = occlusionCullingEnable;
+};
+API.prototype.getNearGeoIssueListEnable = function() 
+{
+	return this.nearGeoIssueListEnable;
+};
+API.prototype.setNearGeoIssueListEnable = function(nearGeoIssueListEnable) 
+{
+	this.nearGeoIssueListEnable = nearGeoIssueListEnable;
+};
+
+API.prototype.getInsertIssueState = function() 
+{
+	return this.insertIssueState;
+};
+API.prototype.setInsertIssueState = function(insertIssueState) 
+{
+	this.insertIssueState = insertIssueState;
+};
+
+API.prototype.getDrawType = function() 
+{
+	return this.drawType;
+};
+API.prototype.setDrawType = function(drawType) 
+{
+	this.drawType = drawType;
+};
+
+API.prototype.getLod0DistInMeters = function() 
+{
+	return this.lod0DistInMeters;
+};
+API.prototype.setLod0DistInMeters = function(lod0DistInMeters) 
+{
+	this.lod0DistInMeters = lod0DistInMeters;
+};
+API.prototype.getLod1DistInMeters = function() 
+{
+	return this.lod1DistInMeters;
+};
+API.prototype.setLod1DistInMeters = function(lod1DistInMeters) 
+{
+	this.lod1DistInMeters = lod1DistInMeters;
+};
+API.prototype.getLod2DistInMeters = function() 
+{
+	return this.lod2DistInMeters;
+};
+API.prototype.setLod2DistInMeters = function(lod2DistInMeters) 
+{
+	this.lod2DistInMeters = lod2DistInMeters;
+};
+API.prototype.getLod3DistInMeters = function() 
+{
+	return this.lod3DistInMeters;
+};
+API.prototype.setLod3DistInMeters = function(lod3DistInMeters) 
+{
+	this.lod3DistInMeters = lod3DistInMeters;
+};
+API.prototype.getLod4DistInMeters = function() 
+{
+	return this.lod4DistInMeters;
+};
+API.prototype.setLod4DistInMeters = function(lod4DistInMeters) 
+{
+	this.lod4DistInMeters = lod4DistInMeters;
+};
+API.prototype.getLod5DistInMeters = function() 
+{
+	return this.lod5DistInMeters;
+};
+API.prototype.setLod5DistInMeters = function(lod5DistInMeters) 
+{
+	this.lod5DistInMeters = lod5DistInMeters;
+};
+
+API.prototype.getAmbientReflectionCoef = function() 
+{
+	return this.ambientReflectionCoef;
+};
+API.prototype.setAmbientReflectionCoef = function(ambientReflectionCoef) 
+{
+	this.ambientReflectionCoef = ambientReflectionCoef;
+};
+API.prototype.getDiffuseReflectionCoef = function() 
+{
+	return this.diffuseReflectionCoef;
+};
+API.prototype.setDiffuseReflectionCoef = function(diffuseReflectionCoef) 
+{
+	this.diffuseReflectionCoef = diffuseReflectionCoef;
+};
+API.prototype.getSpecularReflectionCoef = function() 
+{
+	return this.specularReflectionCoef;
+};
+API.prototype.setSpecularReflectionCoef = function(specularReflectionCoef) 
+{
+	this.specularReflectionCoef = specularReflectionCoef;
+};
+API.prototype.getAmbientColor = function() 
+{
+	return this.ambientColor;
+};
+API.prototype.setAmbientColor = function(ambientColor) 
+{
+	this.ambientColor = ambientColor;
+};
+API.prototype.getSpecularColor = function() 
+{
+	return this.specularColor;
+};
+API.prototype.setSpecularColor = function(specularColor) 
+{
+	this.specularColor = specularColor;
+};
+API.prototype.getSsaoRadius = function() 
+{
+	return this.ssaoRadius;
+};
+API.prototype.setSsaoRadius = function(ssaoRadius) 
+{
+	this.ssaoRadius = ssaoRadius;
+};
+API.prototype.getFPVMode = function()
+{
+	return this.FPVMode;
+};
+API.prototype.setFPVMode = function(value)
+{
+	this.FPVMode = value;
+};
+API.prototype.getMagoMode = function()
+{
+	return this.magoMode;
+};
+API.prototype.setMagoMode = function(value)
+{
+	this.magoMode = value;
+};
+API.prototype.getDuration = function()
+{
+	return this.duration;
+};
+API.prototype.setDuration = function(duration)
+{
+	this.duration = duration;
+};
+
+API.prototype.getInputPoint = function()
+{
+	return this.inputPoint;
+};
+API.prototype.setInputPoint = function(inputPoint)
+{
+	this.inputPoint = inputPoint;
+};
+
+API.prototype.getResultPoint = function()
+{
+	return this.resultPoint;
+};
+API.prototype.setResultPoint = function(resultPoint)
+{
+	this.resultPoint = resultPoint;
+};
+
+API.prototype.getUnit = function()
+{
+	return this.unit;
+};
+API.prototype.setUnit = function(unit)
+{
+	if (unit !== undefined)
+	{
+		if (isNaN(unit) || unit > CODE.units.RADIAN)
+		{
+			throw new Error('unit parameter needs CODE.units');
+		}
+		this.unit = unit;
+	}
+};
+
+API.prototype.getInstantiateObj = function()
+{
+	return this.instantiateObj;
+};
+API.prototype.setInstantiateObj = function(instantiateObj)
+{
+	this.instantiateObj = instantiateObj;
+};
+
+API.prototype.getStaticModelAttributeObj = function()
+{
+	return this.staticModelAttributeObj;
+};
+API.prototype.setStaticModelAttributeObj = function(staticModelAttributeObj)
+{
+	this.staticModelAttributeObj = staticModelAttributeObj;
+};
+
+API.prototype.getAnimationOption = function()
+{
+	return this.animationOption;
+};
+API.prototype.setAnimationOption = function(animationOption)
+{
+	this.animationOption = animationOption;
+};
+
+API.prototype.getTrackOption = function()
+{
+	return this.trackOption;
+};
+API.prototype.setTrackOption = function(trackOption)
+{
+	this.trackOption = trackOption;
+};
+
+API.prototype.getNodeAttribute = function()
+{
+	return this.nodeAttribute;
+};
+API.prototype.setNodeAttribute = function(nodeAttribute)
+{
+	this.nodeAttribute = nodeAttribute;
+};
+
+'use strict';
+
+/**
+ * 사용자가 변경한 moving, color, rotation 등 이력 정보를 위한 domain
+ * @class Policy
+ */
+var ChangeHistory = function() 
+{
+	if (!(this instanceof ChangeHistory)) 
+	{
+		throw new Error(Messages.CONSTRUCT_ERROR);
+	}
+
+	this.moveHistory = false;
+	this.colorHistory = false;
+	this.rotationHistory = false;
+	
+	// move mode. ALL : 0 , OBJECT : 1, NONE : 2
+	this.objectMoveMode = null;
+	
+	// project id
+	this.projectId = null;
+	// project data folder
+	this.projectDataFolder = null;
+	// data_key
+	this.dataKey = null;	
+	// objectId
+	this.objectId = null;
+	// objectIndexOrder
+	this.objectIndexOrder = 0;
+	
+	// referenceObject aditional movement.
+	this.refObjectAditionalMove;
+	this.refObjectAditionalMoveRelToBuilding;
+	
+	// 위도
+	this.latitude = 0.0;
+	// 경도
+	this.longitude = 0.0;
+	// 높이
+	this.elevation = 0.0;
+	// heading
+	this.heading = 0.0;
+	// pitch
+	this.pitch = 0.0;
+	// roll
+	this.roll = 0.0;
+	// duration
+	this.duration = 0;
+	// 색깔
+	this.color = 0;
+	// color rgb
+	this.rgbColor = [];
+	// 속성
+	this.property = null;
+	this.propertyKey = null;
+	this.propertyValue = null;
+};
+
+ChangeHistory.prototype.getReferenceObjectAditionalMovement = function() 
+{
+	if (this.refObjectAditionalMove === undefined)
+	{ this.refObjectAditionalMove = new Point3D(); }
+	
+	return this.refObjectAditionalMove;
+};
+
+ChangeHistory.prototype.getReferenceObjectAditionalMovementRelToBuilding = function() 
+{
+	if (this.refObjectAditionalMoveRelToBuilding === undefined)
+	{ this.refObjectAditionalMoveRelToBuilding = new Point3D(); }
+	
+	return this.refObjectAditionalMoveRelToBuilding;
+};
+
+ChangeHistory.prototype.getProjectId = function() 
+{
+	return this.projectId;
+};
+ChangeHistory.prototype.setProjectId = function(projectId) 
+{
+	this.projectId = projectId;
+};
+
+ChangeHistory.prototype.getProjectDataFolder = function() 
+{
+	return this.projectDataFolder;
+};
+ChangeHistory.prototype.setProjectDataFolder = function(projectDataFolder) 
+{
+	this.projectDataFolder = projectDataFolder;
+};
+
+ChangeHistory.prototype.getDataKey = function() 
+{
+	return this.dataKey;
+};
+ChangeHistory.prototype.setDataKey = function(dataKey) 
+{
+	this.dataKey = dataKey;
+};
+
+ChangeHistory.prototype.getObjectId = function() 
+{
+	return this.objectId;
+};
+ChangeHistory.prototype.setObjectId = function(objectId) 
+{
+	this.objectId = objectId;
+};
+
+ChangeHistory.prototype.getObjectIndexOrder = function() 
+{
+	return this.objectIndexOrder;
+};
+ChangeHistory.prototype.setObjectIndexOrder = function(objectIndexOrder) 
+{
+	this.objectIndexOrder = objectIndexOrder;
+};
+
+ChangeHistory.prototype.getLatitude = function() 
+{
+	return this.latitude;
+};
+ChangeHistory.prototype.setLatitude = function(latitude) 
+{
+	this.latitude = latitude;
+};
+
+ChangeHistory.prototype.getLongitude = function() 
+{
+	return this.longitude;
+};
+ChangeHistory.prototype.setLongitude = function(longitude) 
+{
+	this.longitude = longitude;
+};
+
+ChangeHistory.prototype.getElevation = function() 
+{
+	return this.elevation;
+};
+ChangeHistory.prototype.setElevation = function(elevation) 
+{
+	this.elevation = elevation;
+};
+
+ChangeHistory.prototype.getHeading = function() 
+{
+	return this.heading;
+};
+ChangeHistory.prototype.setHeading = function(heading) 
+{
+	this.heading = heading;
+};
+
+ChangeHistory.prototype.getPitch = function() 
+{
+	return this.pitch;
+};
+ChangeHistory.prototype.setPitch = function(pitch) 
+{
+	this.pitch = pitch;
+};
+
+ChangeHistory.prototype.getRoll = function() 
+{
+	return this.roll;
+};
+ChangeHistory.prototype.setRoll = function(roll) 
+{
+	this.roll = roll;
+};
+
+ChangeHistory.prototype.getColor = function() 
+{
+	return this.color;
+};
+ChangeHistory.prototype.setColor = function(color) 
+{
+	this.color = color;
+};
+ChangeHistory.prototype.getRgbColor = function() 
+{
+	return this.rgbColor;
+};
+ChangeHistory.prototype.setRgbColor = function(rgbColor) 
+{
+	this.rgbColor = rgbColor;
+};
+
+ChangeHistory.prototype.getProperty = function() 
+{
+	return this.property;
+};
+ChangeHistory.prototype.setProperty = function(property) 
+{
+	this.property = property;
+};
+ChangeHistory.prototype.getPropertyKey = function() 
+{
+	return this.propertyKey;
+};
+ChangeHistory.prototype.setPropertyKey = function(propertyKey) 
+{
+	this.propertyKey = propertyKey;
+};
+ChangeHistory.prototype.getPropertyValue = function() 
+{
+	return this.propertyValue;
+};
+ChangeHistory.prototype.setPropertyValue = function(propertyValue) 
+{
+	this.propertyValue = propertyValue;
+};
+
+ChangeHistory.prototype.getDuration = function()
+{
+	return this.duration;
+};
+ChangeHistory.prototype.setDuration = function(duration)
+{
+	this.duration = duration;
+};
+
+ChangeHistory.prototype.getObjectMoveMode = function() 
+{
+	return this.objectMoveMode;
+};
+ChangeHistory.prototype.setObjectMoveMode = function(objectMoveMode) 
+{
+	this.objectMoveMode = objectMoveMode;
+};
+"use strict";
+
+var CODE = {};
+
+// magoManager가 다 로딩 되지 않은 상태에서 화면으로 부터 호출 되는 것을 막기 위해
+CODE.magoManagerState = {
+	"INIT"   	: 0,
+	"STARTED"	: 1,
+	"READY"   : 2
+};
+
+//0 = no started to load. 1 = started loading. 2 = finished loading. 3 = parse started. 4 = parse finished.
+CODE.fileLoadState = {
+	"READY"            : 0,
+	"LOADING_STARTED"  : 1,
+	"LOADING_FINISHED" : 2,
+	"PARSE_STARTED"    : 3,
+	"PARSE_FINISHED"   : 4,
+	"IN_QUEUE"         : 5,
+	"IN_PARSE_QUEUE"   : 6,
+	"BINDING_STARTED"  : 7,
+	"BINDING_FINISHED" : 8,
+	"LOAD_FAILED"      : 9
+};
+
+CODE.moveMode = {
+	"ALL"              : "0",
+	"OBJECT"           : "1",
+	"GEOGRAPHICPOINTS" : "2",
+	"NONE"             : "3"
+};
+
+CODE.magoMode = {
+	"NORMAL"  : 0,
+	"DRAWING" : 1
+};
+
+CODE.magoCurrentProcess = {
+	"Unknown"                    : 0,
+	"DepthRendering"             : 1,
+	"ColorRendering"             : 2,
+	"ColorCodeRendering"         : 3,
+	"DepthShadowRendering"       : 4,
+	"SilhouetteDepthRendering"   : 5,
+	"StencilSilhouetteRendering" : 6
+};
+
+CODE.modelerMode = {
+	"INACTIVE"                 : 0,
+	"DRAWING_POLYLINE"         : 1,
+	"DRAWING_PLANEGRID"        : 2,
+	"DRAWING_GEOGRAPHICPOINTS" : 3,
+	"DRAWING_EXCAVATIONPOINTS" : 4,
+	"DRAWING_TUNNELPOINTS"     : 5,
+	"DRAWING_BSPLINE"          : 6,
+	"DRAWING_BASICFACTORY"     : 7,
+	"DRAWING_STATICGEOMETRY"   : 8,
+	"DRAWING_PIPE"             : 9,
+	"DRAWING_SPHERE"           : 10,
+	"DRAWING_BOX"              : 11,
+	"DRAWING_CUTTINGPLANE"     : 12,
+	"DRAWING_CLIPPINGBOX"      : 13,
+	"DRAWING_CONCENTRICTUBES"  : 14,
+	"DRAWING_TUBE"             : 15,
+	"DRAWING_FREECONTOURWALL"  : 16,
+	"DRAWING_CYLYNDER"         : 17
+};
+
+CODE.boxFace = {
+	"UNKNOWN" : 0,
+	"LEFT"    : 1,
+	"RIGHT"   : 2,
+	"FRONT"   : 3,
+	"REAR"    : 4,
+	"TOP"     : 5,
+	"BOTTOM"  : 6
+};
+
+CODE.modelerDrawingState = {
+	"NO_STARTED" : 0,
+	"STARTED"    : 1
+};
+
+CODE.modelerDrawingElement = {
+	"NOTHING"          : 0,
+	"POINTS"           : 1,
+	"LINES"            : 2,
+	"POLYLINES"        : 3,
+	"GEOGRAPHICPOINTS" : 4,
+};
+
+CODE.units = {
+	"METRE"  : 0,
+	"DEGREE" : 1,
+	"RADIAN" : 2
+};
+
+
+CODE.trackMode = {
+	"TRACKING" : 0,
+	"DRIVER"   : 1
+};
+
+CODE.movementType = {
+	"NO_MOVEMENT" : 0,
+	"TRANSLATION" : 1,
+	"ROTATION"    : 2,
+	"ROTATION_ZX" : 3
+};
+
+CODE.imageryType = {
+	"UNKNOWN"      : 0,
+	"CRS84"        : 1,
+	"WEB_MERCATOR" : 2
+};
+
+CODE.animationType = {
+	"UNKNOWN"         : 0,
+	"REALTIME_POINTS" : 1,
+	"PATH"            : 2
+};
+
+CODE.relativePosition2D = {
+	"UNKNOWN"    : 0,
+	"LEFT"       : 1,
+	"RIGHT"      : 2,
+	"COINCIDENT" : 3
+};
+CODE.imageFilter = {
+	"UNKNOWN"    : 0,
+	"BATHYMETRY" : 1
+};
+CODE.cesiumTerrainType = {
+	GEOSERVER          : 'geoserver',
+	CESIUM_DEFAULT     : 'cesium-default',
+	CESIUM_ION_DEFAULT : 'cesium-ion-default',
+	CESIUM_ION_CDN     : 'cesium-ion-cdn',
+	CESIUM_CUSTOMER    : 'cesium-customer'
+};
+CODE.magoEarthTerrainType = {
+	PLAIN     : 'plain',
+	ELEVATION : 'elevation',
+	REALTIME  : 'realtime'
+};
+
+CODE.drawGeometryType = {
+	POINT     : 'point',
+	LINE    	 : 'line',
+	POLYGON   : 'polygon',
+	RECTANGLE : 'rectangle'
+};
+
+CODE.PROJECT_ID_PREFIX = "projectId_";
+CODE.PROJECT_DATA_FOLDER_PREFIX = "projectDataFolder_";
+
+CODE.parametricCurveState = {
+	"NORMAL" : 0,
+	"EDITED" : 1
+};
+
+'use strict';
+
+/**
+ * 상수 설정
+ * @class Constant
+ */
+var Constant = {};
+
+Constant.CESIUM = "cesium";
+Constant.WORLDWIND = "worldwind";
+Constant.MAGOWORLD = "magoworld";
+Constant.OBJECT_INDEX_FILE = "/objectIndexFile.ihe";
+Constant.TILE_INDEX_FILE = "/smartTile_f4d_indexFile.sii";
+Constant.CACHE_VERSION = "?cache_version=";
+Constant.SIMPLE_BUILDING_TEXTURE3x3_BMP = "/SimpleBuildingTexture3x3.bmp";
+Constant.RESULT_XDO2F4D = "/Result_xdo2f4d/Images/";
+Constant.RESULT_XDO2F4D_TERRAINTILES = "/Result_xdo2f4d/F4D_TerrainTiles/";
+Constant.RESULT_XDO2F4D_TERRAINTILEFILE_TXT = "/Result_xdo2f4d/f4dTerranTileFile.txt";
+
+Constant.INTERSECTION_OUTSIDE = 0;
+Constant.INTERSECTION_INTERSECT= 1;
+Constant.INTERSECTION_INSIDE = 2;
+Constant.INTERSECTION_POINT_A = 3;
+Constant.INTERSECTION_POINT_B = 4;
+
+'use strict';
+
+/**
+ * mago3D 전체 환경 설정을 관리
+ * @class MagoConfig
+ */
+var MagoConfig = {};
+
+MagoConfig.setContainerId = function(containerId) 
+{
+	this.containerId = containerId;
+};
+
+MagoConfig.getContainerId = function() 
+{
+	return this.containerId;
+};
+
+MagoConfig.getPolicy = function() 
+{
+	return this.serverPolicy;
+};
+
+MagoConfig.getGeoserver = function() 
+{
+	return this.geoserver;
+};
+
+MagoConfig.getData = function(key) 
+{
+	return this.dataObject[key];
+};
+
+MagoConfig.isDataExist = function(key) 
+{
+	return this.dataObject.hasOwnProperty(key);
+};
+
+MagoConfig.deleteData = function(key) 
+{
+	return delete this.dataObject[key];
+};
+
+/**
+ * data 를 map에 저장
+ * @param key map에 저장될 key
+ * @param value map에 저장될 value
+ */
+MagoConfig.setData = function(key, value) 
+{
+	if (!this.isDataExist(key)) 
+	{
+		this.dataObject[key] = value;
+	}
+};
+
+/**
+ * F4D Converter 실행 결과물이 저장된 project data folder 명을 획득
+ * @param projectDataFolder data folder
+ */
+MagoConfig.getProjectDataFolder = function(projectDataFolder) 
+{
+	var key = CODE.PROJECT_DATA_FOLDER_PREFIX + projectDataFolder;
+	return this.dataObject[key];
+};
+
+/**
+ * project map에 data folder명의 존재 유무를 검사
+ * @param projectDataFolder
+ */
+MagoConfig.isProjectDataFolderExist = function(projectDataFolder) 
+{
+	var key = CODE.PROJECT_DATA_FOLDER_PREFIX + projectDataFolder;
+	return this.dataObject.hasOwnProperty(key);
+};
+
+/**
+ * project data folder명을 map에서 삭제
+ * @param projectDataFolder
+ */
+MagoConfig.deleteProjectDataFolder = function(projectDataFolder) 
+{
+	var key = CODE.PROJECT_DATA_FOLDER_PREFIX + projectDataFolder;
+	return delete this.dataObject[key];
+};
+
+/**
+ * project data folder명을 Object에서 삭제
+ * @param projectDataFolder Object에 저장될 key
+ * @param value Object에 저장될 value
+ */
+MagoConfig.setProjectDataFolder = function(projectDataFolder, value) 
+{
+	var key = CODE.PROJECT_DATA_FOLDER_PREFIX + projectDataFolder;
+	if (!this.isProjectDataFolderExist(key))
+	{
+		this.dataObject[key] = value;
+	}
+};
+
+/**
+ * 환경설정 초기화
+ * @param serverPolicy mago3d policy(json)
+ * @param projectIdArray data 정보를 map 저장할 key name
+ * @param projectDataArray data 정보(json)
+ */
+MagoConfig.init = function(serverPolicy, projectIdArray, projectDataArray) 
+{
+	if (!serverPolicy || !serverPolicy instanceof Object) 
+	{
+		throw new Error('geopolicy is required object.');
+	}
+	this.dataObject = {};
+	
+	this.selectHistoryObject = {};
+	this.movingHistoryObject = {};
+	this.colorHistoryObject = {};
+	this.locationAndRotationHistoryObject = {};
+
+	this.serverPolicy = serverPolicy;
+	this.scriptRootPath = getScriptRootPath();
+	this.twoDimension = false;
+
+	if (this.serverPolicy.geoserverEnable) 
+	{
+		this.geoserver = new GeoServer();
+
+		var info = {
+			"wmsVersion"    : this.serverPolicy.geoserverWmsVersion,
+			"dataUrl"       : this.serverPolicy.geoserverDataUrl,
+			"dataWorkspace" : this.serverPolicy.geoserverDataWorkspace,
+			"dataStore"     : this.serverPolicy.geoserverDataStore,
+			"user"          : this.serverPolicy.geoserverUser,
+			"password"      : this.serverPolicy.geoserverPassword
+		};
+		this.geoserver.setServerInfo(info);
+	}
+
+
+	if (projectIdArray && projectIdArray.length > 0) 
+	{
+		for (var i=0; i<projectIdArray.length; i++) 
+		{
+			if (!this.isDataExist(CODE.PROJECT_ID_PREFIX + projectIdArray[i])) 
+			{
+				this.setData(CODE.PROJECT_ID_PREFIX + projectIdArray[i], projectDataArray[i]);
+				this.setProjectDataFolder(CODE.PROJECT_DATA_FOLDER_PREFIX + projectDataArray[i].data_key, projectDataArray[i].data_key);
+			}
+		}
+	}
+
+	function getScriptRootPath() 
+	{
+		var magoScriptQueryStrRegex = /((?:.*\/)|^)mago3d\.js\?(?:&?[^=&]*=[^=&]*)*/;
+		var magoScriptRegex = /((?:.*\/)|^)mago3d\.js$/;
+		var magoScriptPath;
+		var scripts = document.getElementsByTagName('script');
+		for ( var j = 0, len = scripts.length; j < len; ++j) 
+		{
+			var src = scripts[j].getAttribute('src');
+			var nomalResult = magoScriptRegex.exec(src);
+			var queryStrResult = magoScriptQueryStrRegex.exec(src);
+
+			var result = nomalResult||queryStrResult;
+			if (result !== null) 
+			{
+				magoScriptPath = result[1];
+			}
+		}
+		return magoScriptPath;
+	}
+};
+
+/**
+ * 모든 데이터를 삭제함
+ */
+MagoConfig.clearAllData = function() 
+{
+	this.dataObject = {};
+};
+
+/**
+ * 모든 선택 히스토리 삭제
+ */
+MagoConfig.clearSelectHistory = function() 
+{
+	this.selectHistoryObject = {};
+};
+
+/**
+ * 모든 object 선택 내용 이력을 취득
+ */
+MagoConfig.getAllSelectHistory = function()
+{
+	return this.selectHistoryObject;
+};
+
+/**
+ * project 별 해당 키에 해당하는 모든 object 선택 내용 이력을 취득
+ */
+MagoConfig.getSelectHistoryObjects = function(projectId, dataKey)
+{
+	// projectId 별 Object을 검사
+	var projectIdObject = this.selectHistoryObject[projectId];
+	if (projectIdObject === undefined) { return undefined; }
+	// dataKey 별 Object을 검사
+	var dataKeyObject = projectIdObject[dataKey];
+	return dataKeyObject;
+};
+
+/**
+ * object 선택 내용 이력을 취득
+ */
+MagoConfig.getSelectHistoryObject = function(projectId, dataKey, objectIndexOrder)
+{
+	// projectId 별 Object을 검사
+	var projectIdObject = this.selectHistoryObject[projectId];
+	if (projectIdObject === undefined) { return undefined; }
+	// dataKey 별 Object을 검사
+	var dataKeyObject = projectIdObject[dataKey];
+	if (dataKeyObject === undefined) { return undefined; }
+	// objectIndexOrder 를 저장
+	return dataKeyObject[objectIndexOrder];
+};
+
+/**
+ * object 선택 내용을 저장
+ */
+MagoConfig.saveSelectHistory = function(projectId, dataKey, objectIndexOrder, changeHistory) 
+{
+	// projectId 별 Object을 검사
+	var projectIdObject = this.selectHistoryObject.get(projectId);
+	if (projectIdObject === undefined)
+	{
+		projectIdObject = {};
+		this.selectHistoryObject[projectId] = projectIdObject;
+	}
+	
+	// dataKey 별 Object을 검사
+	var dataKeyObject = projectIdObject[dataKey];
+	if (dataKeyObject === undefined)
+	{
+		dataKeyObject = {};
+		projectIdObject[dataKey] = dataKeyObject;
+	}
+	
+	// objectIndexOrder 를 저장
+	dataKeyObject[objectIndexOrder] = changeHistory;
+};
+
+/**
+ * object 선택 내용을 삭제
+ */
+MagoConfig.deleteSelectHistoryObject = function(projectId, dataKey, objectIndexOrder)
+{
+	// projectId 별 Object을 검사
+	var projectIdObject = this.selectHistoryObject[projectId];
+	if (projectIdObject === undefined) { return undefined; }
+	// dataKey 별 Object을 검사
+	var dataKeyObject = projectIdObject[dataKey];
+	if (dataKeyObject === undefined) { return undefined; }
+	// objectIndexOrder 를 저장
+	return delete dataKeyObject[objectIndexOrder];
+};
+
+/**
+ * 모든 이동 히스토리 삭제
+ */
+MagoConfig.clearMovingHistory = function() 
+{
+	this.movingHistoryObject = {};
+};
+
+/**
+ * 모든 object 선택 내용 이력을 취득
+ */
+MagoConfig.getAllMovingHistory = function()
+{
+	return this.movingHistoryObject;
+};
+
+/**
+ * project별 입력키 값과 일치하는 object 이동 내용 이력을 취득
+ */
+MagoConfig.getMovingHistoryObjects = function(projectId, dataKey)
+{
+	// projectId 별 Object을 검사
+	var projectIdObject = this.movingHistoryObject[projectId];
+	if (projectIdObject === undefined) { return undefined; }
+	// dataKey 별 Object을 검사
+	var dataKeyObject = projectIdObject[dataKey];
+	return dataKeyObject;
+};
+
+/**
+ * object 이동 내용 이력을 취득
+ */
+MagoConfig.getMovingHistoryObject = function(projectId, dataKey, objectIndexOrder)
+{
+	// projectId 별 Object을 검사
+	var projectIdObject = this.movingHistoryObject[projectId];
+	if (projectIdObject === undefined) { return undefined; }
+	// dataKey 별 Object을 검사
+	var dataKeyObject = projectIdObject[dataKey];
+	if (dataKeyObject === undefined) { return undefined; }
+	// objectIndexOrder 를 저장
+	return dataKeyObject[objectIndexOrder];
+};
+
+/**
+ * object 이동 내용을 저장
+ */
+MagoConfig.saveMovingHistory = function(projectId, dataKey, objectIndexOrder, changeHistory) 
+{
+	// projectId 별 Object을 검사
+	var projectIdObject = this.movingHistoryObject[projectId];
+	if (projectIdObject === undefined)
+	{
+		projectIdObject = {};
+		this.movingHistoryObject[projectId] = projectIdObject;
+	}
+	
+	// dataKey 별 Object을 검사
+	var dataKeyObject = projectIdObject[dataKey];
+	if (dataKeyObject === undefined)
+	{
+		dataKeyObject = {};
+		projectIdObject[dataKey] = dataKeyObject;
+	}
+	
+	// objectIndexOrder 를 저장
+	dataKeyObject[objectIndexOrder] = changeHistory;
+};
+
+/**
+ * object 이동 내용을 삭제
+ */
+MagoConfig.deleteMovingHistoryObject = function(projectId, dataKey, objectIndexOrder)
+{
+	// projectId 별 Object을 검사
+	var projectIdObject = this.movingHistoryObject[projectId];
+	if (projectIdObject === undefined) { return undefined; }
+	// dataKey 별 Object을 검사
+	var dataKeyObject = projectIdObject[dataKey];
+	if (dataKeyObject === undefined) { return undefined; }
+	// objectIndexOrder 를 저장
+	return delete dataKeyObject[objectIndexOrder];
+};
+
+/**
+ * 모든 색깔 변경 이력을 획득
+ */
+MagoConfig.getAllColorHistory = function() 
+{
+	return this.colorHistoryObject;
+};
+
+/**
+ * 모든 색깔변경 히스토리 삭제
+ */
+MagoConfig.clearColorHistory = function() 
+{
+	this.colorHistoryObject = {};
+};
+
+/**
+ * project별 키에 해당하는 모든 색깔 변경 이력을 획득
+ */
+MagoConfig.getColorHistorys = function(projectId, dataKey)
+{
+	// projectId 별 Object을 검사
+	var projectIdObject = this.colorHistoryObject[projectId];
+	if (projectIdObject === undefined) { return undefined; }
+	// dataKey 별 Object을 검사
+	var dataKeyObject = projectIdObject[dataKey];
+	return dataKeyObject;
+};
+
+/**
+ * 색깝 변경 이력을 획득
+ */
+MagoConfig.getColorHistory = function(projectId, dataKey, objectId)
+{
+	// projectId 별 Object을 검사
+	var projectIdObject = this.colorHistoryObject[projectId];
+	if (projectIdObject === undefined) { return undefined; }
+	// dataKey 별 Object을 검사
+	var dataKeyObject = projectIdObject[dataKey];
+	if (dataKeyObject === undefined) { return undefined; }
+	// objectId 를 저장
+	return dataKeyObject[objectId];
+};
+
+/**
+ * 색깝 변경 내용을 저장
+ */
+MagoConfig.saveColorHistory = function(projectId, dataKey, objectId, changeHistory) 
+{
+	// projectId 별 Object을 검사
+	var projectIdObject = this.colorHistoryObject[projectId];
+	if (projectIdObject === undefined)
+	{
+		projectIdObject = {};
+		this.colorHistoryObject[projectId] = projectIdObject;
+	}
+	
+	// dataKey 별 Object을 검사
+	var dataKeyObject = projectIdObject[dataKey];
+	if (dataKeyObject === undefined)
+	{
+		dataKeyObject = {};
+		projectIdObject[dataKey] = dataKeyObject;
+	}
+
+	if (objectId === null || objectId === "") 
+	{
+		dataKeyObject[dataKey] = changeHistory;
+	}
+	else 
+	{
+		dataKeyObject[objectId] = changeHistory;
+	}
+};
+
+/**
+ * 색깔 변경 이력을 삭제
+ */
+MagoConfig.deleteColorHistory = function(projectId, dataKey, objectId)
+{
+	// projectId 별 Object을 검사
+	var projectIdObject = this.colorHistoryObject[projectId];
+	if (projectIdObject === undefined) { return undefined; }
+	// dataKey 별 Object을 검사
+	var dataKeyObject = projectIdObject[dataKey];
+	if (dataKeyObject === undefined) { return undefined; }
+	// objectIndexOrder 를 저장
+	return delete dataKeyObject[objectId];
+};
+
+/**
+ * 모든 색깔변경 히스토리 삭제
+ */
+MagoConfig.clearColorHistory = function() 
+{
+	this.colorHistoryObject = {};
+};
+
+/**
+ * 모든 location and rotation 변경 이력을 획득
+ */
+MagoConfig.getAllLocationAndRotationHistory = function() 
+{
+	return this.locationAndRotationHistoryObject;
+};
+
+/**
+ * 프로젝트별 해당 키 값을 갖는 모든 location and rotation 이력을 획득
+ */
+MagoConfig.getLocationAndRotationHistorys = function(projectId, dataKey)
+{
+	// projectId 별 Object을 검사
+	var projectIdObject = this.locationAndRotationHistoryObject[projectId];
+	if (projectIdObject === undefined) { return undefined; }
+	// dataKey 별 Object을 검사
+	var dataKeyObject = projectIdObject[dataKey];
+	return dataKeyObject;
+};
+
+/**
+ * location and rotation 이력을 획득
+ */
+MagoConfig.getLocationAndRotationHistory = function(projectId, dataKey)
+{
+	// projectId 별 Object을 검사
+	var projectIdObject = this.locationAndRotationHistoryObject[projectId];
+	if (projectIdObject === undefined) { return undefined; }
+	// dataKey 별 Object을 검사
+	var dataKeyObject = projectIdObject[dataKey];
+	
+	return dataKeyObject;
+};
+
+/**
+ * location and rotation 내용을 저장
+ */
+MagoConfig.saveLocationAndRotationHistory = function(projectId, dataKey, changeHistory) 
+{
+	// projectId 별 Object을 검사
+	var projectIdObject = this.locationAndRotationHistoryObject[projectId];
+	if (projectIdObject === undefined)
+	{
+		projectIdObject = {};
+		this.locationAndRotationHistoryObject[projectId] = projectIdObject;
+	}
+	
+	// dataKey 별 Object을 검사
+	var dataKeyObject = projectIdObject[dataKey];
+	if (dataKeyObject === undefined)
+	{
+		dataKeyObject = {};
+	}
+
+	dataKeyObject[dataKey] = changeHistory;
+};
+
+/**
+ * location and rotation 이력을 삭제
+ */
+MagoConfig.deleteLocationAndRotationHistory = function(projectId, dataKey)
+{
+	// projectId 별 Object을 검사
+	var projectIdObject = this.locationAndRotationHistoryObject[projectId];
+	if (projectIdObject === undefined) { return undefined; }
+	// dataKey 별 Object을 검사
+	var dataKeyObject = delete projectIdObject[dataKey];
+};
+
+/**
+ * 모든 location and rotation 히스토리 삭제
+ */
+MagoConfig.clearLocationAndRotationHistory = function() 
+{
+	this.locationAndRotationHistoryObject = {};
+};
+	
+/**
+ * TODO 이건 나중에 활요. 사용하지 않음
+ * check 되지 않은 데이터들을 삭제함
+ * @param keyObject 비교할 맵
+ */
+/*MagoConfig.clearUnSelectedData = function(keyObject)
+{
+	for (var key of this.dataObject.keys())
+	{
+		if (!keyObject.hasxxxxx(key))
+		{
+			// data folder path가 존재하면....
+			if (key.indexOf(CODE.PROJECT_DATA_FOLDER_PREFIX) >= 0) 
+			{
+				// 지우는 처리가 있어야 함
+			}
+			this.dataObject.delete(key);
+		}
+	}
+};*/
+
+MagoConfig.setTwoDimension = function(twoDimension) 
+{
+	this.twoDimension = twoDimension;
+};
+MagoConfig.isTwoDimension = function()
+{
+	return this.twoDimension;
+};
+'use strict';
+
+/**
+ * Policy
+ * @class Policy
+ */
+var Policy = function() 
+{
+	if (!(this instanceof Policy)) 
+	{
+		throw new Error(Messages.CONSTRUCT_ERROR);
+	}
+
+	// mago3d 활성화/비활성화 여부
+	this.magoEnable = true;
+
+	// outfitting 표시 여부
+	this.showOutFitting = false;
+	// label 표시/비표시
+	this.showLabelInfo = false;
+	// boundingBox 표시/비표시
+	this.showBoundingBox = false;
+	// 그림자 표시/비표시
+	this.showShadow = false;
+	// squared far frustum 거리
+	this.frustumFarSquaredDistance = 5000000;
+	// far frustum
+	this.frustumFarDistance = 20000;
+
+	// highlighting
+	this.highLightedBuildings = [];
+	// color
+	this.colorBuildings = [];
+	// color
+	this.color = [];
+	// show/hide
+	this.hideBuildings = [];
+	// move mode
+	this.objectMoveMode = CODE.moveMode.NONE;
+	// 이슈 등록 표시
+	this.issueInsertEnable = false;
+	// object 정보 표시
+	this.objectInfoViewEnable = false;
+	// 이슈 목록 표시
+	this.nearGeoIssueListEnable = false;
+	// occlusion culling
+	this.occlusionCullingEnable = false;
+	// origin axis XYZ
+	this.showOrigin = false;
+	// mago generalMode
+	this.magoMode = CODE.magoMode.NORMAL;
+	
+	// 이미지 경로
+	this.imagePath = "";
+	
+	// provisional.
+	this.colorChangedObjectId;
+	
+	// LOD1
+	this.lod0DistInMeters = 15;
+	this.lod1DistInMeters = 50;
+	this.lod2DistInMeters = 90;
+	this.lod3DistInMeters = 200;
+	this.lod4DistInMeters = 1000;
+	this.lod5DistInMeters = 50000;
+	
+	// Lighting
+	this.ambientReflectionCoef = 0.45; // 0.2.
+	this.diffuseReflectionCoef = 0.75; // 1.0
+	this.specularReflectionCoef = 0.6; // 0.7
+	this.ambientColor = null;
+	this.specularColor = new Float32Array([0.6, 0.6, 0.6]);
+	
+	this.ssaoRadius = 0.15;
+
+	this.modelMovable = true;
+	
+	var policy = MagoConfig.getPolicy();
+	// PointsCloud.
+	this.pointsCloudSettings = {};
+	if (defined(policy)) 
+	{
+		this.pointsCloudSettings.maxPartitionsLod0 = defaultValueCheckLength(policy.maxPartitionsLod0, 4);
+		this.pointsCloudSettings.maxPartitionsLod1 = defaultValueCheckLength(policy.maxPartitionsLod1, 2);
+		this.pointsCloudSettings.maxPartitionsLod2orLess = defaultValueCheckLength(policy.maxPartitionsLod2OrLess, 1);
+		this.pointsCloudSettings.MaxPerUnitPointsRenderDistToCam0m = 1.0/defaultValueCheckLength(policy.maxRatioPointsDist0m, 10.0);
+		this.pointsCloudSettings.MaxPerUnitPointsRenderDistToCam100m = 1.0/defaultValueCheckLength(policy.maxRatioPointsDist100m, 120.0);
+		this.pointsCloudSettings.MaxPerUnitPointsRenderDistToCam200m = 1.0/defaultValueCheckLength(policy.maxRatioPointsDist200m, 240.0);
+		this.pointsCloudSettings.MaxPerUnitPointsRenderDistToCam400m = 1.0/defaultValueCheckLength(policy.maxRatioPointsDist400m, 480.0);
+		this.pointsCloudSettings.MaxPerUnitPointsRenderDistToCam800m = 1.0/defaultValueCheckLength(policy.maxRatioPointsDist800m, 960.0);
+		this.pointsCloudSettings.MaxPerUnitPointsRenderDistToCam1600m = 1.0/defaultValueCheckLength(policy.maxRatioPointsDist1600m, 1920.0);
+		this.pointsCloudSettings.MaxPerUnitPointsRenderDistToCamMoreThan1600m = 1.0/defaultValueCheckLength(policy.maxRatioPointsDistOver1600m, 3840.0);
+		this.pointsCloudSettings.maxPointSize = defaultValueCheckLength(policy.maxPointSizeForPc, 40.0);
+		this.pointsCloudSettings.minPointSize = defaultValueCheckLength(policy.minPointSizeForPc, 3.0);
+		this.pointsCloudSettings.pendentPointSize = defaultValueCheckLength(policy.pendentPointSizeForPc, 60.0);
+		this.pointsCloudSettings.minHeightRainbow = defaultValueCheckLength(policy.minHeight_rainbow_loc, 0.0);
+		this.pointsCloudSettings.maxHeightRainbow = defaultValueCheckLength(policy.maxHeight_rainbow_loc, 100.0);
+	}
+	else 
+	{
+		this.pointsCloudSettings.maxPartitionsLod0 = 4;
+		this.pointsCloudSettings.maxPartitionsLod1 = 2;
+		this.pointsCloudSettings.maxPartitionsLod2orLess = 1;
+		this.pointsCloudSettings.MaxPerUnitPointsRenderDistToCam0m = 1.0/10.0;
+		this.pointsCloudSettings.MaxPerUnitPointsRenderDistToCam100m = 1.0/120.0;
+		this.pointsCloudSettings.MaxPerUnitPointsRenderDistToCam200m = 1.0/240.0;
+		this.pointsCloudSettings.MaxPerUnitPointsRenderDistToCam400m = 1.0/480.0;
+		this.pointsCloudSettings.MaxPerUnitPointsRenderDistToCam800m = 1.0/960.0;
+		this.pointsCloudSettings.MaxPerUnitPointsRenderDistToCam1600m = 1.0/1920.0;
+		this.pointsCloudSettings.MaxPerUnitPointsRenderDistToCamMoreThan1600m = 1.0/3840.0;
+		this.pointsCloudSettings.maxPointSize = 40.0;
+		this.pointsCloudSettings.minPointSize = 3.0;
+		this.pointsCloudSettings.pendentPointSize = 60.0;
+		this.pointsCloudSettings.minHeightRainbow = 0.0;
+		this.pointsCloudSettings.maxHeightRainbow = 100.0;
+	}
+};
+
+Policy.prototype.getPointsCloudSettings = function() 
+{
+	return this.pointsCloudSettings;
+};
+
+Policy.prototype.getShowOrigin = function() 
+{
+	return this.showOrigin;
+};
+Policy.prototype.setShowOrigin = function(showOrigin) 
+{
+	this.showOrigin = showOrigin;
+};
+
+Policy.prototype.getMagoEnable = function() 
+{
+	return this.magoEnable;
+};
+Policy.prototype.setMagoEnable = function(magoEnable) 
+{
+	this.magoEnable = magoEnable;
+};
+
+Policy.prototype.getShowOutFitting = function() 
+{
+	return this.showOutFitting;
+};
+Policy.prototype.setShowOutFitting = function(showOutFitting) 
+{
+	this.showOutFitting = showOutFitting;
+};
+Policy.prototype.getShowLabelInfo = function() 
+{
+	return this.showLabelInfo;
+};
+Policy.prototype.setShowLabelInfo = function(showLabelInfo) 
+{
+	this.showLabelInfo = showLabelInfo;
+};
+Policy.prototype.getShowBoundingBox = function() 
+{
+	return this.showBoundingBox;
+};
+Policy.prototype.setShowBoundingBox = function(showBoundingBox) 
+{
+	this.showBoundingBox = showBoundingBox;
+};
+
+Policy.prototype.getShowShadow = function() 
+{
+	return this.showShadow;
+};
+Policy.prototype.setShowShadow = function(showShadow) 
+{
+	this.showShadow = showShadow;
+};
+
+Policy.prototype.getFrustumFarSquaredDistance = function() 
+{
+	return this.frustumFarSquaredDistance;
+};
+Policy.prototype.setFrustumFarSquaredDistance = function(frustumFarSquaredDistance) 
+{
+	this.frustumFarSquaredDistance = frustumFarSquaredDistance;
+};
+
+Policy.prototype.getFrustumFarDistance = function() 
+{
+	return this.frustumFarDistance;
+};
+Policy.prototype.setFrustumFarDistance = function(frustumFarDistance) 
+{
+	this.frustumFarDistance = frustumFarDistance;
+};
+
+Policy.prototype.getHighLightedBuildings = function() 
+{
+	return this.highLightedBuildings;
+};
+Policy.prototype.setHighLightedBuildings = function(highLightedBuildings) 
+{
+	this.highLightedBuildings = highLightedBuildings;
+};
+
+Policy.prototype.getColorBuildings = function() 
+{
+	return this.colorBuildings;
+};
+Policy.prototype.setColorBuildings = function(colorBuildings) 
+{
+	this.colorBuildings = colorBuildings;
+};
+
+Policy.prototype.getColor = function() 
+{
+	return this.color;
+};
+Policy.prototype.setColor = function(color) 
+{
+	this.color = color;
+};
+
+Policy.prototype.getHideBuildings = function() 
+{
+	return this.hideBuildings;
+};
+Policy.prototype.setHideBuildings = function(hideBuildings) 
+{
+	this.hideBuildings = hideBuildings;
+};
+
+Policy.prototype.getObjectMoveMode = function() 
+{
+	return this.objectMoveMode;
+};
+Policy.prototype.setObjectMoveMode = function(objectMoveMode) 
+{
+	this.objectMoveMode = objectMoveMode;
+};
+
+Policy.prototype.getMagoMode = function() 
+{
+	return this.magoMode;
+};
+Policy.prototype.setMagoMode = function(magoMode) 
+{
+	this.magoMode = magoMode;
+};
+
+Policy.prototype.getIssueInsertEnable = function() 
+{
+	return this.issueInsertEnable;
+};
+Policy.prototype.setIssueInsertEnable = function(issueInsertEnable) 
+{
+	this.issueInsertEnable = issueInsertEnable;
+};
+Policy.prototype.getObjectInfoViewEnable = function() 
+{
+	return this.objectInfoViewEnable;
+};
+Policy.prototype.setObjectInfoViewEnable = function(objectInfoViewEnable) 
+{
+	this.objectInfoViewEnable = objectInfoViewEnable;
+};
+Policy.prototype.getOcclusionCullingEnable = function() 
+{
+	return this.occlusionCullingEnable;
+};
+Policy.prototype.setOcclusionCullingEnable = function(occlusionCullingEnable) 
+{
+	this.occlusionCullingEnable = occlusionCullingEnable;
+};
+Policy.prototype.getNearGeoIssueListEnable = function() 
+{
+	return this.nearGeoIssueListEnable;
+};
+Policy.prototype.setNearGeoIssueListEnable = function(nearGeoIssueListEnable) 
+{
+	this.nearGeoIssueListEnable = nearGeoIssueListEnable;
+};
+
+Policy.prototype.getImagePath = function() 
+{
+	return this.imagePath;
+};
+Policy.prototype.setImagePath = function(imagePath) 
+{
+	this.imagePath = imagePath;
+};
+
+Policy.prototype.getLod = function(distInMeters) 
+{
+	var lod = -1;
+	if (distInMeters < this.lod0DistInMeters)
+	{ lod = 0; }
+	else if (distInMeters < this.lod1DistInMeters)
+	{ lod = 1; }
+	else if (distInMeters < this.lod2DistInMeters)
+	{ lod = 2; }
+	else if (distInMeters < this.lod3DistInMeters)
+	{ lod = 3; }
+	else if (distInMeters < this.lod4DistInMeters)
+	{ lod = 4; }
+	else 
+	{ lod = 5; }
+	
+	return lod;	
+};
+Policy.prototype.getLod0DistInMeters = function() 
+{
+	return this.lod0DistInMeters;
+};
+Policy.prototype.setLod0DistInMeters = function(lod0DistInMeters) 
+{
+	this.lod0DistInMeters = lod0DistInMeters;
+};
+Policy.prototype.getLod1DistInMeters = function() 
+{
+	return this.lod1DistInMeters;
+};
+Policy.prototype.setLod1DistInMeters = function(lod1DistInMeters) 
+{
+	this.lod1DistInMeters = lod1DistInMeters;
+};
+Policy.prototype.getLod2DistInMeters = function() 
+{
+	return this.lod2DistInMeters;
+};
+Policy.prototype.setLod2DistInMeters = function(lod2DistInMeters) 
+{
+	this.lod2DistInMeters = lod2DistInMeters;
+};
+Policy.prototype.getLod3DistInMeters = function() 
+{
+	return this.lod3DistInMeters;
+};
+Policy.prototype.setLod3DistInMeters = function(lod3DistInMeters) 
+{
+	this.lod3DistInMeters = lod3DistInMeters;
+};
+Policy.prototype.getLod4DistInMeters = function() 
+{
+	return this.lod4DistInMeters;
+};
+Policy.prototype.setLod4DistInMeters = function(lod4DistInMeters) 
+{
+	this.lod4DistInMeters = lod4DistInMeters;
+};
+Policy.prototype.getLod5DistInMeters = function() 
+{
+	return this.lod5DistInMeters;
+};
+Policy.prototype.setLod5DistInMeters = function(lod5DistInMeters) 
+{
+	this.lod5DistInMeters = lod5DistInMeters;
+};
+Policy.prototype.getAmbientReflectionCoef = function() 
+{
+	return this.ambientReflectionCoef;
+};
+Policy.prototype.setAmbientReflectionCoef = function(ambientReflectionCoef) 
+{
+	this.ambientReflectionCoef = ambientReflectionCoef;
+};
+Policy.prototype.getDiffuseReflectionCoef = function() 
+{
+	return this.diffuseReflectionCoef;
+};
+Policy.prototype.setDiffuseReflectionCoef = function(diffuseReflectionCoef) 
+{
+	this.diffuseReflectionCoef = diffuseReflectionCoef;
+};
+Policy.prototype.getSpecularReflectionCoef = function() 
+{
+	return this.specularReflectionCoef;
+};
+Policy.prototype.setSpecularReflectionCoef = function(specularReflectionCoef) 
+{
+	this.specularReflectionCoef = specularReflectionCoef;
+};
+Policy.prototype.getAmbientColor = function() 
+{
+	return this.ambientColor;
+};
+Policy.prototype.setAmbientColor = function(ambientColor) 
+{
+	this.ambientColor = ambientColor;
+};
+Policy.prototype.getSpecularColor = function() 
+{
+	return this.specularColor;
+};
+Policy.prototype.setSpecularColor = function(specularColor) 
+{
+	this.specularColor = specularColor;
+};
+Policy.prototype.getSsaoRadius = function() 
+{
+	return this.ssaoRadius;
+};
+Policy.prototype.setSsaoRadius = function(ssaoRadius) 
+{
+	this.ssaoRadius = ssaoRadius;
+};
+Policy.prototype.setModelMovable = function(movable)
+{
+	this.modelMovable = movable;
+};
+Policy.prototype.isModelMovable = function()
+{
+	return this.modelMovable;
 };
 'use strict';
 
@@ -22204,6 +24380,22 @@ GeographicExtent.prototype.intersects2dWithGeoCoord = function(geoCoord)
 	return false;
 };
 
+GeographicExtent.prototype.intersects2dWithGeoExtent = function(geoExtent) 
+{
+	// In 2D intersection do not considere "altitude".
+	var thisMinGeoCoord = this.minGeographicCoord;
+	var thisMaxGeoCoord = this.maxGeographicCoord;
+	var minGeoCoord = geoExtent.minGeographicCoord;
+	var maxGeoCoord = geoExtent.maxGeographicCoord;
+
+	if (thisMinGeoCoord.longitude > maxGeoCoord.longitude || thisMaxGeoCoord.longitude < minGeoCoord.longitude)
+	{ return false; }
+	else if (thisMinGeoCoord.latitude > maxGeoCoord.latitude || thisMaxGeoCoord.latitude < minGeoCoord.latitude)
+	{ return false; }
+
+	return true;
+};
+
 
 
 
@@ -24378,52 +26570,150 @@ MagoEvent.prototype.getListener = function()
  * This is the layer for MagoModel.
  * @class MagoLayer
  * 
- * @param {object} layer layer object.
+ * @param {MagoLayer~option} option layer object.
  */
-
-var MagoLayer = function(layer)
+var MagoLayer = function(option)
 {
+	/**
+	 * @typedef {object} MagoLayer~option
+	 * @property {string} dataGroupId 필수. 레이어 아이디
+	 * @property {string} dataGroupKey 필수. 레이어 키. f4d폴더와 매칭.
+	 * @property {string} dataGroupName 필수. 레이어 이름
+	 * @property {string} dataGroupPath 필수. 레이어 폴더 경로.
+	 * @property {boolean} tiling 스마트 타일링 레이어 유무. 기본은 false.
+	 * @property {MagoLayer~style} style 레이어 전역 스타일 정보. 옵션.
+	 * @property {number} longitude 옵션. 
+	 * @property {number} latitude 옵션.
+	 * @property {number} altitude 옵션.
+	 */
 	if (!(this instanceof MagoLayer)) 
 	{
 		throw new Error(Messages.CONSTRUCT_ERROR);
 	}
-	if (isEmpty(layer.dataGroupId))
+	if (isEmpty(option.dataGroupId))
 	{
 		throw new Error(Messages.REQUIRED_EMPTY_ERROR('dataGroupId'));
 	}
 
-	if (isEmpty(layer.dataGroupKey))
+	if (isEmpty(option.dataGroupKey))
 	{
 		throw new Error(Messages.REQUIRED_EMPTY_ERROR('dataGroupKey'));
 	}
 
-	if (isEmpty(layer.dataGroupName))
+	if (isEmpty(option.dataGroupName))
 	{
 		throw new Error(Messages.REQUIRED_EMPTY_ERROR('dataGroupName'));
 	}
 
-	if (isEmpty(layer.dataGroupPath))
+	if (isEmpty(option.dataGroupPath))
 	{
 		throw new Error(Messages.REQUIRED_EMPTY_ERROR('dataGroupPath'));
 	}
-	this.id = layer.dataGroupId;
-	this.key = layer.dataGroupKey;
-	this.name = layer.dataGroupName;
-	this.path = layer.dataGroupPath;
-    
-	this.tiling = defaultValue(layer.tiling, false);
-	this.style = Object.assign({}, layer.style||{});
+	this.ready = false;
 
-	var longitude = layer.longitude;
-	var latitude = layer.latitude;
-	var altitude = layer.altitude;
+	// objectfile을 성공적으로 읽을 시 할당됨.
+	this.buildingSeedMap;
+
+	this.id = option.dataGroupId;
+	this.key = option.dataGroupKey;
+	this.name = option.dataGroupName;
+	this.path = option.dataGroupPath.replace(/\/+$/, '');
+    
+	this.tiling = defaultValue(option.tiling, false);
+	this.style = Object.assign({}, option.style||{});
+
+	var longitude = option.longitude;
+	var latitude = option.latitude;
+	var altitude = option.altitude;
 
 	if (!isNaN(longitude) && !isNaN(latitude) && !isNaN(altitude)) 
 	{
-		//
+		//TODO
 	}
 	//datas
+	this.datas = [];
+
+	if (option.datas && Array.isArray(option.datas))
+	{
+		for (var i=0, len = option.datas.length; i<len; i++)
+		{
+			var data = option.datas[i];
+			this.addData(data);
+		}
+	}
 }; 
+
+MagoLayer.prototype.getObjectIndexFile = function()
+{
+	var that = this;
+	var filePath = '/f4d/' + this.path + Constant.OBJECT_INDEX_FILE + Constant.CACHE_VERSION + new Date().getTime();
+	loadWithXhr(filePath).then(function(response) 
+	{	
+		var arrayBuffer = response;
+		if (arrayBuffer) 
+		{
+			var buildingSeedMap = new BuildingSeedMap();
+			buildingSeedMap.dataArrayBuffer = arrayBuffer;
+			buildingSeedMap.parseBuildingSeedArrayBuffer();
+
+			that.ready = true;
+			that.buildingSeedMap = buildingSeedMap;
+			
+			var dataLength = that.datas.length;
+			if (dataLength > 0) 
+			{
+				for (var i=0;i<dataLength;i++ )
+				{
+					that.readyData(that.datas[i]);
+				}
+			}
+		}
+	},
+	function(status) 
+	{
+		console.log("xhr status = " + status);
+	});
+};
+
+/**
+ * Layer에 f4d 데이터 추가.
+ * @param {MagoModel | Object} data
+ */
+MagoLayer.prototype.addData = function(data) 
+{
+	if (!(data instanceof MagoModel))
+	{
+		data = new MagoModel(data);
+	}
+
+	this.datas.push(data);
+	if (this.ready && that.buildingSeedMap)
+	{
+		this.readyData(data);
+	}
+};
+
+/**
+ * data를 표출하기 위한 값계산. 기존의 makenode와 같은 역할
+ * @param {MagoModel} data
+ */
+MagoLayer.prototype.readyData = function(data) 
+{
+	try 
+	{
+		var seed = this.buildingSeedMap.map.get(data.key);
+		if (!seed)
+		{
+			throw new Error('This data(' + data.key + ') is seedless!');
+		}
+		//When set seed, calculate model geolocation.
+		data.buildingSeed = seed;
+	}
+	catch (e)
+	{
+		console.warn(e);
+	}
+};
 'use strict';
 
 /**
@@ -24467,6 +26757,12 @@ MagoLayerCollection.prototype.add = function(layer)
 	if (!(layer instanceof MagoLayer))
 	{
 		layer = new MagoLayer(layer);
+	}
+	
+	//일반 f4d 사용시
+	if (!layer.tiling)
+	{
+		layer.getObjectIndexFile();
 	}
    
 	this.layers.push(layer);
@@ -24837,6 +27133,12 @@ var MagoManager = function()
 	 * @type {InteractionCollection}
 	 */
 	this.interactions = new InteractionCollection(this);
+
+	/**
+	 * MagoLayer collection
+	 * @type {MagoLayerCollection}
+	 */
+	this.magoLayerCollection = new MagoLayerCollection();
 };
 MagoManager.prototype = Object.create(Emitter.prototype);
 MagoManager.prototype.constructor = MagoManager;
@@ -25229,6 +27531,29 @@ MagoManager.prototype.upDateSceneStateMatrices = function(sceneState)
 		// consider near as zero provisionally.***
 		var projectionMatrix = sceneState.projectionMatrix;
 		projectionMatrix._floatArrays = glMatrix.mat4.perspective(projectionMatrix._floatArrays, frustum0.fovyRad[0], frustum0.aspectRatio[0], frustum0.near[0], frustum0.far[0]);
+
+		// perspective for reverseDepthRange:
+		/*
+		projectionMatrix.set(2, 2, -projectionMatrix.get(2, 2));
+		projectionMatrix.set(2, 3, -projectionMatrix.get(2, 3));
+		var frustum0 = this.myCameraSCX.getFrustum(0);
+		var sceneCamFurustum0 = sceneState.camera.getFrustum(0);
+		frustum0.near[0] = sceneCamFurustum0.near[0];
+		frustum0.far[0] = sceneCamFurustum0.far[0];
+		frustum0.fovyRad[0] = sceneCamFurustum0.fovyRad[0];
+		frustum0.tangentOfHalfFovy[0] = sceneCamFurustum0.tangentOfHalfFovy[0];
+		frustum0.fovRad[0] = sceneCamFurustum0.fovRad[0];
+		frustum0.aspectRatio[0] = sceneCamFurustum0.aspectRatio[0];
+
+		var t = 1.0 / (Math.tan(sceneCamFurustum0.fovRad[0] * 0.5));
+		var a = t;
+		var b = (t * sceneCamFurustum0.aspectRatio[0]);
+		projectionMatrix.setByFloat32Array(new Float32Array([
+			a, 0.0, 0.0, 0.0,
+			0.0, b, 0.0, 0.0,
+			0.0, 0.0, -frustum0.near[0], 1.0,
+			0.0, 0.0, 1.0, 0.0]));
+			*/
 		
 		// Large far projection for sky.
 		var farSky = eqRadius + camHeight * 1.5;
@@ -25266,6 +27591,8 @@ MagoManager.prototype.upDateSceneStateMatrices = function(sceneState)
 		// Large far modelViewProjectionRelToEyeSky.***
 		var modelViewProjRelToEyeMatrixSky = sceneState.modelViewProjRelToEyeMatrixSky;
 		modelViewProjRelToEyeMatrixSky._floatArrays = glMatrix.mat4.multiply(modelViewProjRelToEyeMatrixSky._floatArrays, projectionMatrixSky._floatArrays, modelViewRelToEyeMatrix._floatArrays);
+
+		
 	}
 	
 	
@@ -25935,6 +28262,7 @@ MagoManager.prototype.doRender = function(frustumVolumenObject)
 	{
 		gl.clearColor(0, 0, 0, 1);
 		gl.clearDepth(1);
+		//gl.clearDepth(0);
 		gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 		gl.clearStencil(0); // provisionally here.***
 	}
@@ -29224,11 +31552,24 @@ MagoManager.prototype.setRenderCondition = function(projectId, dataKey, conditio
  */
 MagoManager.prototype.createDefaultShaders = function(gl) 
 {
+	var use_linearOrLogarithmicDepth = "USE_LINEAR_DEPTH";
+	if (!this.isCesiumGlobe())
+	{
+		var supportEXT = gl.getSupportedExtensions().indexOf("EXT_frag_depth");
+		if (supportEXT)
+		{
+			gl.getExtension("EXT_frag_depth");
+		}
+		this.EXTENSIONS_init = true;
+		use_linearOrLogarithmicDepth = "USE_LOGARITHMIC_DEPTH";
+	}
+
 	// here creates the necessary shaders for mago3d.***
 	// 1) ModelReferences ssaoShader.******************************************************************************
 	var shaderName = "modelRefSsao";
 	var ssao_vs_source = ShaderSource.ModelRefSsaoVS;
 	var ssao_fs_source = ShaderSource.ModelRefSsaoFS;
+	ssao_fs_source = ssao_fs_source.replace(/%USE_LOGARITHMIC_DEPTH%/g, use_linearOrLogarithmicDepth);
 	var shader = this.postFxShadersManager.createShaderProgram(gl, ssao_vs_source, ssao_fs_source, shaderName, this);
 	shader.bUseLogarithmicDepth_loc = gl.getUniformLocation(shader.program, "bUseLogarithmicDepth");
 
@@ -29236,7 +31577,9 @@ MagoManager.prototype.createDefaultShaders = function(gl)
 	var shaderName = "modelRefDepth";
 	var showDepth_vs_source = ShaderSource.RenderShowDepthVS;
 	var showDepth_fs_source = ShaderSource.RenderShowDepthFS;
+	showDepth_fs_source = showDepth_fs_source.replace(/%USE_LOGARITHMIC_DEPTH%/g, use_linearOrLogarithmicDepth);
 	shader = this.postFxShadersManager.createShaderProgram(gl, showDepth_vs_source, showDepth_fs_source, shaderName, this);
+	shader.bUseLogarithmicDepth_loc = gl.getUniformLocation(shader.program, "bUseLogarithmicDepth");
 
 	// 2) ModelReferences colorCoding shader.***********************************************************************
 	var shaderName = "modelRefColorCoding";
@@ -29248,6 +31591,7 @@ MagoManager.prototype.createDefaultShaders = function(gl)
 	shaderName = "tinTerrain";
 	ssao_vs_source = ShaderSource.TinTerrainVS;
 	ssao_fs_source = ShaderSource.TinTerrainFS;
+	ssao_fs_source = ssao_fs_source.replace(/%USE_LOGARITHMIC_DEPTH%/g, use_linearOrLogarithmicDepth);
 	shader = this.postFxShadersManager.createShaderProgram(gl, ssao_vs_source, ssao_fs_source, shaderName, this);
 
 	shader.bIsMakingDepth_loc = gl.getUniformLocation(shader.program, "bIsMakingDepth");
@@ -29455,6 +31799,7 @@ MagoManager.prototype.createDefaultShaders = function(gl)
 	var shaderName = "thickLine";
 	var ssao_vs_source = ShaderSource.thickLineVS;
 	var ssao_fs_source = ShaderSource.thickLineFS;
+	ssao_fs_source = ssao_fs_source.replace(/%USE_LOGARITHMIC_DEPTH%/g, use_linearOrLogarithmicDepth);
 	shader = this.postFxShadersManager.createShaderProgram(gl, ssao_vs_source, ssao_fs_source, shaderName, this);
 	// ThickLine shader locations.***
 	shader.projectionMatrix_loc = gl.getUniformLocation(shader.program, "projectionMatrix");
@@ -29517,6 +31862,8 @@ MagoManager.prototype.createDefaultShaders = function(gl)
 	shader.position2_loc = gl.getAttribLocation(shader.program, "a_pos");
 	shader.uActiveTextures_loc = gl.getUniformLocation(shader.program, "uActiveTextures");
 	shader.externalAlphasArray_loc = gl.getUniformLocation(shader.program, "externalAlphasArray");
+	shader.uExternalTexCoordsArray_loc = gl.getUniformLocation(shader.program, "uExternalTexCoordsArray");
+	shader.uMinMaxAltitudes_loc = gl.getUniformLocation(shader.program, "uMinMaxAltitudes");
 	shader.tex_0_loc = gl.getUniformLocation(shader.program, "texture_0");
 	shader.tex_1_loc = gl.getUniformLocation(shader.program, "texture_1");
 	shader.tex_2_loc = gl.getUniformLocation(shader.program, "texture_2");
@@ -30058,9 +32405,9 @@ MagoManager.prototype.getObjectIndexFile = function(projectId, projectDataFolder
 	}
 	
 	//this.buildingSeedList = new BuildingSeedList();
-	var fileName;
+	
 	var geometrySubDataPath = projectDataFolder;
-	fileName = this.readerWriter.geometryDataPath + "/" + geometrySubDataPath + Constant.OBJECT_INDEX_FILE + Constant.CACHE_VERSION + new Date().getTime();
+	var fileName = this.readerWriter.geometryDataPath + "/" + geometrySubDataPath + Constant.OBJECT_INDEX_FILE + Constant.CACHE_VERSION + new Date().getTime();
 	this.readerWriter.getObjectIndexFileForSmartTile(fileName, this, undefined, projectId);
 };
 
@@ -30722,7 +33069,30 @@ MagoManager.prototype.isExistStaticModel = function(projectId)
  */
 MagoManager.prototype.addLayer = function(layer) 
 {
-	this.tinTerrainManager.addImageryLayer(layer);
+	if (!layer)
+	{
+		throw new Error('layer is empty'); 
+	}
+
+	if (layer instanceof TextureLayer)
+	{
+		this.tinTerrainManager.addImageryLayer(layer);
+	}
+	else if (isMagoLayer(layer))
+	{
+
+		if (!this.magoLayerCollection)
+		{
+			this.magoLayerCollection = new MagoLayerCollection();
+		}
+
+		this.magoLayerCollection.add(layer);
+	}
+
+	function isMagoLayer(l) 
+	{
+		return l instanceof MagoLayer || (l.hasOwnProperty(dataGroupId) && l.hasOwnProperty(dataGroupKey) && l.hasOwnProperty(dataGroupPath));
+	}
 };
 
 /**
@@ -31615,9 +33985,8 @@ MagoManager.prototype.checkCollision = function (position, direction)
  * @class MagoModel
  * 
  * @param {object} model model object.
- * @param {BuildingSeed} seed require. model bounding box seed.
  */
-var MagoModel = function(model, seed) 
+var MagoModel = function(model) 
 {
 	if (!(this instanceof MagoModel)) 
 	{
@@ -31629,6 +33998,11 @@ var MagoModel = function(model, seed)
 		throw new Error(Messages.REQUIRED_EMPTY_ERROR('dataId'));
 	}
 
+	if (isEmpty(model.dataKey))
+	{
+		throw new Error(Messages.REQUIRED_EMPTY_ERROR('dataKey'));
+	}
+
 	if (isEmpty(model.dataGroupId))
 	{
 		throw new Error(Messages.REQUIRED_EMPTY_ERROR('dataGroupId'));
@@ -31638,14 +34012,16 @@ var MagoModel = function(model, seed)
 	{
 		throw new Error(Messages.REQUIRED_EMPTY_ERROR('longitude', 'latitude'));
 	}
-
+	/*
 	if (!seed || (seed instanceof BuildingSeed && !seed.hasOwnProperty('bBox'))) 
 	{
 		throw new Error(Messages.REQUIRED_EMPTY_ERROR('BuildingSeed'));
 	}
-
+*/
+	this.ready = false;
 	this.id = model.dataId;
 	this.layerId = model.dataGroupId;
+	this.layerKey = model.dataGroupKey;
 	this.key = model.dataKey;
 	this.name = model.dataName;
 	this.dataType = model.dataType;
@@ -31656,30 +34032,52 @@ var MagoModel = function(model, seed)
 	this.rotationsDegree = new Point3D(defaultValue(model.pitch, 0), defaultValue(model.roll, 0), defaultValue(model.heading, 0));
 	this.bbox = new BoundingBox();
 
-	this.buildingSeed = seed; 
-
-	if (this.buildingSeed.geographicCoord === undefined)
-	{ this.buildingSeed.geographicCoord = new GeographicCoord(); }
-
-	if (this.buildingSeed.rotationsDegree === undefined)
-	{ this.buildingSeed.rotationsDegree = new Point3D(); }
-	// now calculate the geographic coord of the center of the bbox.
-	if (this.buildingSeed.geographicCoordOfBBox === undefined) 
-	{ this.buildingSeed.geographicCoordOfBBox = new GeographicCoord(); }
-
-	//값
-	this._calculate();
-
 	this.style = Object.assign({}, MagoModel.DEFAULT_STYLE, model.style||{});
+
+	this._buildingSeed; 
 };
 
+Object.defineProperties(MagoModel.prototype, {
+	buildingSeed: {
+		get: function()
+		{
+			return this._buildingSeed;
+		},
+		set: function(seed)
+		{
+			if (!(seed instanceof BuildingSeed))
+			{
+				return;
+			}
+			this._buildingSeed = seed;
+			if (this._buildingSeed.geographicCoord === undefined)
+			{ this._buildingSeed.geographicCoord = new GeographicCoord(); }
+		
+			if (this._buildingSeed.rotationsDegree === undefined)
+			{ this._buildingSeed.rotationsDegree = new Point3D(); }
+			// now calculate the geographic coord of the center of the bbox.
+			if (this._buildingSeed.geographicCoordOfBBox === undefined) 
+			{ this._buildingSeed.geographicCoordOfBBox = new GeographicCoord(); }
+		
+			//값
+			this._calculate();
+
+			this.ready = true;
+		}
+	}
+});
+/**
+ * 기존의 makenode와 같은 역할
+ * @private
+ */
 MagoModel.prototype._calculate = function() 
 {
 	var longitude = this.geographicCoord.longitude;
 	var latitude = this.geographicCoord.latitude;
 	var altitude = this.geographicCoord.altitude;
 	this.buildingSeed.geographicCoord.setLonLatAlt(longitude, latitude, altitude);
-	this.buildingSeed.rotationsDegree.set(this.rotationsDegree.pitch, this.rotationsDegree.roll, this.rotationsDegree.heading);
+	//x : pitch, y : roll, z : heading
+	this.buildingSeed.rotationsDegree.set(this.rotationsDegree.x, this.rotationsDegree.y, this.rotationsDegree.z);
 
 	var tMatrix = this.getTmatrix();
 
@@ -31715,7 +34113,9 @@ MagoModel.prototype._calculate = function()
 		}
 	}
 };
-
+/**
+ * @private
+ */
 MagoModel.prototype.getTmatrix = function() 
 {
 	var geoCoord = this.geographicCoord;
@@ -38680,7 +41080,9 @@ var Texture = function(options)
 	this.imageWidth = 32;
 	this.imageHeight = 32;
 	this.url;
+	this.blob; 
 	this.opacity = 1.0;
+	this.activeTextureType = 1; // 0= inactive. 1= XYZLayer, WMSLayer. 2= Custom image. 10= Bathymetry.
 
 	if (options)
 	{
@@ -38689,6 +41091,16 @@ var Texture = function(options)
 			this.opacity = options.opacity;
 		}
 	}
+};
+
+/**
+ * Sets the activeTextureType of the texture.
+ * 0= inactive. 1= XYZLayer, WMSLayer. 2= Custom image. 10= Bathymetry.
+ * @param {Number} activeTextureType
+ */
+Texture.prototype.setActiveTextureType = function(activeTextureType)
+{
+	this.activeTextureType = activeTextureType;
 };
 
 /**
@@ -38787,6 +41199,18 @@ var TextureLayer = function(options)
 	Object.freeze(this._freezeAttr);
 	this._show = defaultValue(options.show, true);
 	this._opacity = defaultValue(options.opacity, 1.0);
+
+
+	// Note: if filter === BATHYMETRY, then need minAltitude & maxAltitude.
+	if (options.minAltitude)
+	{
+		this.minAltitude = options.minAltitude;
+	}
+	if (options.maxAltitude)
+	{
+		this.maxAltitude = options.maxAltitude;
+	}
+
 };
 
 TextureLayer.prototype = Object.create(Emitter.prototype);
@@ -38951,7 +41375,7 @@ TexturesManager.loadTexture = function(imagePath, texture, magoManager, flip_y_t
 		{ flip_y_texCoord = false; }
 		
 		handleTextureLoaded(gl, imageToLoad, texture.texId, flip_y_texCoord);
-		texture.fileLoadState = CODE.fileLoadState.LOADING_FINISHED;
+		texture.fileLoadState = CODE.fileLoadState.BINDING_FINISHED;
 	};
 
 	imageToLoad.onerror = function() 
@@ -38962,9 +41386,8 @@ TexturesManager.loadTexture = function(imagePath, texture, magoManager, flip_y_t
 	imageToLoad.src = imagePath;
 };
 
-TexturesManager.newWebGlTextureByEmbeddedImage = function(gl, embeddedImage, texture)
+TexturesManager.newWebGlTextureByBlob = function(gl, blob, texture)
 {
-	var blob = new Blob([embeddedImage], {type: 'application/octet-binary'});
 	var url = URL.createObjectURL(blob);
 	texture.fileLoadState = CODE.fileLoadState.BINDING_STARTED;
 	
@@ -38976,6 +41399,13 @@ TexturesManager.newWebGlTextureByEmbeddedImage = function(gl, embeddedImage, tex
 		texture.fileLoadState = CODE.fileLoadState.BINDING_FINISHED; // file load finished.***
 	};
 	img.src = url;
+};
+
+TexturesManager.newWebGlTextureByEmbeddedImage = function(gl, embeddedImage, texture)
+{
+	// Function called in NeoBuilding.prototype.prepareSkin = function(magoManager).
+	var blob = new Blob([embeddedImage], {type: 'application/octet-binary'});
+	TexturesManager.newWebGlTextureByBlob(gl, blob, texture);
 };
 
 
@@ -41481,2180 +43911,6 @@ XYZLayer.prototype._setDefaultUrlFunction = function()
 		return auxUrl;
 	};
 	that.urlFunction = urlFunction;
-};
-'use strict';
-
-/**
- * color 처리 관련 도메인
- * @class ColorAPI
- */
-var ColorAPI = {};
-
-ColorAPI.changeColor = function(api, magoManager) 
-{
-	var projectId = api.getProjectId();
-	var dataKey = api.getDataKey();
-	var objectIds = api.getObjectIds();
-	var property = api.getProperty();
-	var propertyKey = null;
-	var propertyValue = null;
-	if (property !== null && property !== "") 
-	{
-		var properties = property.split("=");
-		propertyKey = properties[0];
-		propertyValue = properties[1];
-	}
-	var colorString = api.getColor();
-	if (colorString === undefined || colorString === 0)
-	{ return; }
-	
-	var color = api.getColor().split(",");
-	var colorsValueCount = color.length;
-	var alpha = 255.0;
-	if (colorsValueCount === 4)
-	{
-		alpha = color[3]/255;
-	}
-	
-	var rgbaColor = [ color[0]/255, color[1]/255, color[2]/255, alpha ] ;
-	
-	var isExistObjectIds = false;
-	if (objectIds !== null && objectIds.length !== 0) 
-	{
-		isExistObjectIds = true;
-	}
-	
-	var changeHistorys = [];
-	if (isExistObjectIds) 
-	{
-		for (var i=0, objectCount = objectIds.length; i<objectCount; i++) 
-		{
-			var changeHistory = new ChangeHistory();
-			changeHistory.setProjectId(projectId);
-			changeHistory.setDataKey(dataKey);
-			changeHistory.setObjectId(objectIds[i]);
-			changeHistory.setProperty(property);
-			changeHistory.setPropertyKey(propertyKey);
-			changeHistory.setPropertyValue(propertyValue);
-			//changeHistory.setRgbColor(rgbColor);
-			changeHistory.setColor(rgbaColor);
-			
-			changeHistorys.push(changeHistory);
-		}
-	}
-	else 
-	{
-		var changeHistory = new ChangeHistory();
-		changeHistory.setProjectId(projectId);
-		changeHistory.setDataKey(dataKey);
-		changeHistory.setObjectId(null);
-		changeHistory.setProperty(property);
-		changeHistory.setPropertyKey(propertyKey);
-		changeHistory.setPropertyValue(propertyValue);
-		//changeHistory.setRgbColor(rgbColor);
-		changeHistory.setColor(rgbaColor);
-		changeHistorys.push(changeHistory);
-	}
-
-	var changeHistory;
-	var historiesCount = changeHistorys.length;
-	for (var i=0; i<historiesCount; i++)
-	{
-		changeHistory = changeHistorys[i];
-		MagoConfig.saveColorHistory(projectId, dataKey, changeHistory.getObjectId(), changeHistory);
-	}
-};
-'use strict';
-
-/**
- * Draw 관련 API를 담당하는 클래스
- * 원래는 이렇게 만들려고 한게 아니지만, legacy 파일이랑 이름, function 등이 중복되서 이렇게 만들었음
- * @class DrawAPI
- */
-var DrawAPI = {};
-
-DrawAPI.drawAppendData = function(api, magoManager) 
-{
-	magoManager.getObjectIndexFile(api.getProjectId(), api.getProjectDataFolder());
-};
-
-DrawAPI.drawInsertIssueImage = function(api, magoManager) 
-{
-	// pin 을 표시
-	if (magoManager.objMarkerSC === undefined || api.getDrawType() === 0) 
-	{
-		magoManager.objMarkerSC = new ObjectMarker();
-		magoManager.objMarkerSC.geoLocationData.geographicCoord = new GeographicCoord();
-		ManagerUtils.calculateGeoLocationData(parseFloat(api.getLongitude()), parseFloat(api.getLatitude()), parseFloat(api.getElevation()), 
-			undefined, undefined, undefined, magoManager.objMarkerSC.geoLocationData, magoManager);
-	}
-	
-	var objMarker = magoManager.objMarkerManager.newObjectMarker({
-		imageFilePath : 'defaultRed',
-		sizeX         : 64,
-		sizeY         : 64
-	});
-	
-	magoManager.objMarkerSC.issue_id = api.getIssueId();
-	magoManager.objMarkerSC.issue_type = api.getIssueType();
-	magoManager.objMarkerSC.geoLocationData.geographicCoord.setLonLatAlt(parseFloat(api.getLongitude()), parseFloat(api.getLatitude()), parseFloat(api.getElevation()));
-	
-	objMarker.copyFrom(magoManager.objMarkerSC);
-	magoManager.objMarkerSC = undefined;
-};
-'use strict';
-
-/**
- * 변환 행렬 API
- * @class LocationAndRotationAPI
- */
-var LocationAndRotationAPI = {};
-
-LocationAndRotationAPI.changeLocationAndRotation = function(api, magoManager) 
-{
-//	var buildingId = api.getDataKey();
-//	var buildingType = "structure";
-//	var building = this.getNeoBuildingByTypeId(buildingType, buildingId);
-
-	var changeHistory = new ChangeHistory();
-	changeHistory.setProjectId(api.getProjectId());
-	changeHistory.setDataKey(api.getDataKey());
-	changeHistory.setLatitude(parseFloat(api.getLatitude()));
-	changeHistory.setLongitude(parseFloat(api.getLongitude()));
-	changeHistory.setElevation(parseFloat(api.getElevation()));
-	changeHistory.setHeading(parseFloat(api.getHeading()));
-	changeHistory.setPitch(parseFloat(api.getPitch()));
-	changeHistory.setRoll(parseFloat(api.getRoll()));
-	
-	var lat = api.getLatitude();
-	var lon = api.getLongitude();
-	var elevation = api.getElevation();
-	var heading = api.getHeading();
-	var pitch = api.getPitch();
-	var roll = api.getRoll();
-
-
-	magoManager.changeLocationAndRotation(	api.getProjectId(),
-		api.getDataKey(),
-		lat,
-		lon,
-		elevation,
-		heading,
-		pitch,
-		roll,
-		api.getAnimationOption()
-	);
-	
-	// MagoConfig에 저장......?
-};
-'use strict';
-
-/**
- * lod 처리 관련 도메인
- * @class LodAPI
- */
-var LodAPI = {};
-
-LodAPI.changeLod = function(api, magoManager) 
-{
-	if (api.getLod0DistInMeters() !== null && api.getLod0DistInMeters() !== "") { magoManager.magoPolicy.setLod0DistInMeters(api.getLod0DistInMeters()); }
-	if (api.getLod1DistInMeters() !== null && api.getLod1DistInMeters() !== "") { magoManager.magoPolicy.setLod1DistInMeters(api.getLod1DistInMeters()); }
-	if (api.getLod2DistInMeters() !== null && api.getLod2DistInMeters() !== "") { magoManager.magoPolicy.setLod2DistInMeters(api.getLod2DistInMeters()); }
-	if (api.getLod3DistInMeters() !== null && api.getLod3DistInMeters() !== "") { magoManager.magoPolicy.setLod3DistInMeters(api.getLod3DistInMeters()); }
-	if (api.getLod4DistInMeters() !== null && api.getLod4DistInMeters() !== "") { magoManager.magoPolicy.setLod4DistInMeters(api.getLod4DistInMeters()); }
-	if (api.getLod5DistInMeters() !== null && api.getLod5DistInMeters() !== "") { magoManager.magoPolicy.setLod5DistInMeters(api.getLod5DistInMeters()); }
-};
-'use strict';
-
-/**
- * mago3djs API
- * 
- * @alias API
- * @class API
- * @constructor
- * 
- * @param {any} apiName api이름
- */
-function API(apiName)
-{
-	if (!(this instanceof API)) 
-	{
-		throw new Error(Messages.CONSTRUCT_ERROR);
-	}
-
-	// mago3d 활성화/비활성화 여부
-	this.magoEnable = true;
-	// return
-	this.returnable = false;
-
-	// api 이름
-	this.apiName = apiName;
-	
-	// project id
-	this.projectId = null;
-	this.projectDataFolder = null;
-	// objectIds
-	this.objectIds = null;
-	// data_key
-	this.dataKey = null;
-	// issueId
-	this.issueId = null;
-	// issueType
-	this.issueType = null;
-	// drawType 이미지를 그리는 유형 0 : DB, 1 : 이슈등록
-	this.drawType = 0;
-
-	// 위도
-	this.latitude = 0;
-	// 경도
-	this.longitude = 0;
-	// 높이
-	this.elevation = 0;
-	// heading
-	this.heading = 0;
-	// pitch
-	this.pitch = 0;
-	// roll
-	this.roll = 0;
-	// duration
-	this.duration = 0;
-
-	// 속성
-	this.property = null;
-	// 색깔
-	this.color = 0;
-	// structs = MSP, outfitting = MOP
-	this.blockType = null;
-	// outfitting 표시/비표시
-	this.showOutFitting = false;
-	// label 표시/비표시
-	this.showLabelInfo = true;
-	// origin 표시/비표시
-	this.showOrigin = false;
-	// boundingBox 표시/비표시
-	this.showBoundingBox = false;
-	// 그림자 표시/비표시
-	this.showShadow = false;
-	// frustum culling 가시 거리(M단위)
-	this.frustumFarDistance = 0;
-	// move mode 
-	this.objectMoveMode = CODE.moveMode.NONE;
-	// 이슈 등록 표시
-	this.issueInsertEnable = false;
-	// object 정보 표시
-	this.objectInfoViewEnable = false;
-	// 이슈 목록 표시
-	this.nearGeoIssueListEnable = false;
-	// occlusion culling
-	this.occlusionCullingEnable = false;
-	//
-	this.insertIssueState = 0;
-	
-	// LOD1
-	this.lod0DistInMeters = null;
-	this.lod1DistInMeters = null;
-	this.lod2DistInMeters = null;
-	this.lod3DistInMeters = null;
-	this.lod4DistInMeters = null;
-	this.lod5DistInMeters = null;
-	
-	// Lighting
-	this.ambientReflectionCoef = null;
-	this.diffuseReflectionCoef = null;
-	this.specularReflectionCoef = null;
-	this.ambientColor = null;
-	this.specularColor = null;
-	
-	this.ssaoRadius = null;
-	//
-	this.FPVMode = false;
-
-	// input x, y, z
-	this.inputPoint = null;
-	// result x, y, z
-	this.resultPoint = null;
-	
-	// General magoMode.
-	this.magoMode = CODE.magoMode.NORMAL;
-
-	//position unit
-	this.unit = CODE.units.DEGREE;
-
-	//for staticModel instantiate
-	this.instantiateObj = null;
-
-	//for staticModel add
-	this.staticModelAttributeObj = null;
-
-	//animation option. 
-	this.animationOption = null;
-
-	/**
-	 * @type {trackOption}
-	 */
-	this.trackOption = null;
-
-	/**
-	 * @type {nodeAttribute}
-	 */
-	this.nodeAttribute = null;
-};
-
-API.prototype.getMagoEnable = function() 
-{
-	return this.magoEnable;
-};
-API.prototype.setMagoEnable = function(magoEnable) 
-{
-	this.magoEnable = magoEnable;
-};
-
-API.prototype.getReturnable = function()
-{
-	return this.returnable;
-};
-API.prototype.setReturnable = function(returnable)
-{
-	this.returnable = returnable;
-};
-
-API.prototype.getAPIName = function() 
-{
-	return this.apiName;
-};
-
-API.prototype.getProjectId = function() 
-{
-	return this.projectId;
-};
-API.prototype.setProjectId = function(projectId) 
-{
-	this.projectId = projectId;
-};
-
-API.prototype.getProjectDataFolder = function() 
-{
-	return this.projectDataFolder;
-};
-API.prototype.setProjectDataFolder = function(projectDataFolder) 
-{
-	this.projectDataFolder = projectDataFolder;
-};
-
-API.prototype.getObjectIds = function() 
-{
-	return this.objectIds;
-};
-API.prototype.setObjectIds = function(objectIds) 
-{
-	this.objectIds = objectIds;
-};
-
-API.prototype.getIssueId = function() 
-{
-	return this.issueId;
-};
-API.prototype.setIssueId = function(issueId) 
-{
-	this.issueId = issueId;
-};
-API.prototype.getIssueType = function() 
-{
-	return this.issueType;
-};
-API.prototype.setIssueType = function(issueType) 
-{
-	this.issueId = issueType;
-};
-
-API.prototype.getDataKey = function() 
-{
-	return this.dataKey;
-};
-API.prototype.setDataKey = function(dataKey) 
-{
-	this.dataKey = dataKey;
-};
-
-API.prototype.getLatitude = function() 
-{
-	return this.latitude;
-};
-API.prototype.setLatitude = function(latitude) 
-{
-	this.latitude = latitude;
-};
-
-API.prototype.getLongitude = function() 
-{
-	return this.longitude;
-};
-API.prototype.setLongitude = function(longitude) 
-{
-	this.longitude = longitude;
-};
-
-API.prototype.getElevation = function() 
-{
-	return this.elevation;
-};
-API.prototype.setElevation = function(elevation) 
-{
-	this.elevation = elevation;
-};
-
-API.prototype.getHeading = function() 
-{
-	return this.heading;
-};
-API.prototype.setHeading = function(heading) 
-{
-	this.heading = heading;
-};
-
-API.prototype.getPitch = function() 
-{
-	return this.pitch;
-};
-API.prototype.setPitch = function(pitch) 
-{
-	this.pitch = pitch;
-};
-
-API.prototype.getRoll = function() 
-{
-	return this.roll;
-};
-API.prototype.setRoll = function(roll) 
-{
-	this.roll = roll;
-};
-
-API.prototype.getProperty = function() 
-{
-	return this.property;
-};
-API.prototype.setProperty = function(property) 
-{
-	this.property = property;
-};
-
-API.prototype.getColor = function() 
-{
-	return this.color;
-};
-API.prototype.setColor = function(color) 
-{
-	this.color = color;
-};
-
-API.prototype.getBlockType = function() 
-{
-	return this.blockType;
-};
-API.prototype.setBlockType = function(blockType) 
-{
-	this.blockType = blockType;
-};
-
-API.prototype.getShowOutFitting = function() 
-{
-	return this.showOutFitting;
-};
-API.prototype.setShowOutFitting = function(showOutFitting) 
-{
-	this.showOutFitting = showOutFitting;
-};
-
-
-API.prototype.getShowLabelInfo = function() 
-{
-	return this.showLabelInfo;
-};
-API.prototype.setShowLabelInfo = function(showLabelInfo) 
-{
-	this.showLabelInfo = showLabelInfo;
-};
-
-API.prototype.getShowOrigin = function()
-{
-	return this.showOrigin;
-};
-API.prototype.setShowOrigin = function(showOrigin)
-{
-	this.showOrigin = showOrigin;
-};
-
-API.prototype.getShowBoundingBox = function() 
-{
-	return this.showBoundingBox;
-};
-API.prototype.setShowBoundingBox = function(showBoundingBox) 
-{
-	this.showBoundingBox = showBoundingBox;
-};
-
-API.prototype.getShowShadow = function() 
-{
-	return this.showShadow;
-};
-API.prototype.setShowShadow = function(showShadow) 
-{
-	this.showShadow = showShadow;
-};
-
-API.prototype.getFrustumFarDistance = function() 
-{
-	return this.frustumFarDistance;
-};
-API.prototype.setFrustumFarDistance = function(frustumFarDistance) 
-{
-	this.frustumFarDistance = frustumFarDistance;
-};
-
-API.prototype.getObjectMoveMode = function() 
-{
-	return this.objectMoveMode;
-};
-API.prototype.setObjectMoveMode = function(objectMoveMode) 
-{
-	this.objectMoveMode = objectMoveMode;
-};
-
-API.prototype.getIssueInsertEnable = function() 
-{
-	return this.issueInsertEnable;
-};
-API.prototype.setIssueInsertEnable = function(issueInsertEnable) 
-{
-	this.issueInsertEnable = issueInsertEnable;
-};
-API.prototype.getObjectInfoViewEnable = function() 
-{
-	return this.objectInfoViewEnable;
-};
-API.prototype.setObjectInfoViewEnable = function(objectInfoViewEnable) 
-{
-	this.objectInfoViewEnable = objectInfoViewEnable;
-};
-API.prototype.getOcclusionCullingEnable = function() 
-{
-	return this.occlusionCullingEnable;
-};
-API.prototype.setOcclusionCullingEnable = function(occlusionCullingEnable) 
-{
-	this.occlusionCullingEnable = occlusionCullingEnable;
-};
-API.prototype.getNearGeoIssueListEnable = function() 
-{
-	return this.nearGeoIssueListEnable;
-};
-API.prototype.setNearGeoIssueListEnable = function(nearGeoIssueListEnable) 
-{
-	this.nearGeoIssueListEnable = nearGeoIssueListEnable;
-};
-
-API.prototype.getInsertIssueState = function() 
-{
-	return this.insertIssueState;
-};
-API.prototype.setInsertIssueState = function(insertIssueState) 
-{
-	this.insertIssueState = insertIssueState;
-};
-
-API.prototype.getDrawType = function() 
-{
-	return this.drawType;
-};
-API.prototype.setDrawType = function(drawType) 
-{
-	this.drawType = drawType;
-};
-
-API.prototype.getLod0DistInMeters = function() 
-{
-	return this.lod0DistInMeters;
-};
-API.prototype.setLod0DistInMeters = function(lod0DistInMeters) 
-{
-	this.lod0DistInMeters = lod0DistInMeters;
-};
-API.prototype.getLod1DistInMeters = function() 
-{
-	return this.lod1DistInMeters;
-};
-API.prototype.setLod1DistInMeters = function(lod1DistInMeters) 
-{
-	this.lod1DistInMeters = lod1DistInMeters;
-};
-API.prototype.getLod2DistInMeters = function() 
-{
-	return this.lod2DistInMeters;
-};
-API.prototype.setLod2DistInMeters = function(lod2DistInMeters) 
-{
-	this.lod2DistInMeters = lod2DistInMeters;
-};
-API.prototype.getLod3DistInMeters = function() 
-{
-	return this.lod3DistInMeters;
-};
-API.prototype.setLod3DistInMeters = function(lod3DistInMeters) 
-{
-	this.lod3DistInMeters = lod3DistInMeters;
-};
-API.prototype.getLod4DistInMeters = function() 
-{
-	return this.lod4DistInMeters;
-};
-API.prototype.setLod4DistInMeters = function(lod4DistInMeters) 
-{
-	this.lod4DistInMeters = lod4DistInMeters;
-};
-API.prototype.getLod5DistInMeters = function() 
-{
-	return this.lod5DistInMeters;
-};
-API.prototype.setLod5DistInMeters = function(lod5DistInMeters) 
-{
-	this.lod5DistInMeters = lod5DistInMeters;
-};
-
-API.prototype.getAmbientReflectionCoef = function() 
-{
-	return this.ambientReflectionCoef;
-};
-API.prototype.setAmbientReflectionCoef = function(ambientReflectionCoef) 
-{
-	this.ambientReflectionCoef = ambientReflectionCoef;
-};
-API.prototype.getDiffuseReflectionCoef = function() 
-{
-	return this.diffuseReflectionCoef;
-};
-API.prototype.setDiffuseReflectionCoef = function(diffuseReflectionCoef) 
-{
-	this.diffuseReflectionCoef = diffuseReflectionCoef;
-};
-API.prototype.getSpecularReflectionCoef = function() 
-{
-	return this.specularReflectionCoef;
-};
-API.prototype.setSpecularReflectionCoef = function(specularReflectionCoef) 
-{
-	this.specularReflectionCoef = specularReflectionCoef;
-};
-API.prototype.getAmbientColor = function() 
-{
-	return this.ambientColor;
-};
-API.prototype.setAmbientColor = function(ambientColor) 
-{
-	this.ambientColor = ambientColor;
-};
-API.prototype.getSpecularColor = function() 
-{
-	return this.specularColor;
-};
-API.prototype.setSpecularColor = function(specularColor) 
-{
-	this.specularColor = specularColor;
-};
-API.prototype.getSsaoRadius = function() 
-{
-	return this.ssaoRadius;
-};
-API.prototype.setSsaoRadius = function(ssaoRadius) 
-{
-	this.ssaoRadius = ssaoRadius;
-};
-API.prototype.getFPVMode = function()
-{
-	return this.FPVMode;
-};
-API.prototype.setFPVMode = function(value)
-{
-	this.FPVMode = value;
-};
-API.prototype.getMagoMode = function()
-{
-	return this.magoMode;
-};
-API.prototype.setMagoMode = function(value)
-{
-	this.magoMode = value;
-};
-API.prototype.getDuration = function()
-{
-	return this.duration;
-};
-API.prototype.setDuration = function(duration)
-{
-	this.duration = duration;
-};
-
-API.prototype.getInputPoint = function()
-{
-	return this.inputPoint;
-};
-API.prototype.setInputPoint = function(inputPoint)
-{
-	this.inputPoint = inputPoint;
-};
-
-API.prototype.getResultPoint = function()
-{
-	return this.resultPoint;
-};
-API.prototype.setResultPoint = function(resultPoint)
-{
-	this.resultPoint = resultPoint;
-};
-
-API.prototype.getUnit = function()
-{
-	return this.unit;
-};
-API.prototype.setUnit = function(unit)
-{
-	if (unit !== undefined)
-	{
-		if (isNaN(unit) || unit > CODE.units.RADIAN)
-		{
-			throw new Error('unit parameter needs CODE.units');
-		}
-		this.unit = unit;
-	}
-};
-
-API.prototype.getInstantiateObj = function()
-{
-	return this.instantiateObj;
-};
-API.prototype.setInstantiateObj = function(instantiateObj)
-{
-	this.instantiateObj = instantiateObj;
-};
-
-API.prototype.getStaticModelAttributeObj = function()
-{
-	return this.staticModelAttributeObj;
-};
-API.prototype.setStaticModelAttributeObj = function(staticModelAttributeObj)
-{
-	this.staticModelAttributeObj = staticModelAttributeObj;
-};
-
-API.prototype.getAnimationOption = function()
-{
-	return this.animationOption;
-};
-API.prototype.setAnimationOption = function(animationOption)
-{
-	this.animationOption = animationOption;
-};
-
-API.prototype.getTrackOption = function()
-{
-	return this.trackOption;
-};
-API.prototype.setTrackOption = function(trackOption)
-{
-	this.trackOption = trackOption;
-};
-
-API.prototype.getNodeAttribute = function()
-{
-	return this.nodeAttribute;
-};
-API.prototype.setNodeAttribute = function(nodeAttribute)
-{
-	this.nodeAttribute = nodeAttribute;
-};
-
-'use strict';
-
-/**
- * 사용자가 변경한 moving, color, rotation 등 이력 정보를 위한 domain
- * @class Policy
- */
-var ChangeHistory = function() 
-{
-	if (!(this instanceof ChangeHistory)) 
-	{
-		throw new Error(Messages.CONSTRUCT_ERROR);
-	}
-
-	this.moveHistory = false;
-	this.colorHistory = false;
-	this.rotationHistory = false;
-	
-	// move mode. ALL : 0 , OBJECT : 1, NONE : 2
-	this.objectMoveMode = null;
-	
-	// project id
-	this.projectId = null;
-	// project data folder
-	this.projectDataFolder = null;
-	// data_key
-	this.dataKey = null;	
-	// objectId
-	this.objectId = null;
-	// objectIndexOrder
-	this.objectIndexOrder = 0;
-	
-	// referenceObject aditional movement.
-	this.refObjectAditionalMove;
-	this.refObjectAditionalMoveRelToBuilding;
-	
-	// 위도
-	this.latitude = 0.0;
-	// 경도
-	this.longitude = 0.0;
-	// 높이
-	this.elevation = 0.0;
-	// heading
-	this.heading = 0.0;
-	// pitch
-	this.pitch = 0.0;
-	// roll
-	this.roll = 0.0;
-	// duration
-	this.duration = 0;
-	// 색깔
-	this.color = 0;
-	// color rgb
-	this.rgbColor = [];
-	// 속성
-	this.property = null;
-	this.propertyKey = null;
-	this.propertyValue = null;
-};
-
-ChangeHistory.prototype.getReferenceObjectAditionalMovement = function() 
-{
-	if (this.refObjectAditionalMove === undefined)
-	{ this.refObjectAditionalMove = new Point3D(); }
-	
-	return this.refObjectAditionalMove;
-};
-
-ChangeHistory.prototype.getReferenceObjectAditionalMovementRelToBuilding = function() 
-{
-	if (this.refObjectAditionalMoveRelToBuilding === undefined)
-	{ this.refObjectAditionalMoveRelToBuilding = new Point3D(); }
-	
-	return this.refObjectAditionalMoveRelToBuilding;
-};
-
-ChangeHistory.prototype.getProjectId = function() 
-{
-	return this.projectId;
-};
-ChangeHistory.prototype.setProjectId = function(projectId) 
-{
-	this.projectId = projectId;
-};
-
-ChangeHistory.prototype.getProjectDataFolder = function() 
-{
-	return this.projectDataFolder;
-};
-ChangeHistory.prototype.setProjectDataFolder = function(projectDataFolder) 
-{
-	this.projectDataFolder = projectDataFolder;
-};
-
-ChangeHistory.prototype.getDataKey = function() 
-{
-	return this.dataKey;
-};
-ChangeHistory.prototype.setDataKey = function(dataKey) 
-{
-	this.dataKey = dataKey;
-};
-
-ChangeHistory.prototype.getObjectId = function() 
-{
-	return this.objectId;
-};
-ChangeHistory.prototype.setObjectId = function(objectId) 
-{
-	this.objectId = objectId;
-};
-
-ChangeHistory.prototype.getObjectIndexOrder = function() 
-{
-	return this.objectIndexOrder;
-};
-ChangeHistory.prototype.setObjectIndexOrder = function(objectIndexOrder) 
-{
-	this.objectIndexOrder = objectIndexOrder;
-};
-
-ChangeHistory.prototype.getLatitude = function() 
-{
-	return this.latitude;
-};
-ChangeHistory.prototype.setLatitude = function(latitude) 
-{
-	this.latitude = latitude;
-};
-
-ChangeHistory.prototype.getLongitude = function() 
-{
-	return this.longitude;
-};
-ChangeHistory.prototype.setLongitude = function(longitude) 
-{
-	this.longitude = longitude;
-};
-
-ChangeHistory.prototype.getElevation = function() 
-{
-	return this.elevation;
-};
-ChangeHistory.prototype.setElevation = function(elevation) 
-{
-	this.elevation = elevation;
-};
-
-ChangeHistory.prototype.getHeading = function() 
-{
-	return this.heading;
-};
-ChangeHistory.prototype.setHeading = function(heading) 
-{
-	this.heading = heading;
-};
-
-ChangeHistory.prototype.getPitch = function() 
-{
-	return this.pitch;
-};
-ChangeHistory.prototype.setPitch = function(pitch) 
-{
-	this.pitch = pitch;
-};
-
-ChangeHistory.prototype.getRoll = function() 
-{
-	return this.roll;
-};
-ChangeHistory.prototype.setRoll = function(roll) 
-{
-	this.roll = roll;
-};
-
-ChangeHistory.prototype.getColor = function() 
-{
-	return this.color;
-};
-ChangeHistory.prototype.setColor = function(color) 
-{
-	this.color = color;
-};
-ChangeHistory.prototype.getRgbColor = function() 
-{
-	return this.rgbColor;
-};
-ChangeHistory.prototype.setRgbColor = function(rgbColor) 
-{
-	this.rgbColor = rgbColor;
-};
-
-ChangeHistory.prototype.getProperty = function() 
-{
-	return this.property;
-};
-ChangeHistory.prototype.setProperty = function(property) 
-{
-	this.property = property;
-};
-ChangeHistory.prototype.getPropertyKey = function() 
-{
-	return this.propertyKey;
-};
-ChangeHistory.prototype.setPropertyKey = function(propertyKey) 
-{
-	this.propertyKey = propertyKey;
-};
-ChangeHistory.prototype.getPropertyValue = function() 
-{
-	return this.propertyValue;
-};
-ChangeHistory.prototype.setPropertyValue = function(propertyValue) 
-{
-	this.propertyValue = propertyValue;
-};
-
-ChangeHistory.prototype.getDuration = function()
-{
-	return this.duration;
-};
-ChangeHistory.prototype.setDuration = function(duration)
-{
-	this.duration = duration;
-};
-
-ChangeHistory.prototype.getObjectMoveMode = function() 
-{
-	return this.objectMoveMode;
-};
-ChangeHistory.prototype.setObjectMoveMode = function(objectMoveMode) 
-{
-	this.objectMoveMode = objectMoveMode;
-};
-"use strict";
-
-var CODE = {};
-
-// magoManager가 다 로딩 되지 않은 상태에서 화면으로 부터 호출 되는 것을 막기 위해
-CODE.magoManagerState = {
-	"INIT"   	: 0,
-	"STARTED"	: 1,
-	"READY"   : 2
-};
-
-//0 = no started to load. 1 = started loading. 2 = finished loading. 3 = parse started. 4 = parse finished.
-CODE.fileLoadState = {
-	"READY"            : 0,
-	"LOADING_STARTED"  : 1,
-	"LOADING_FINISHED" : 2,
-	"PARSE_STARTED"    : 3,
-	"PARSE_FINISHED"   : 4,
-	"IN_QUEUE"         : 5,
-	"IN_PARSE_QUEUE"   : 6,
-	"BINDING_STARTED"  : 7,
-	"BINDING_FINISHED" : 8,
-	"LOAD_FAILED"      : 9
-};
-
-CODE.moveMode = {
-	"ALL"              : "0",
-	"OBJECT"           : "1",
-	"GEOGRAPHICPOINTS" : "2",
-	"NONE"             : "3"
-};
-
-CODE.magoMode = {
-	"NORMAL"  : 0,
-	"DRAWING" : 1
-};
-
-CODE.magoCurrentProcess = {
-	"Unknown"                    : 0,
-	"DepthRendering"             : 1,
-	"ColorRendering"             : 2,
-	"ColorCodeRendering"         : 3,
-	"DepthShadowRendering"       : 4,
-	"SilhouetteDepthRendering"   : 5,
-	"StencilSilhouetteRendering" : 6
-};
-
-CODE.modelerMode = {
-	"INACTIVE"                 : 0,
-	"DRAWING_POLYLINE"         : 1,
-	"DRAWING_PLANEGRID"        : 2,
-	"DRAWING_GEOGRAPHICPOINTS" : 3,
-	"DRAWING_EXCAVATIONPOINTS" : 4,
-	"DRAWING_TUNNELPOINTS"     : 5,
-	"DRAWING_BSPLINE"          : 6,
-	"DRAWING_BASICFACTORY"     : 7,
-	"DRAWING_STATICGEOMETRY"   : 8,
-	"DRAWING_PIPE"             : 9,
-	"DRAWING_SPHERE"           : 10,
-	"DRAWING_BOX"              : 11,
-	"DRAWING_CUTTINGPLANE"     : 12,
-	"DRAWING_CLIPPINGBOX"      : 13,
-	"DRAWING_CONCENTRICTUBES"  : 14,
-	"DRAWING_TUBE"             : 15,
-	"DRAWING_FREECONTOURWALL"  : 16,
-	"DRAWING_CYLYNDER"         : 17
-};
-
-CODE.boxFace = {
-	"UNKNOWN" : 0,
-	"LEFT"    : 1,
-	"RIGHT"   : 2,
-	"FRONT"   : 3,
-	"REAR"    : 4,
-	"TOP"     : 5,
-	"BOTTOM"  : 6
-};
-
-CODE.modelerDrawingState = {
-	"NO_STARTED" : 0,
-	"STARTED"    : 1
-};
-
-CODE.modelerDrawingElement = {
-	"NOTHING"          : 0,
-	"POINTS"           : 1,
-	"LINES"            : 2,
-	"POLYLINES"        : 3,
-	"GEOGRAPHICPOINTS" : 4,
-};
-
-CODE.units = {
-	"METRE"  : 0,
-	"DEGREE" : 1,
-	"RADIAN" : 2
-};
-
-
-CODE.trackMode = {
-	"TRACKING" : 0,
-	"DRIVER"   : 1
-};
-
-CODE.movementType = {
-	"NO_MOVEMENT" : 0,
-	"TRANSLATION" : 1,
-	"ROTATION"    : 2,
-	"ROTATION_ZX" : 3
-};
-
-CODE.imageryType = {
-	"UNKNOWN"      : 0,
-	"CRS84"        : 1,
-	"WEB_MERCATOR" : 2
-};
-
-CODE.animationType = {
-	"UNKNOWN"         : 0,
-	"REALTIME_POINTS" : 1,
-	"PATH"            : 2
-};
-
-CODE.relativePosition2D = {
-	"UNKNOWN"    : 0,
-	"LEFT"       : 1,
-	"RIGHT"      : 2,
-	"COINCIDENT" : 3
-};
-CODE.imageFilter = {
-	"UNKNOWN"    : 0,
-	"BATHYMETRY" : 1
-};
-CODE.cesiumTerrainType = {
-	GEOSERVER          : 'geoserver',
-	CESIUM_DEFAULT     : 'cesium-default',
-	CESIUM_ION_DEFAULT : 'cesium-ion-default',
-	CESIUM_ION_CDN     : 'cesium-ion-cdn',
-	CESIUM_CUSTOMER    : 'cesium-customer'
-};
-CODE.magoEarthTerrainType = {
-	PLAIN     : 'plain',
-	ELEVATION : 'elevation',
-	REALTIME  : 'realtime'
-};
-
-CODE.drawGeometryType = {
-	POINT     : 'point',
-	LINE    	 : 'line',
-	POLYGON   : 'polygon',
-	RECTANGLE : 'rectangle'
-};
-
-CODE.PROJECT_ID_PREFIX = "projectId_";
-CODE.PROJECT_DATA_FOLDER_PREFIX = "projectDataFolder_";
-
-CODE.parametricCurveState = {
-	"NORMAL" : 0,
-	"EDITED" : 1
-};
-
-'use strict';
-
-/**
- * 상수 설정
- * @class Constant
- */
-var Constant = {};
-
-Constant.CESIUM = "cesium";
-Constant.WORLDWIND = "worldwind";
-Constant.MAGOWORLD = "magoworld";
-Constant.OBJECT_INDEX_FILE = "/objectIndexFile.ihe";
-Constant.TILE_INDEX_FILE = "/smartTile_f4d_indexFile.sii";
-Constant.CACHE_VERSION = "?cache_version=";
-Constant.SIMPLE_BUILDING_TEXTURE3x3_BMP = "/SimpleBuildingTexture3x3.bmp";
-Constant.RESULT_XDO2F4D = "/Result_xdo2f4d/Images/";
-Constant.RESULT_XDO2F4D_TERRAINTILES = "/Result_xdo2f4d/F4D_TerrainTiles/";
-Constant.RESULT_XDO2F4D_TERRAINTILEFILE_TXT = "/Result_xdo2f4d/f4dTerranTileFile.txt";
-
-Constant.INTERSECTION_OUTSIDE = 0;
-Constant.INTERSECTION_INTERSECT= 1;
-Constant.INTERSECTION_INSIDE = 2;
-Constant.INTERSECTION_POINT_A = 3;
-Constant.INTERSECTION_POINT_B = 4;
-
-'use strict';
-
-/**
- * mago3D 전체 환경 설정을 관리
- * @class MagoConfig
- */
-var MagoConfig = {};
-
-MagoConfig.setContainerId = function(containerId) 
-{
-	this.containerId = containerId;
-};
-
-MagoConfig.getContainerId = function() 
-{
-	return this.containerId;
-};
-
-MagoConfig.getPolicy = function() 
-{
-	return this.serverPolicy;
-};
-
-MagoConfig.getGeoserver = function() 
-{
-	return this.geoserver;
-};
-
-MagoConfig.getData = function(key) 
-{
-	return this.dataObject[key];
-};
-
-MagoConfig.isDataExist = function(key) 
-{
-	return this.dataObject.hasOwnProperty(key);
-};
-
-MagoConfig.deleteData = function(key) 
-{
-	return delete this.dataObject[key];
-};
-
-/**
- * data 를 map에 저장
- * @param key map에 저장될 key
- * @param value map에 저장될 value
- */
-MagoConfig.setData = function(key, value) 
-{
-	if (!this.isDataExist(key)) 
-	{
-		this.dataObject[key] = value;
-	}
-};
-
-/**
- * F4D Converter 실행 결과물이 저장된 project data folder 명을 획득
- * @param projectDataFolder data folder
- */
-MagoConfig.getProjectDataFolder = function(projectDataFolder) 
-{
-	var key = CODE.PROJECT_DATA_FOLDER_PREFIX + projectDataFolder;
-	return this.dataObject[key];
-};
-
-/**
- * project map에 data folder명의 존재 유무를 검사
- * @param projectDataFolder
- */
-MagoConfig.isProjectDataFolderExist = function(projectDataFolder) 
-{
-	var key = CODE.PROJECT_DATA_FOLDER_PREFIX + projectDataFolder;
-	return this.dataObject.hasOwnProperty(key);
-};
-
-/**
- * project data folder명을 map에서 삭제
- * @param projectDataFolder
- */
-MagoConfig.deleteProjectDataFolder = function(projectDataFolder) 
-{
-	var key = CODE.PROJECT_DATA_FOLDER_PREFIX + projectDataFolder;
-	return delete this.dataObject[key];
-};
-
-/**
- * project data folder명을 Object에서 삭제
- * @param projectDataFolder Object에 저장될 key
- * @param value Object에 저장될 value
- */
-MagoConfig.setProjectDataFolder = function(projectDataFolder, value) 
-{
-	var key = CODE.PROJECT_DATA_FOLDER_PREFIX + projectDataFolder;
-	if (!this.isProjectDataFolderExist(key))
-	{
-		this.dataObject[key] = value;
-	}
-};
-
-/**
- * 환경설정 초기화
- * @param serverPolicy mago3d policy(json)
- * @param projectIdArray data 정보를 map 저장할 key name
- * @param projectDataArray data 정보(json)
- */
-MagoConfig.init = function(serverPolicy, projectIdArray, projectDataArray) 
-{
-	if (!serverPolicy || !serverPolicy instanceof Object) 
-	{
-		throw new Error('geopolicy is required object.');
-	}
-	this.dataObject = {};
-	
-	this.selectHistoryObject = {};
-	this.movingHistoryObject = {};
-	this.colorHistoryObject = {};
-	this.locationAndRotationHistoryObject = {};
-
-	this.serverPolicy = serverPolicy;
-	this.scriptRootPath = getScriptRootPath();
-	this.twoDimension = false;
-
-	if (this.serverPolicy.geoserverEnable) 
-	{
-		this.geoserver = new GeoServer();
-
-		var info = {
-			"wmsVersion"    : this.serverPolicy.geoserverWmsVersion,
-			"dataUrl"       : this.serverPolicy.geoserverDataUrl,
-			"dataWorkspace" : this.serverPolicy.geoserverDataWorkspace,
-			"dataStore"     : this.serverPolicy.geoserverDataStore,
-			"user"          : this.serverPolicy.geoserverUser,
-			"password"      : this.serverPolicy.geoserverPassword
-		};
-		this.geoserver.setServerInfo(info);
-	}
-
-
-	if (projectIdArray && projectIdArray.length > 0) 
-	{
-		for (var i=0; i<projectIdArray.length; i++) 
-		{
-			if (!this.isDataExist(CODE.PROJECT_ID_PREFIX + projectIdArray[i])) 
-			{
-				this.setData(CODE.PROJECT_ID_PREFIX + projectIdArray[i], projectDataArray[i]);
-				this.setProjectDataFolder(CODE.PROJECT_DATA_FOLDER_PREFIX + projectDataArray[i].data_key, projectDataArray[i].data_key);
-			}
-		}
-	}
-
-	function getScriptRootPath() 
-	{
-		var magoScriptQueryStrRegex = /((?:.*\/)|^)mago3d\.js\?(?:&?[^=&]*=[^=&]*)*/;
-		var magoScriptRegex = /((?:.*\/)|^)mago3d\.js$/;
-		var magoScriptPath;
-		var scripts = document.getElementsByTagName('script');
-		for ( var j = 0, len = scripts.length; j < len; ++j) 
-		{
-			var src = scripts[j].getAttribute('src');
-			var nomalResult = magoScriptRegex.exec(src);
-			var queryStrResult = magoScriptQueryStrRegex.exec(src);
-
-			var result = nomalResult||queryStrResult;
-			if (result !== null) 
-			{
-				magoScriptPath = result[1];
-			}
-		}
-		return magoScriptPath;
-	}
-};
-
-/**
- * 모든 데이터를 삭제함
- */
-MagoConfig.clearAllData = function() 
-{
-	this.dataObject = {};
-};
-
-/**
- * 모든 선택 히스토리 삭제
- */
-MagoConfig.clearSelectHistory = function() 
-{
-	this.selectHistoryObject = {};
-};
-
-/**
- * 모든 object 선택 내용 이력을 취득
- */
-MagoConfig.getAllSelectHistory = function()
-{
-	return this.selectHistoryObject;
-};
-
-/**
- * project 별 해당 키에 해당하는 모든 object 선택 내용 이력을 취득
- */
-MagoConfig.getSelectHistoryObjects = function(projectId, dataKey)
-{
-	// projectId 별 Object을 검사
-	var projectIdObject = this.selectHistoryObject[projectId];
-	if (projectIdObject === undefined) { return undefined; }
-	// dataKey 별 Object을 검사
-	var dataKeyObject = projectIdObject[dataKey];
-	return dataKeyObject;
-};
-
-/**
- * object 선택 내용 이력을 취득
- */
-MagoConfig.getSelectHistoryObject = function(projectId, dataKey, objectIndexOrder)
-{
-	// projectId 별 Object을 검사
-	var projectIdObject = this.selectHistoryObject[projectId];
-	if (projectIdObject === undefined) { return undefined; }
-	// dataKey 별 Object을 검사
-	var dataKeyObject = projectIdObject[dataKey];
-	if (dataKeyObject === undefined) { return undefined; }
-	// objectIndexOrder 를 저장
-	return dataKeyObject[objectIndexOrder];
-};
-
-/**
- * object 선택 내용을 저장
- */
-MagoConfig.saveSelectHistory = function(projectId, dataKey, objectIndexOrder, changeHistory) 
-{
-	// projectId 별 Object을 검사
-	var projectIdObject = this.selectHistoryObject.get(projectId);
-	if (projectIdObject === undefined)
-	{
-		projectIdObject = {};
-		this.selectHistoryObject[projectId] = projectIdObject;
-	}
-	
-	// dataKey 별 Object을 검사
-	var dataKeyObject = projectIdObject[dataKey];
-	if (dataKeyObject === undefined)
-	{
-		dataKeyObject = {};
-		projectIdObject[dataKey] = dataKeyObject;
-	}
-	
-	// objectIndexOrder 를 저장
-	dataKeyObject[objectIndexOrder] = changeHistory;
-};
-
-/**
- * object 선택 내용을 삭제
- */
-MagoConfig.deleteSelectHistoryObject = function(projectId, dataKey, objectIndexOrder)
-{
-	// projectId 별 Object을 검사
-	var projectIdObject = this.selectHistoryObject[projectId];
-	if (projectIdObject === undefined) { return undefined; }
-	// dataKey 별 Object을 검사
-	var dataKeyObject = projectIdObject[dataKey];
-	if (dataKeyObject === undefined) { return undefined; }
-	// objectIndexOrder 를 저장
-	return delete dataKeyObject[objectIndexOrder];
-};
-
-/**
- * 모든 이동 히스토리 삭제
- */
-MagoConfig.clearMovingHistory = function() 
-{
-	this.movingHistoryObject = {};
-};
-
-/**
- * 모든 object 선택 내용 이력을 취득
- */
-MagoConfig.getAllMovingHistory = function()
-{
-	return this.movingHistoryObject;
-};
-
-/**
- * project별 입력키 값과 일치하는 object 이동 내용 이력을 취득
- */
-MagoConfig.getMovingHistoryObjects = function(projectId, dataKey)
-{
-	// projectId 별 Object을 검사
-	var projectIdObject = this.movingHistoryObject[projectId];
-	if (projectIdObject === undefined) { return undefined; }
-	// dataKey 별 Object을 검사
-	var dataKeyObject = projectIdObject[dataKey];
-	return dataKeyObject;
-};
-
-/**
- * object 이동 내용 이력을 취득
- */
-MagoConfig.getMovingHistoryObject = function(projectId, dataKey, objectIndexOrder)
-{
-	// projectId 별 Object을 검사
-	var projectIdObject = this.movingHistoryObject[projectId];
-	if (projectIdObject === undefined) { return undefined; }
-	// dataKey 별 Object을 검사
-	var dataKeyObject = projectIdObject[dataKey];
-	if (dataKeyObject === undefined) { return undefined; }
-	// objectIndexOrder 를 저장
-	return dataKeyObject[objectIndexOrder];
-};
-
-/**
- * object 이동 내용을 저장
- */
-MagoConfig.saveMovingHistory = function(projectId, dataKey, objectIndexOrder, changeHistory) 
-{
-	// projectId 별 Object을 검사
-	var projectIdObject = this.movingHistoryObject[projectId];
-	if (projectIdObject === undefined)
-	{
-		projectIdObject = {};
-		this.movingHistoryObject[projectId] = projectIdObject;
-	}
-	
-	// dataKey 별 Object을 검사
-	var dataKeyObject = projectIdObject[dataKey];
-	if (dataKeyObject === undefined)
-	{
-		dataKeyObject = {};
-		projectIdObject[dataKey] = dataKeyObject;
-	}
-	
-	// objectIndexOrder 를 저장
-	dataKeyObject[objectIndexOrder] = changeHistory;
-};
-
-/**
- * object 이동 내용을 삭제
- */
-MagoConfig.deleteMovingHistoryObject = function(projectId, dataKey, objectIndexOrder)
-{
-	// projectId 별 Object을 검사
-	var projectIdObject = this.movingHistoryObject[projectId];
-	if (projectIdObject === undefined) { return undefined; }
-	// dataKey 별 Object을 검사
-	var dataKeyObject = projectIdObject[dataKey];
-	if (dataKeyObject === undefined) { return undefined; }
-	// objectIndexOrder 를 저장
-	return delete dataKeyObject[objectIndexOrder];
-};
-
-/**
- * 모든 색깔 변경 이력을 획득
- */
-MagoConfig.getAllColorHistory = function() 
-{
-	return this.colorHistoryObject;
-};
-
-/**
- * 모든 색깔변경 히스토리 삭제
- */
-MagoConfig.clearColorHistory = function() 
-{
-	this.colorHistoryObject = {};
-};
-
-/**
- * project별 키에 해당하는 모든 색깔 변경 이력을 획득
- */
-MagoConfig.getColorHistorys = function(projectId, dataKey)
-{
-	// projectId 별 Object을 검사
-	var projectIdObject = this.colorHistoryObject[projectId];
-	if (projectIdObject === undefined) { return undefined; }
-	// dataKey 별 Object을 검사
-	var dataKeyObject = projectIdObject[dataKey];
-	return dataKeyObject;
-};
-
-/**
- * 색깝 변경 이력을 획득
- */
-MagoConfig.getColorHistory = function(projectId, dataKey, objectId)
-{
-	// projectId 별 Object을 검사
-	var projectIdObject = this.colorHistoryObject[projectId];
-	if (projectIdObject === undefined) { return undefined; }
-	// dataKey 별 Object을 검사
-	var dataKeyObject = projectIdObject[dataKey];
-	if (dataKeyObject === undefined) { return undefined; }
-	// objectId 를 저장
-	return dataKeyObject[objectId];
-};
-
-/**
- * 색깝 변경 내용을 저장
- */
-MagoConfig.saveColorHistory = function(projectId, dataKey, objectId, changeHistory) 
-{
-	// projectId 별 Object을 검사
-	var projectIdObject = this.colorHistoryObject[projectId];
-	if (projectIdObject === undefined)
-	{
-		projectIdObject = {};
-		this.colorHistoryObject[projectId] = projectIdObject;
-	}
-	
-	// dataKey 별 Object을 검사
-	var dataKeyObject = projectIdObject[dataKey];
-	if (dataKeyObject === undefined)
-	{
-		dataKeyObject = {};
-		projectIdObject[dataKey] = dataKeyObject;
-	}
-
-	if (objectId === null || objectId === "") 
-	{
-		dataKeyObject[dataKey] = changeHistory;
-	}
-	else 
-	{
-		dataKeyObject[objectId] = changeHistory;
-	}
-};
-
-/**
- * 색깔 변경 이력을 삭제
- */
-MagoConfig.deleteColorHistory = function(projectId, dataKey, objectId)
-{
-	// projectId 별 Object을 검사
-	var projectIdObject = this.colorHistoryObject[projectId];
-	if (projectIdObject === undefined) { return undefined; }
-	// dataKey 별 Object을 검사
-	var dataKeyObject = projectIdObject[dataKey];
-	if (dataKeyObject === undefined) { return undefined; }
-	// objectIndexOrder 를 저장
-	return delete dataKeyObject[objectId];
-};
-
-/**
- * 모든 색깔변경 히스토리 삭제
- */
-MagoConfig.clearColorHistory = function() 
-{
-	this.colorHistoryObject = {};
-};
-
-/**
- * 모든 location and rotation 변경 이력을 획득
- */
-MagoConfig.getAllLocationAndRotationHistory = function() 
-{
-	return this.locationAndRotationHistoryObject;
-};
-
-/**
- * 프로젝트별 해당 키 값을 갖는 모든 location and rotation 이력을 획득
- */
-MagoConfig.getLocationAndRotationHistorys = function(projectId, dataKey)
-{
-	// projectId 별 Object을 검사
-	var projectIdObject = this.locationAndRotationHistoryObject[projectId];
-	if (projectIdObject === undefined) { return undefined; }
-	// dataKey 별 Object을 검사
-	var dataKeyObject = projectIdObject[dataKey];
-	return dataKeyObject;
-};
-
-/**
- * location and rotation 이력을 획득
- */
-MagoConfig.getLocationAndRotationHistory = function(projectId, dataKey)
-{
-	// projectId 별 Object을 검사
-	var projectIdObject = this.locationAndRotationHistoryObject[projectId];
-	if (projectIdObject === undefined) { return undefined; }
-	// dataKey 별 Object을 검사
-	var dataKeyObject = projectIdObject[dataKey];
-	
-	return dataKeyObject;
-};
-
-/**
- * location and rotation 내용을 저장
- */
-MagoConfig.saveLocationAndRotationHistory = function(projectId, dataKey, changeHistory) 
-{
-	// projectId 별 Object을 검사
-	var projectIdObject = this.locationAndRotationHistoryObject[projectId];
-	if (projectIdObject === undefined)
-	{
-		projectIdObject = {};
-		this.locationAndRotationHistoryObject[projectId] = projectIdObject;
-	}
-	
-	// dataKey 별 Object을 검사
-	var dataKeyObject = projectIdObject[dataKey];
-	if (dataKeyObject === undefined)
-	{
-		dataKeyObject = {};
-	}
-
-	dataKeyObject[dataKey] = changeHistory;
-};
-
-/**
- * location and rotation 이력을 삭제
- */
-MagoConfig.deleteLocationAndRotationHistory = function(projectId, dataKey)
-{
-	// projectId 별 Object을 검사
-	var projectIdObject = this.locationAndRotationHistoryObject[projectId];
-	if (projectIdObject === undefined) { return undefined; }
-	// dataKey 별 Object을 검사
-	var dataKeyObject = delete projectIdObject[dataKey];
-};
-
-/**
- * 모든 location and rotation 히스토리 삭제
- */
-MagoConfig.clearLocationAndRotationHistory = function() 
-{
-	this.locationAndRotationHistoryObject = {};
-};
-	
-/**
- * TODO 이건 나중에 활요. 사용하지 않음
- * check 되지 않은 데이터들을 삭제함
- * @param keyObject 비교할 맵
- */
-/*MagoConfig.clearUnSelectedData = function(keyObject)
-{
-	for (var key of this.dataObject.keys())
-	{
-		if (!keyObject.hasxxxxx(key))
-		{
-			// data folder path가 존재하면....
-			if (key.indexOf(CODE.PROJECT_DATA_FOLDER_PREFIX) >= 0) 
-			{
-				// 지우는 처리가 있어야 함
-			}
-			this.dataObject.delete(key);
-		}
-	}
-};*/
-
-MagoConfig.setTwoDimension = function(twoDimension) 
-{
-	this.twoDimension = twoDimension;
-};
-MagoConfig.isTwoDimension = function()
-{
-	return this.twoDimension;
-};
-'use strict';
-
-/**
- * Policy
- * @class Policy
- */
-var Policy = function() 
-{
-	if (!(this instanceof Policy)) 
-	{
-		throw new Error(Messages.CONSTRUCT_ERROR);
-	}
-
-	// mago3d 활성화/비활성화 여부
-	this.magoEnable = true;
-
-	// outfitting 표시 여부
-	this.showOutFitting = false;
-	// label 표시/비표시
-	this.showLabelInfo = false;
-	// boundingBox 표시/비표시
-	this.showBoundingBox = false;
-	// 그림자 표시/비표시
-	this.showShadow = false;
-	// squared far frustum 거리
-	this.frustumFarSquaredDistance = 5000000;
-	// far frustum
-	this.frustumFarDistance = 20000;
-
-	// highlighting
-	this.highLightedBuildings = [];
-	// color
-	this.colorBuildings = [];
-	// color
-	this.color = [];
-	// show/hide
-	this.hideBuildings = [];
-	// move mode
-	this.objectMoveMode = CODE.moveMode.NONE;
-	// 이슈 등록 표시
-	this.issueInsertEnable = false;
-	// object 정보 표시
-	this.objectInfoViewEnable = false;
-	// 이슈 목록 표시
-	this.nearGeoIssueListEnable = false;
-	// occlusion culling
-	this.occlusionCullingEnable = false;
-	// origin axis XYZ
-	this.showOrigin = false;
-	// mago generalMode
-	this.magoMode = CODE.magoMode.NORMAL;
-	
-	// 이미지 경로
-	this.imagePath = "";
-	
-	// provisional.
-	this.colorChangedObjectId;
-	
-	// LOD1
-	this.lod0DistInMeters = 15;
-	this.lod1DistInMeters = 50;
-	this.lod2DistInMeters = 90;
-	this.lod3DistInMeters = 200;
-	this.lod4DistInMeters = 1000;
-	this.lod5DistInMeters = 50000;
-	
-	// Lighting
-	this.ambientReflectionCoef = 0.45; // 0.2.
-	this.diffuseReflectionCoef = 0.75; // 1.0
-	this.specularReflectionCoef = 0.6; // 0.7
-	this.ambientColor = null;
-	this.specularColor = new Float32Array([0.6, 0.6, 0.6]);
-	
-	this.ssaoRadius = 0.15;
-
-	this.modelMovable = true;
-	
-	var policy = MagoConfig.getPolicy();
-	// PointsCloud.
-	this.pointsCloudSettings = {};
-	if (defined(policy)) 
-	{
-		this.pointsCloudSettings.maxPartitionsLod0 = defaultValueCheckLength(policy.maxPartitionsLod0, 4);
-		this.pointsCloudSettings.maxPartitionsLod1 = defaultValueCheckLength(policy.maxPartitionsLod1, 2);
-		this.pointsCloudSettings.maxPartitionsLod2orLess = defaultValueCheckLength(policy.maxPartitionsLod2OrLess, 1);
-		this.pointsCloudSettings.MaxPerUnitPointsRenderDistToCam0m = 1.0/defaultValueCheckLength(policy.maxRatioPointsDist0m, 10.0);
-		this.pointsCloudSettings.MaxPerUnitPointsRenderDistToCam100m = 1.0/defaultValueCheckLength(policy.maxRatioPointsDist100m, 120.0);
-		this.pointsCloudSettings.MaxPerUnitPointsRenderDistToCam200m = 1.0/defaultValueCheckLength(policy.maxRatioPointsDist200m, 240.0);
-		this.pointsCloudSettings.MaxPerUnitPointsRenderDistToCam400m = 1.0/defaultValueCheckLength(policy.maxRatioPointsDist400m, 480.0);
-		this.pointsCloudSettings.MaxPerUnitPointsRenderDistToCam800m = 1.0/defaultValueCheckLength(policy.maxRatioPointsDist800m, 960.0);
-		this.pointsCloudSettings.MaxPerUnitPointsRenderDistToCam1600m = 1.0/defaultValueCheckLength(policy.maxRatioPointsDist1600m, 1920.0);
-		this.pointsCloudSettings.MaxPerUnitPointsRenderDistToCamMoreThan1600m = 1.0/defaultValueCheckLength(policy.maxRatioPointsDistOver1600m, 3840.0);
-		this.pointsCloudSettings.maxPointSize = defaultValueCheckLength(policy.maxPointSizeForPc, 40.0);
-		this.pointsCloudSettings.minPointSize = defaultValueCheckLength(policy.minPointSizeForPc, 3.0);
-		this.pointsCloudSettings.pendentPointSize = defaultValueCheckLength(policy.pendentPointSizeForPc, 60.0);
-		this.pointsCloudSettings.minHeightRainbow = defaultValueCheckLength(policy.minHeight_rainbow_loc, 0.0);
-		this.pointsCloudSettings.maxHeightRainbow = defaultValueCheckLength(policy.maxHeight_rainbow_loc, 100.0);
-	}
-	else 
-	{
-		this.pointsCloudSettings.maxPartitionsLod0 = 4;
-		this.pointsCloudSettings.maxPartitionsLod1 = 2;
-		this.pointsCloudSettings.maxPartitionsLod2orLess = 1;
-		this.pointsCloudSettings.MaxPerUnitPointsRenderDistToCam0m = 1.0/10.0;
-		this.pointsCloudSettings.MaxPerUnitPointsRenderDistToCam100m = 1.0/120.0;
-		this.pointsCloudSettings.MaxPerUnitPointsRenderDistToCam200m = 1.0/240.0;
-		this.pointsCloudSettings.MaxPerUnitPointsRenderDistToCam400m = 1.0/480.0;
-		this.pointsCloudSettings.MaxPerUnitPointsRenderDistToCam800m = 1.0/960.0;
-		this.pointsCloudSettings.MaxPerUnitPointsRenderDistToCam1600m = 1.0/1920.0;
-		this.pointsCloudSettings.MaxPerUnitPointsRenderDistToCamMoreThan1600m = 1.0/3840.0;
-		this.pointsCloudSettings.maxPointSize = 40.0;
-		this.pointsCloudSettings.minPointSize = 3.0;
-		this.pointsCloudSettings.pendentPointSize = 60.0;
-		this.pointsCloudSettings.minHeightRainbow = 0.0;
-		this.pointsCloudSettings.maxHeightRainbow = 100.0;
-	}
-};
-
-Policy.prototype.getPointsCloudSettings = function() 
-{
-	return this.pointsCloudSettings;
-};
-
-Policy.prototype.getShowOrigin = function() 
-{
-	return this.showOrigin;
-};
-Policy.prototype.setShowOrigin = function(showOrigin) 
-{
-	this.showOrigin = showOrigin;
-};
-
-Policy.prototype.getMagoEnable = function() 
-{
-	return this.magoEnable;
-};
-Policy.prototype.setMagoEnable = function(magoEnable) 
-{
-	this.magoEnable = magoEnable;
-};
-
-Policy.prototype.getShowOutFitting = function() 
-{
-	return this.showOutFitting;
-};
-Policy.prototype.setShowOutFitting = function(showOutFitting) 
-{
-	this.showOutFitting = showOutFitting;
-};
-Policy.prototype.getShowLabelInfo = function() 
-{
-	return this.showLabelInfo;
-};
-Policy.prototype.setShowLabelInfo = function(showLabelInfo) 
-{
-	this.showLabelInfo = showLabelInfo;
-};
-Policy.prototype.getShowBoundingBox = function() 
-{
-	return this.showBoundingBox;
-};
-Policy.prototype.setShowBoundingBox = function(showBoundingBox) 
-{
-	this.showBoundingBox = showBoundingBox;
-};
-
-Policy.prototype.getShowShadow = function() 
-{
-	return this.showShadow;
-};
-Policy.prototype.setShowShadow = function(showShadow) 
-{
-	this.showShadow = showShadow;
-};
-
-Policy.prototype.getFrustumFarSquaredDistance = function() 
-{
-	return this.frustumFarSquaredDistance;
-};
-Policy.prototype.setFrustumFarSquaredDistance = function(frustumFarSquaredDistance) 
-{
-	this.frustumFarSquaredDistance = frustumFarSquaredDistance;
-};
-
-Policy.prototype.getFrustumFarDistance = function() 
-{
-	return this.frustumFarDistance;
-};
-Policy.prototype.setFrustumFarDistance = function(frustumFarDistance) 
-{
-	this.frustumFarDistance = frustumFarDistance;
-};
-
-Policy.prototype.getHighLightedBuildings = function() 
-{
-	return this.highLightedBuildings;
-};
-Policy.prototype.setHighLightedBuildings = function(highLightedBuildings) 
-{
-	this.highLightedBuildings = highLightedBuildings;
-};
-
-Policy.prototype.getColorBuildings = function() 
-{
-	return this.colorBuildings;
-};
-Policy.prototype.setColorBuildings = function(colorBuildings) 
-{
-	this.colorBuildings = colorBuildings;
-};
-
-Policy.prototype.getColor = function() 
-{
-	return this.color;
-};
-Policy.prototype.setColor = function(color) 
-{
-	this.color = color;
-};
-
-Policy.prototype.getHideBuildings = function() 
-{
-	return this.hideBuildings;
-};
-Policy.prototype.setHideBuildings = function(hideBuildings) 
-{
-	this.hideBuildings = hideBuildings;
-};
-
-Policy.prototype.getObjectMoveMode = function() 
-{
-	return this.objectMoveMode;
-};
-Policy.prototype.setObjectMoveMode = function(objectMoveMode) 
-{
-	this.objectMoveMode = objectMoveMode;
-};
-
-Policy.prototype.getMagoMode = function() 
-{
-	return this.magoMode;
-};
-Policy.prototype.setMagoMode = function(magoMode) 
-{
-	this.magoMode = magoMode;
-};
-
-Policy.prototype.getIssueInsertEnable = function() 
-{
-	return this.issueInsertEnable;
-};
-Policy.prototype.setIssueInsertEnable = function(issueInsertEnable) 
-{
-	this.issueInsertEnable = issueInsertEnable;
-};
-Policy.prototype.getObjectInfoViewEnable = function() 
-{
-	return this.objectInfoViewEnable;
-};
-Policy.prototype.setObjectInfoViewEnable = function(objectInfoViewEnable) 
-{
-	this.objectInfoViewEnable = objectInfoViewEnable;
-};
-Policy.prototype.getOcclusionCullingEnable = function() 
-{
-	return this.occlusionCullingEnable;
-};
-Policy.prototype.setOcclusionCullingEnable = function(occlusionCullingEnable) 
-{
-	this.occlusionCullingEnable = occlusionCullingEnable;
-};
-Policy.prototype.getNearGeoIssueListEnable = function() 
-{
-	return this.nearGeoIssueListEnable;
-};
-Policy.prototype.setNearGeoIssueListEnable = function(nearGeoIssueListEnable) 
-{
-	this.nearGeoIssueListEnable = nearGeoIssueListEnable;
-};
-
-Policy.prototype.getImagePath = function() 
-{
-	return this.imagePath;
-};
-Policy.prototype.setImagePath = function(imagePath) 
-{
-	this.imagePath = imagePath;
-};
-
-Policy.prototype.getLod = function(distInMeters) 
-{
-	var lod = -1;
-	if (distInMeters < this.lod0DistInMeters)
-	{ lod = 0; }
-	else if (distInMeters < this.lod1DistInMeters)
-	{ lod = 1; }
-	else if (distInMeters < this.lod2DistInMeters)
-	{ lod = 2; }
-	else if (distInMeters < this.lod3DistInMeters)
-	{ lod = 3; }
-	else if (distInMeters < this.lod4DistInMeters)
-	{ lod = 4; }
-	else 
-	{ lod = 5; }
-	
-	return lod;	
-};
-Policy.prototype.getLod0DistInMeters = function() 
-{
-	return this.lod0DistInMeters;
-};
-Policy.prototype.setLod0DistInMeters = function(lod0DistInMeters) 
-{
-	this.lod0DistInMeters = lod0DistInMeters;
-};
-Policy.prototype.getLod1DistInMeters = function() 
-{
-	return this.lod1DistInMeters;
-};
-Policy.prototype.setLod1DistInMeters = function(lod1DistInMeters) 
-{
-	this.lod1DistInMeters = lod1DistInMeters;
-};
-Policy.prototype.getLod2DistInMeters = function() 
-{
-	return this.lod2DistInMeters;
-};
-Policy.prototype.setLod2DistInMeters = function(lod2DistInMeters) 
-{
-	this.lod2DistInMeters = lod2DistInMeters;
-};
-Policy.prototype.getLod3DistInMeters = function() 
-{
-	return this.lod3DistInMeters;
-};
-Policy.prototype.setLod3DistInMeters = function(lod3DistInMeters) 
-{
-	this.lod3DistInMeters = lod3DistInMeters;
-};
-Policy.prototype.getLod4DistInMeters = function() 
-{
-	return this.lod4DistInMeters;
-};
-Policy.prototype.setLod4DistInMeters = function(lod4DistInMeters) 
-{
-	this.lod4DistInMeters = lod4DistInMeters;
-};
-Policy.prototype.getLod5DistInMeters = function() 
-{
-	return this.lod5DistInMeters;
-};
-Policy.prototype.setLod5DistInMeters = function(lod5DistInMeters) 
-{
-	this.lod5DistInMeters = lod5DistInMeters;
-};
-Policy.prototype.getAmbientReflectionCoef = function() 
-{
-	return this.ambientReflectionCoef;
-};
-Policy.prototype.setAmbientReflectionCoef = function(ambientReflectionCoef) 
-{
-	this.ambientReflectionCoef = ambientReflectionCoef;
-};
-Policy.prototype.getDiffuseReflectionCoef = function() 
-{
-	return this.diffuseReflectionCoef;
-};
-Policy.prototype.setDiffuseReflectionCoef = function(diffuseReflectionCoef) 
-{
-	this.diffuseReflectionCoef = diffuseReflectionCoef;
-};
-Policy.prototype.getSpecularReflectionCoef = function() 
-{
-	return this.specularReflectionCoef;
-};
-Policy.prototype.setSpecularReflectionCoef = function(specularReflectionCoef) 
-{
-	this.specularReflectionCoef = specularReflectionCoef;
-};
-Policy.prototype.getAmbientColor = function() 
-{
-	return this.ambientColor;
-};
-Policy.prototype.setAmbientColor = function(ambientColor) 
-{
-	this.ambientColor = ambientColor;
-};
-Policy.prototype.getSpecularColor = function() 
-{
-	return this.specularColor;
-};
-Policy.prototype.setSpecularColor = function(specularColor) 
-{
-	this.specularColor = specularColor;
-};
-Policy.prototype.getSsaoRadius = function() 
-{
-	return this.ssaoRadius;
-};
-Policy.prototype.setSsaoRadius = function(ssaoRadius) 
-{
-	this.ssaoRadius = ssaoRadius;
-};
-Policy.prototype.setModelMovable = function(movable)
-{
-	this.modelMovable = movable;
-};
-Policy.prototype.isModelMovable = function()
-{
-	return this.modelMovable;
 };
 'use strict';
 
@@ -58382,6 +58638,10 @@ TinTerrain.prototype.isPrepared = function()
 	if (this.fileLoadState !== CODE.fileLoadState.PARSE_FINISHED)
 	{ return false; }
 	
+	//if (this.depth > 2 && this.layersStyleId !== this.tinTerrainManager.layersStyleId)
+	//{ 
+	//	return false;
+	//}
 	
 	if (!this.isTexturePrepared(this.texture)) { return false; }
 	
@@ -58389,8 +58649,41 @@ TinTerrain.prototype.isPrepared = function()
 		this.vboKeyContainer.vboCacheKeysArray === undefined || 
 		this.vboKeyContainer.vboCacheKeysArray.length === 0)
 	{ return false; }
+
+	if (this.depth > 2 && !this.textureMasterPrepared)
+	{ return false; }
 	
 	return true;
+};
+
+TinTerrain.prototype.getTexCoordsOfGeoExtent = function(geoExtent)
+{
+	// Calculate the texCoords of geoExtent relative to this tile.
+	var minGeoCoord = geoExtent.geographicExtent.minGeographicCoord;
+	var maxGeoCoord = geoExtent.geographicExtent.maxGeographicCoord;
+	
+	var minLon = minGeoCoord.longitude;
+	var minLat = minGeoCoord.latitude;
+	var maxLon = maxGeoCoord.longitude;
+	var maxLat = maxGeoCoord.latitude;
+
+	// This tile geoExtent.
+	var thisMinGeoCoord = this.geographicExtent.minGeographicCoord;
+	var thisMaxGeoCoord = this.geographicExtent.maxGeographicCoord;
+	
+	var thisMinLon = thisMinGeoCoord.longitude;
+	var thisMinLat = thisMinGeoCoord.latitude;
+	var thisMaxLon = thisMaxGeoCoord.longitude;
+	var thisMaxLat = thisMaxGeoCoord.latitude;
+	var thisLonRange = thisMaxLon - thisMinLon;
+	var thisLatRange = thisMaxLat - thisMinLat;
+
+	var minS = (minLon - thisMinLon)/thisLonRange;
+	var maxS = (maxLon - thisMinLon)/thisLonRange;
+	var minT = (minLat - thisMinLat)/thisLatRange;
+	var maxT = (maxLat - thisMinLat)/thisLatRange;
+	
+
 };
 
 TinTerrain.prototype.mergeTexturesToTextureMaster = function(gl, shader, texturesArray)
@@ -58404,25 +58697,63 @@ TinTerrain.prototype.mergeTexturesToTextureMaster = function(gl, shader, texture
 	var activeTexturesLayers = new Int32Array([0, 0, 0, 0, 0, 0, 0, 0]); 
 	var externalAlphaLayers = new Float32Array([1, 1, 1, 1, 1, 1, 1, 1]); 
 
+	// externalTexCoordsArray = (minS, minT, maxS, maxT, 
+	// minS, minT, maxS, maxT, 
+	// minS, minT, maxS, maxT, ...)
+	var externalTexCoordsArray; 
+	var thereAreCustomImages = false;
+
 	for (var i=0; i<texturesCount; i++)
 	{
 		var texture = texturesArray[i];
 		gl.activeTexture(gl.TEXTURE0 + i); 
 		gl.bindTexture(gl.TEXTURE_2D, texture.texId);
 		
-		activeTexturesLayers[i] = 1;
+		activeTexturesLayers[i] = texture.activeTextureType;
 		externalAlphaLayers[i] = texture.opacity;
+		if (texture.activeTextureType === 2)
+		{
+			// custom image.
+			if (externalTexCoordsArray === undefined)
+			{
+				externalTexCoordsArray = new Float32Array([0, 0, 1, 1, 
+					0, 0, 1, 1, 
+					0, 0, 1, 1, 
+					0, 0, 1, 1, 
+					0, 0, 1, 1, 
+					0, 0, 1, 1, 
+					0, 0, 1, 1,
+					0, 0, 1, 1]); 
+			}
+			thereAreCustomImages = true;
+
+			externalTexCoordsArray[i*4] = texture.temp_clampToTerrainTexCoord[0];
+			externalTexCoordsArray[i*4+1] = texture.temp_clampToTerrainTexCoord[1];
+			externalTexCoordsArray[i*4+2] = texture.temp_clampToTerrainTexCoord[2];
+			externalTexCoordsArray[i*4+3] = texture.temp_clampToTerrainTexCoord[3];
+		}
+		else if (texture.activeTextureType === 10)
+		{
+			// bathymetry image.
+			gl.uniform2fv(shader.uMinMaxAltitudes_loc, [texture.imagery.minAltitude, texture.imagery.maxAltitude]);
+		}
 	}
 
 	gl.uniform1iv(shader.uActiveTextures_loc, activeTexturesLayers);
 	gl.uniform1fv(shader.externalAlphasArray_loc, externalAlphaLayers);
+	if (thereAreCustomImages)
+	{ gl.uniform4fv(shader.uExternalTexCoordsArray_loc, externalTexCoordsArray); }
 	gl.drawArrays(gl.TRIANGLES, 0, 6);
 };
 
 TinTerrain.prototype.makeTextureMaster = function()
 {
 	if (this.textureMasterPrepared)
-	{ return; }
+	{ 
+		return; 
+	}
+
+	//if()
 
 	// If there are 2 or more layers, then merge all layers into one texture.
 	var magoManager = this.tinTerrainManager.magoManager;
@@ -58477,10 +58808,13 @@ TinTerrain.prototype.makeTextureMaster = function()
 		{ continue; }
 
 		var textureKey = layer._id;
+		var activeTexType = 1;
 
 		var filter = texture.imagery.filter;
 		if (filter === CODE.imageFilter.BATHYMETRY) 
-		{ continue; }
+		{ 
+			activeTexType = 10;
+		}
 		
 		if (!(texture.texId instanceof WebGLTexture)) 
 		{ continue; }
@@ -58495,6 +58829,7 @@ TinTerrain.prototype.makeTextureMaster = function()
 		if (!texture.imagery.show) { continue; }
 
 		texture.setOpacity(texture.imagery.opacity); // update to the current imagery opacity.
+		texture.setActiveTextureType(activeTexType);
 		texturesToMergeArray.push(texture);
 		if (texturesToMergeArray.length === 8)
 		{
@@ -58507,6 +58842,109 @@ TinTerrain.prototype.makeTextureMaster = function()
 	if (texturesToMergeArray.length > 0)
 	{ texturesToMergeMatrix.push(texturesToMergeArray); }
 
+	
+	// Now, check if exist objects to clamp to terrain.
+	var objectsToClampToTerrainExistsAndBibded = true;
+	var objectsToClampToTerrain = this.tinTerrainManager.objectsToClampToTerrainArray;
+	if (objectsToClampToTerrain && objectsToClampToTerrain.length > 0)
+	{
+		// check if objects intersects with this tile.
+		var objToClampCount = objectsToClampToTerrain.length;
+		for (var i=0; i<objToClampCount; i++)
+		{
+			var objToClamp = objectsToClampToTerrain[i];
+			if (objToClamp instanceof MagoRectangle)
+			{
+				
+				var minGeoCoord = objToClamp.minGeographicCoord;
+				var maxGeoCoord = objToClamp.maxGeographicCoord;
+				var objMinLon = minGeoCoord.longitude;
+				var objMinLat = minGeoCoord.latitude;
+				var objMaxLon = maxGeoCoord.longitude;
+				var objMaxLat = maxGeoCoord.latitude;
+				var geoExtent = new GeographicExtent(objMinLon, objMinLat, minGeoCoord.altitude, objMaxLon, objMaxLat, maxGeoCoord.altitude);
+				if (this.geographicExtent.intersects2dWithGeoExtent(geoExtent))
+				{
+					if (objToClamp.texture === undefined)
+					{
+						// load texture 1rst.
+						objToClamp.texture = new Texture();
+						objToClamp.texture.setActiveTextureType(2);
+						var style = objToClamp.style;
+						if (style)
+						{
+							//clampToTerrain: true
+							//fillColor: "#00FF00"
+							var imageUrl = style.imageUrl;//: "/images/materialImages/factoryRoof.jpg"
+							objToClamp.texture.url = imageUrl;
+							var flipYTexCoord = false;
+							TexturesManager.loadTexture(imageUrl, objToClamp.texture, magoManager, flipYTexCoord);
+						}
+
+						objectsToClampToTerrainExistsAndBibded = false;
+						continue;
+					}
+					else if (!(objToClamp.texture.texId instanceof WebGLTexture))
+					{
+						// there are 2 possibilities.
+						// 1- there are a blob.
+						// 2- there are a imageUrl.
+						if (objToClamp.texture.blob)
+						{
+							// load by blob.
+							TexturesManager.newWebGlTextureByBlob(gl, objToClamp.texture.blob, objToClamp.texture);
+						}
+						else if (objToClamp.texture.url)
+						{
+							// load by url.
+							TexturesManager.loadTexture(objToClamp.texture.url, objToClamp.texture, magoManager, flipYTexCoord);
+						}
+
+						objectsToClampToTerrainExistsAndBibded = false;
+						continue;
+					}
+
+					// calculate the relative texCoords of the rectangle.
+					var thisMinLon = this.geographicExtent.minGeographicCoord.longitude;
+					var thisMinLat = this.geographicExtent.minGeographicCoord.latitude;
+					var thisMaxLon = this.geographicExtent.maxGeographicCoord.longitude;
+					var thisMaxLat = this.geographicExtent.maxGeographicCoord.latitude;
+					var thisLonRange = thisMaxLon - thisMinLon;
+					var thisLatRange = thisMaxLat - thisMinLat;
+
+					var minS = (objMinLon - thisMinLon)/thisLonRange;
+					var minT = (objMinLat - thisMinLat)/thisLatRange;
+
+					var maxS = (objMaxLon - thisMinLon)/thisLonRange;
+					var maxT = (objMaxLat - thisMinLat)/thisLatRange;
+
+					objToClamp.texture.temp_clampToTerrainTexCoord = [minS, minT, maxS, maxT];
+
+					if (texturesToMergeArray.length === 8)
+					{
+						texturesToMergeMatrix.push(texturesToMergeArray);
+						texturesToMergeArray = [];
+					}
+
+					if (objToClamp.texture.fileLoadState === CODE.fileLoadState.BINDING_FINISHED)
+					{ 
+						texturesToMergeArray.push(objToClamp.texture); 
+					}
+					else
+					{
+						objectsToClampToTerrainExistsAndBibded = false;
+					}
+				}
+			}
+		} 
+	}
+
+	// Last step: finally, if there are any texture in the "texturesToMergeArray", then push it.
+	if (texturesToMergeArray.length > 0)
+	{ texturesToMergeMatrix.push(texturesToMergeArray); }
+	
+
+	// Merge textures into textureMaster.
 	gl.enable(gl.BLEND);
 	var texturesArraysCount = texturesToMergeMatrix.length;
 	for (var i=0; i<texturesArraysCount; i++)
@@ -58515,7 +58953,7 @@ TinTerrain.prototype.makeTextureMaster = function()
 	}
 	gl.disable(gl.BLEND);
 
-	if (this.isTexturePrepared(this.texture))
+	if (objectsToClampToTerrainExistsAndBibded && this.isTexturePrepared(this.texture))
 	{ 
 		// If this textures are prepared => all textures was merged into textureMaster.
 		this.textureMasterPrepared = true; 
@@ -58529,6 +58967,7 @@ TinTerrain.prototype.bindTexture = function(gl, shader)
 {
 	// Binding textureMaster.
 	var activeTexturesLayers = new Int32Array([1, 1, 0, 0, 1, 0, 0, 0]); // note: the 1rst & 2nd are shadowMap textures.
+	var externalAlphaLayers = new Float32Array([1, 1, 1, 1, 1, 1, 1, 1]); 
 
 	if (this.textureMaster)// && this.textureMasterPrepared === true)
 	{
@@ -58561,23 +59000,22 @@ TinTerrain.prototype.bindTexture = function(gl, shader)
 			{
 				if (filter === CODE.imageFilter.BATHYMETRY) 
 				{
-					activeTexturesLayers[4+i] = 10;
-					gl.activeTexture(gl.TEXTURE4 + i);
+					activeTexturesLayers[4+1] = 10;
+					gl.activeTexture(gl.TEXTURE4 + 1);
 					gl.bindTexture(gl.TEXTURE_2D, texture.texId);
 				}
 			}
 		}	
 
 		gl.uniform1iv(shader.uActiveTextures_loc, activeTexturesLayers);
+		gl.uniform1fv(shader.externalAlphasArray_loc, externalAlphaLayers);
 		//////////////////////////////////
 
 		return;
 	}
-	
 
-	
 	// If no exist textureMaster, then provisionally render textures individually.
-	var externalAlphaLayers = new Float32Array([1, 1, 1, 1, 1, 1, 1, 1]); 
+	
 	var textureKeys = Object.keys(this.texture);
 	var textureLength = textureKeys.length; 
 	for (var i=0;i<textureLength;i++) 
@@ -58627,14 +59065,14 @@ TinTerrain.prototype.prepareTexture = function(texturesMap, imagerys, magoManage
 	var X = this.X.toString();
 	var Y = this.Y.toString();
 
-	//var imagerys = tinTerrainManager.imagerys;
-
 	for (var i = 0, len = imagerys.length; i < len; i++) 
 	{
 		var imagery = imagerys[i];
 		if (!imagery.show || imagery.maxZoom < parseInt(L) || imagery.minZoom > parseInt(L)) { continue; }
 		var id = imagery._id;
 		if (this.texture[id]) { continue; }
+
+		// In the new version check if exist blob : todo.***
 		
 		var texture = new Texture();
 		var textureUrl = imagery.getUrl({x: X, y: Y, z: L});
@@ -58851,7 +59289,7 @@ TinTerrain.prototype.prepareTinTerrain = function(magoManager, tinTerrainManager
 		{
 			// Test.***
 			return this.prepareTinTerrainPlain(magoManager, tinTerrainManager);
-			return false;
+			//return false;
 			// End test.---
 		}
 
@@ -58859,9 +59297,11 @@ TinTerrain.prototype.prepareTinTerrain = function(magoManager, tinTerrainManager
 		// If there are 2 or more layers, then must create textureMaster.
 		// Check if tinTerrain is syncronized with this.tinTerrainManager.
 		if (this.layersStyleId !== this.tinTerrainManager.layersStyleId)
-		{ this.textureMasterPrepared = undefined; }
+		{ 
+			this.textureMasterPrepared = undefined; 
+		}
 
-		if (this.textureMasterPrepared === undefined)
+		if (this.textureMasterPrepared === undefined && this.isTexturePrepared(this.texture))
 		{
 			this.makeTextureMaster();
 		}
@@ -59030,6 +59470,12 @@ TinTerrain.prototype.render = function(currentShader, magoManager, bDepth, rende
 				// If my owner rendered, then do no render me.
 				return; 
 			}
+
+			if (this.depth > 2 && this.layersStyleId !== this.tinTerrainManager.layersStyleId)
+			{ 
+				this.textureMasterPrepared = false;
+				this.makeTextureMaster();
+			}
 		
 			var gl = magoManager.getGl();
 			if (renderType === 2)
@@ -59185,7 +59631,7 @@ TinTerrain.prototype.render = function(currentShader, magoManager, bDepth, rende
 					
 					this.drawTerrainName(magoManager);
 				}
-
+				//this.drawTerrainName(magoManager); // test. delete.
 			}
 			// End test.--------------------------------------------------------------------------------------
 			
@@ -60964,8 +61410,13 @@ var TinTerrainManager = function(magoManager, options)
 	this.textureIdCntMap = {};
 	this.textureIdDeleteMap = {};
 	this.bRenderSea = true;
+
+	// Vars to maintain syncronization between this & tinTerrains.
 	this.renderingFase = 0;
 	this.layersStyleId = 0;
+
+	// Objects to clampToTerrain.
+	this.objectsToClampToTerrainArray;
 
 	this.init();
 	this.makeTinTerrainWithDEMIndex(); // provisional.
@@ -60988,7 +61439,28 @@ TinTerrainManager.prototype.imageryLayersChanged = function()
 	{ this.layersStyleId = 0; }
 };
 
+TinTerrainManager.prototype.addObjectToClampToTerrain = function(object)
+{
+	if (this.objectsToClampToTerrainArray === undefined)
+	{ this.objectsToClampToTerrainArray = []; }
 
+	this.objectsToClampToTerrainArray.push(object);
+
+	// An objectToClampToTerrain is not a imageryLayer, but this objects must be merged into
+	// textureMaster, so call "imageryLayersChanged".
+	this.imageryLayersChanged();
+};
+TinTerrainManager.prototype.removeObjectToClampToTerrain = function(object)
+{
+	this.objectsToClampToTerrainArray = this.objectsToClampToTerrainArray.filter(function(obj)
+	{
+		return obj !== object;
+	});
+
+	// An objectToClampToTerrain is not a imageryLayer, but this objects must be merged into
+	// textureMaster, so call "imageryLayersChanged".
+	this.imageryLayersChanged();
+};
 TinTerrainManager.prototype.getTerrainType = function()
 {
 	return this.terrainType;
@@ -61157,23 +61629,29 @@ TinTerrainManager.prototype.makeDistanceLimitByDepth = function()
 	this.distLimitByDepth[8] = 200000; 
 	this.distLimitByDepth[9] = 100000; 
 	this.distLimitByDepth[10] = 60000; 
-	this.distLimitByDepth[11] = 10000; 
-	this.distLimitByDepth[12] = 12000; 
+	this.distLimitByDepth[11] = 30000; 
+	this.distLimitByDepth[12] = 9000; 
 	this.distLimitByDepth[13] = 6000; 
 	this.distLimitByDepth[14] = 4000; 
-	this.distLimitByDepth[15] = 1200; 
-	this.distLimitByDepth[16] = 900; 
-	this.distLimitByDepth[17] = 600; 
-	this.distLimitByDepth[18] = 400; 
-	this.distLimitByDepth[19] = 200; 
-	this.distLimitByDepth[20] = 100; 
+	this.distLimitByDepth[15] = 2000; 
+	this.distLimitByDepth[16] = 800; 
+	this.distLimitByDepth[17] = 400; 
+	this.distLimitByDepth[18] = 200; 
+	this.distLimitByDepth[19] = 100; 
+	this.distLimitByDepth[20] = 50; 
 
+	//for (var i = 19; i>=0; i--)
+	//{
+	//	this.distLimitByDepth[i] = this.distLimitByDepth[i+1]*2; 
+	//}
+
+	/*
 	var count = this.distLimitByDepth.length;
 	for (var i=0; i<count; i++)
 	{
 		this.distLimitByDepth[i] *= 1.5;
 	}
-	
+	*/
 };
 
 TinTerrainManager.prototype.getTexCorrection = function(depth)
@@ -61521,6 +61999,9 @@ TinTerrainManager.prototype.render = function(magoManager, bDepth, renderType, s
 	{ bApplyShadow = false; } // cant apply shadow anyway.
 	
 	var succesfullyRenderedTilesArray = [];
+
+	gl.depthRange(0, 1);
+	//gl.depthFunc(gl.GREATER);
 	
 	if (bApplyShadow)
 	{
@@ -61589,7 +62070,8 @@ TinTerrainManager.prototype.render = function(magoManager, bDepth, renderType, s
 		gl.enable(gl.CULL_FACE);
 	}
 	*/
-
+	gl.depthRange(0, 1);
+	gl.depthFunc(gl.LEQUAL);
 	currentShader.disableVertexAttribArray(currentShader.texCoord2_loc); 
 	currentShader.disableVertexAttribArray(currentShader.position3_loc); 
 	currentShader.disableVertexAttribArray(currentShader.normal3_loc); 
@@ -65840,7 +66322,13 @@ MagoGeometry.prototype.setStyle = function(style, magoManager)
 		this.init(magoManager);
 	}
 
-	this.style = style;
+	for (var key in style)
+	{
+		if (style.hasOwnProperty(key))
+		{
+			this.style[key] = style[key];
+		}
+	}
 };
 'use strict';
 
@@ -66214,23 +66702,7 @@ MagoPolyline.prototype.getPoints = function()
 	});
 };
 'use strict';
-/**
- * 
- * @typedef {object} MagoRectangle~MagoRectanglePosition MagoRectangle position 옵션.
- * @property {number} minLongitude 
- * @property {number} minLatitude 
- * @property {number} maxLongitude 
- * @property {number} maxLatitude 
- * @property {number} altitude default is 0.
- */
-/** 
- * @typedef {object} MagoRectangle~MagoRectangleStyle MagoRectangle position 옵션.
- * @property {string} imageUrl image url. 
- * @property {string} fillColor html color code. if imageUrl defined, ignore this value.
- * @property {number} opacity range 0-1. default is 1.
- * @property {number} strokeWidth stroke width.
- * @property {number} strokeColor stroke color. if strokeWidth isn't define, ignore this value.
- */
+
 /**
  * 직사각형을 표현하는 클래스
  * @exception {Error} Messages.CONSTRUCT_ERROR
@@ -66250,6 +66722,23 @@ MagoPolyline.prototype.getPoints = function()
  */
 var MagoRectangle = function(position, style) 
 {
+	/**
+	 * 
+	 * @typedef {object} MagoRectangle~MagoRectanglePosition MagoRectangle position 옵션.
+	 * @property {number} minLongitude 
+	 * @property {number} minLatitude 
+	 * @property {number} maxLongitude 
+	 * @property {number} maxLatitude 
+	 * @property {number} altitude default is 0.
+	 */
+	/** 
+	 * @typedef {object} MagoRectangle~MagoRectangleStyle MagoRectangle position 옵션.
+	 * @property {string} imageUrl image url. 
+	 * @property {string} fillColor html color code. if imageUrl defined, ignore this value.
+	 * @property {number} opacity range 0-1. default is 1.
+	 * @property {number} strokeWidth stroke width.
+	 * @property {number} strokeColor stroke color. if strokeWidth isn't define, ignore this value.
+	 */
 	if (!(this instanceof MagoRectangle)) 
 	{
 		throw new Error(Messages.CONSTRUCT_ERROR);
@@ -66301,7 +66790,7 @@ MagoRectangle.prototype.clone = function()
 		maxLatitude  : this.maxGeographicCoord.latitude,
 		altitude     : this.maxGeographicCoord.altitude
 	};
-	var style = this.style;
+	var style = JSON.parse(JSON.stringify(this.style));
 
 	return new MagoRectangle(position, style);
 };
@@ -66343,8 +66832,8 @@ MagoRectangle.prototype.setPosition = function(position)
 MagoRectangle.prototype.getArea = function() 
 {
 	var edge = new GeographicCoord(this.minGeographicCoord.longitude, this.maxGeographicCoord.latitude, this.maxGeographicCoord.altitude);
-	var width = Globe.getArcDistanceBetweenGeographicCoords(this.minGeographicCoord, edge);
-	var height = Globe.getArcDistanceBetweenGeographicCoords(edge, this.maxGeographicCoord);
+	var height = Globe.getArcDistanceBetweenGeographicCoords(this.minGeographicCoord, edge);
+	var width = Globe.getArcDistanceBetweenGeographicCoords(edge, this.maxGeographicCoord);
 	return Math.abs(width * height);
 };
 /**
@@ -66593,6 +67082,55 @@ MagoRectangle.prototype.makeMesh = function(magoManager)
 	this.objectsArray.push(mesh);
     
 	this.setDirty(false);
+};
+
+/**
+ * set geometry style, if this geometry has been renderd, init use magomanager.
+ * @param {MagoGeometryStyle} style
+ * @param {MagoManager} magoManager
+ */
+MagoRectangle.prototype.setStyle = function(style, magoManager) 
+{
+	if (!style) 
+	{
+		throw new Error(Messages.REQUIRED_EMPTY_ERROR('style'));
+	}
+
+	if (magoManager && magoManager instanceof MagoManager) 
+	{
+		this.init(magoManager);
+	}
+
+	for (var key in style)
+	{
+		if (style.hasOwnProperty(key))
+		{
+			var value = style[key];
+			var oldValue = this.style[key];
+			
+			if (key === 'clampToTerrain' && value !== oldValue)
+			{
+				if (value)
+				{
+					console.info(value);
+				}
+				else
+				{
+					console.info(oldValue);
+				}		
+				magoManager.modeler.removeObject(this);
+				magoManager.modeler.addObject(this, 1);
+			}
+
+			this.style[key] = value;
+
+			if (this.style.clampToTerrain && key === 'imageUrl')
+			{
+				this.texture = undefined;
+				magoManager.tinTerrainManager.imageryLayersChanged();
+			}
+		}
+	}
 };
 'use strict';
 
@@ -67648,21 +68186,46 @@ MagoWorld.prototype.doTest__TerrainScanner = function()
 
 MagoWorld.prototype.doTest__MagoRectangle = function()
 {
-	// create a magoRectangle.***
+	// create a magoRectangle to clamp to terrain.***
 	var position = {
 		minLongitude : 126.31394,
-		minLatitude  : 33.18262,
+		minLatitude  : 33.22,
 		maxLongitude : 126.34513,
-		maxLatitude  : 33.21500,
-		altitude     : 200.0
+		maxLatitude  : 33.25,
+		altitude     : 800.0
 	};
 
 	var style = {
-		strokeWidth : 2,
-		strokeColor : '#FF0000',
-		fillColor   : '#00FF00',
-		//imageUrl    : '/images/materialImages//factoryRoof.jpg',
-		opacity     : 0.7,
+		strokeWidth    : 2,
+		strokeColor    : '#FF0000',
+		fillColor      : '#00FF00',
+		imageUrl       : '/images/materialImages/factoryRoof.jpg',
+		opacity        : 0.7,
+		clampToTerrain : true
+	};
+
+	var magoRect = new MagoRectangle(position, style);
+	//magoRect.setOneColor(0.5, 1.0, 0.8);
+
+	var targetDepth = 3;
+	this.magoManager.modeler.addObject(magoRect, targetDepth);
+
+	// create another magoRectangle that NO clampToTerrain.***
+	var position = {
+		minLongitude : 126.31394,
+		minLatitude  : 33.22,
+		maxLongitude : 126.34513,
+		maxLatitude  : 33.25,
+		altitude     : 800.0
+	};
+
+	var style = {
+		strokeWidth    : 2,
+		strokeColor    : '#FF0000',
+		fillColor      : '#00FF00',
+		imageUrl       : '/images/materialImages/factoryRoof.jpg',
+		opacity        : 0.7,
+		clampToTerrain : false
 	};
 
 	var magoRect = new MagoRectangle(position, style);
@@ -69372,11 +69935,23 @@ Modeler.prototype.addObject = function(object, depth)
 	if (this.objectsArray === undefined)
 	{ this.objectsArray = []; }
 
+	// Check object's style.
+	if (object instanceof MagoRectangle)
+	{
+		var style = object.style;
+		if (style && style.clampToTerrain)
+		{
+			// put this object into tinTerrainManager.
+			this.magoManager.tinTerrainManager.addObjectToClampToTerrain(object);
+			return;
+		}
+	}
+
 	this.objectsArray.push(object);
 	
 	var smartTileManager = this.magoManager.smartTileManager;
 	// Note: the targetDepth must be calculated by the objects bbox size.
-	var targetDepth = depth ? depth : 16;
+	var targetDepth = depth ? depth : 5;
 	smartTileManager.putObject(targetDepth, object, this.magoManager);
 };
 
@@ -69389,19 +69964,27 @@ Modeler.prototype.removeObject = function(target)
 	if (target === undefined)
 	{ return false; }
 
+	if (target instanceof MagoRectangle && target.style.clampToTerrain) 
+	{
+		this.magoManager.tinTerrainManager.removeObjectToClampToTerrain(target);
+		target.deleteObjects(this.magoManager.vboMemoryManager);
+		return;
+	}
 	target.deleteObjects(this.magoManager.vboMemoryManager);
 
 	var tile = target.smartTileOwner;
-
-	tile.nativeObjects.opaquesArray = tile.nativeObjects.opaquesArray.filter(function(opaq)
+	if (tile)
 	{
-		return opaq !== target;
-	});
-	
-	tile.nativeObjects.transparentsArray = tile.nativeObjects.transparentsArray.filter(function(t)
-	{
-		return t !== target;
-	});
+		tile.nativeObjects.opaquesArray = tile.nativeObjects.opaquesArray.filter(function(opaq)
+		{
+			return opaq !== target;
+		});
+		
+		tile.nativeObjects.transparentsArray = tile.nativeObjects.transparentsArray.filter(function(t)
+		{
+			return t !== target;
+		});
+	}
 	
 	this.objectsArray = this.objectsArray.filter(function(object)
 	{
@@ -82629,42 +83212,6 @@ VtxSegment.prototype.intersectionWithPoint = function(point, error)
 'use strict';
 
 /**
- * Geoserver for mago3Djs object.
- * @class Geoserver
- */
-var GeoServer = function() 
-{
-
-	this.serverInfo = {};
-}; 
-
-GeoServer.prototype.setServerInfo = function(info) 
-{
-	this.serverInfo = info;
-};
-
-GeoServer.prototype.getDataUrl = function() 
-{
-	return this.serverInfo.dataUrl;
-};
-
-GeoServer.prototype.getDataWorkspace = function() 
-{
-	return this.serverInfo.dataWorkspace;
-};
-
-GeoServer.prototype.getDataRequestUrl = function() 
-{
-	return this.getDataUrl() + '/' + this.getDataWorkspace();
-};
-
-GeoServer.prototype.getWmsVersion = function() 
-{
-	return this.serverInfo.wmsVersion;
-};
-'use strict';
-
-/**
  * 메세지
  * 
  * @class
@@ -82766,6 +83313,7071 @@ MessageSource.ko = {
       }
     }
   };
+
+'use strict';
+
+/**
+ * Geoserver for mago3Djs object.
+ * @class Geoserver
+ */
+var GeoServer = function() 
+{
+
+	this.serverInfo = {};
+}; 
+
+GeoServer.prototype.setServerInfo = function(info) 
+{
+	this.serverInfo = info;
+};
+
+GeoServer.prototype.getDataUrl = function() 
+{
+	return this.serverInfo.dataUrl;
+};
+
+GeoServer.prototype.getDataWorkspace = function() 
+{
+	return this.serverInfo.dataWorkspace;
+};
+
+GeoServer.prototype.getDataRequestUrl = function() 
+{
+	return this.getDataUrl() + '/' + this.getDataWorkspace();
+};
+
+GeoServer.prototype.getWmsVersion = function() 
+{
+	return this.serverInfo.wmsVersion;
+};
+'use strict';
+
+/**
+ * 어떤 일을 하고 있습니까?
+ * @class AttribLocationState
+ */
+var AttribLocationState = function() 
+{
+	if (!(this instanceof AttribLocationState)) 
+	{
+		throw new Error(Messages.CONSTRUCT_ERROR);
+	}
+	
+	this.attribLocationEnabled = false;
+};
+'use strict';
+
+/**
+ * 어떤 일을 하고 있습니까?
+ * @class PostFxShader
+ * @param gl 변수
+ */
+var PostFxShader = function(gl) 
+{
+	if (!(this instanceof PostFxShader)) 
+	{
+		throw new Error(Messages.CONSTRUCT_ERROR);
+	}
+	this.gl = gl;
+	this.name;
+	this.attribLocationCacheObj = {}; // old.
+	this.uniformsArrayGeneral = []; // this array has the same uniforms that "uniformsCacheObj".
+	this.uniformsMapGeneral = {}; // this object has the same uniforms that "uniformsArray".
+	
+	this.uniformsArrayLocal = []; // this array has the same uniforms that "uniformsCacheObj".
+	this.uniformsMapLocal = {}; // this object has the same uniforms that "uniformsArray".
+	
+	// No general objects.
+	this.camera;
+	
+	// shader program.
+	this.program;
+	this.shader_vertex;
+	this.shader_fragment;
+	
+	// current buffers binded.
+	this.last_tex_id;
+	this.last_isAditionalMovedZero = false;
+	
+	this.lastVboKeyBindedMap = {};
+	
+	
+	// attribLocations state management.
+	this.attribLocationStateArray = [];
+	
+	this.shaderManager; 
+};
+
+PostFxShader.createShader = function(gl, type, source) 
+{
+	var shader = gl.createShader(type);
+	gl.shaderSource(shader, source);
+
+	gl.compileShader(shader);
+	if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) 
+	{
+		throw new Error(gl.getShaderInfoLog(shader));
+	}
+
+	return shader;
+};
+
+PostFxShader.createProgram = function(gl, vertexSource, fragmentSource) 
+{
+	// static function.***
+	var program = gl.createProgram();
+
+	var vertexShader = PostFxShader.createShader(gl, gl.VERTEX_SHADER, vertexSource);
+	var fragmentShader = PostFxShader.createShader(gl, gl.FRAGMENT_SHADER, fragmentSource);
+
+	gl.attachShader(program, vertexShader);
+	gl.attachShader(program, fragmentShader);
+
+	gl.linkProgram(program);
+	if (!gl.getProgramParameter(program, gl.LINK_STATUS)) 
+	{
+		throw new Error(gl.getProgramInfoLog(program));
+	}
+
+	var wrapper = {program: program};
+
+	var numAttributes = gl.getProgramParameter(program, gl.ACTIVE_ATTRIBUTES);
+	for (var i = 0; i < numAttributes; i++) 
+	{
+		var attribute = gl.getActiveAttrib(program, i);
+		wrapper[attribute.name] = gl.getAttribLocation(program, attribute.name);
+	}
+	var numUniforms = gl.getProgramParameter(program, gl.ACTIVE_UNIFORMS);
+	for (var i = 0; i < numUniforms; i++) 
+	{
+		var uniform = gl.getActiveUniform(program, i);
+		wrapper[uniform.name] = gl.getUniformLocation(program, uniform.name);
+	}
+
+	return wrapper;
+};
+
+/**
+ * 어떤 일을 하고 있습니까?
+ * @param shaderName 변수
+ * @returns shader
+ */
+PostFxShader.prototype.resetLastBuffersBinded = function()
+{
+	this.last_tex_id = undefined; // todo: must distinguish by channel.
+	this.last_isAditionalMovedZero = false;
+	
+	this.lastVboKeyBindedMap = {};
+	
+	this.disableVertexAttribArrayAll();
+	
+	if (this.attribLocationStateArray)
+	{
+		var attribLocsCount = this.attribLocationStateArray.length;
+		for (var i=0; i<attribLocsCount; i++)
+		{
+			var attribLocationState = this.attribLocationStateArray[i];
+			if (attribLocationState !== undefined)
+			{
+				attribLocationState.attribLocationEnabled = undefined;
+				this.attribLocationStateArray[i] = undefined;
+			}
+		}
+		this.attribLocationStateArray.length = 0;
+	}
+};
+
+/**
+ * 어떤 일을 하고 있습니까?
+ * @param shaderName 변수
+ * @returns shader
+ */
+PostFxShader.prototype.enableVertexAttribArray = function(attribLocation)
+{
+	if (attribLocation === undefined || attribLocation < 0)
+	{ return false; }
+	
+	var attribLocationState = this.attribLocationStateArray[attribLocation];
+	if (attribLocationState === undefined)
+	{
+		attribLocationState = new AttribLocationState();
+		this.attribLocationStateArray[attribLocation] = attribLocationState;
+		attribLocationState.attribLocationEnabled = false;
+	}
+
+	if (!attribLocationState.attribLocationEnabled)
+	{
+		this.gl.enableVertexAttribArray(attribLocation);
+		attribLocationState.attribLocationEnabled = true;
+	}
+	
+	return true;
+};
+
+/**
+ * 어떤 일을 하고 있습니까?
+ * @param shaderName 변수
+ * @returns shader
+ */
+PostFxShader.prototype.disableTextureImagesUnitsAll = function()
+{
+	var gl = this.gl;
+	var textureImagesUnitsCount = gl.getParameter(gl.MAX_TEXTURE_IMAGE_UNITS);
+	for (var i = 0; i<textureImagesUnitsCount; i++)
+	{ 
+		gl.activeTexture(gl.TEXTURE0 + i);
+		gl.bindTexture(gl.TEXTURE_2D, null);
+	}
+};
+
+/**
+ * 어떤 일을 하고 있습니까?
+ * @param shaderName 변수
+ * @returns shader
+ */
+PostFxShader.prototype.disableVertexAttribArrayAll = function()
+{
+	var gl = this.gl;
+	var vertexAttribsCount = gl.getParameter(gl.MAX_VERTEX_ATTRIBS);
+	for (var i = 0; i<vertexAttribsCount; i++)
+	{ gl.disableVertexAttribArray(i); }
+};
+
+/**
+ * 어떤 일을 하고 있습니까?
+ * @param shaderName 변수
+ * @returns shader
+ */
+PostFxShader.prototype.disableVertexAttribArray = function(attribLocation)
+{
+	if (attribLocation === undefined || attribLocation < 0)
+	{ return; }
+	
+	var attribLocationState = this.attribLocationStateArray[attribLocation];
+	if (attribLocationState === undefined)
+	{
+		attribLocationState = new AttribLocationState();
+		this.attribLocationStateArray[attribLocation] = attribLocationState;
+		attribLocationState.attribLocationEnabled = true;
+	}
+
+	if (attribLocationState.attribLocationEnabled)
+	{
+		this.gl.disableVertexAttribArray(attribLocation);
+		attribLocationState.attribLocationEnabled = false;
+	}
+};
+
+/**
+ * 어떤 일을 하고 있습니까?
+ * @param shaderName 변수
+ * @returns shader
+ */
+PostFxShader.prototype.useProgram = function()
+{
+	var gl = this.gl;
+	var currProgram = gl.getParameter(gl.CURRENT_PROGRAM);
+	if (currProgram !== this.program)
+	{
+		gl.useProgram(this.program);
+		this.shaderManager.currentShaderUsing = this;
+	}
+	this.resetLastBuffersBinded();
+};
+
+/**
+ * 어떤 일을 하고 있습니까?
+ * @param shaderName 변수
+ * @returns shader
+ */
+PostFxShader.prototype.bindUniformGenerals = function()
+{
+	if (this.uniformsArrayGeneral === undefined)
+	{ return; }
+	
+	var uniformsDataPairsCount = this.uniformsArrayGeneral.length;
+	for (var i=0; i<uniformsDataPairsCount; i++)
+	{
+		this.uniformsArrayGeneral[i].bindUniform();
+	}
+	
+	// Bind camera uniforms.
+	if (this.camera)
+	{ this.camera.bindUniforms(this.gl, this); }
+};
+
+/**
+ * 어떤 일을 하고 있습니까?
+ * @param shaderName 변수
+ * @returns shader
+ */
+PostFxShader.prototype.getUniformDataPair = function(uniformName)
+{
+	return this.uniformsMapGeneral[uniformName];
+};
+
+/**
+ * 어떤 일을 하고 있습니까?
+ * @param shaderName 변수
+ * @returns shader
+ */
+PostFxShader.prototype.newUniformDataPair = function(uniformType, uniformName)
+{
+	var uniformDataPair;//
+	if (uniformType === "Matrix4fv")
+	{
+		uniformDataPair = new UniformMatrix4fvDataPair(this.gl, uniformName);
+		this.uniformsArrayGeneral.push(uniformDataPair);
+		this.uniformsMapGeneral[uniformName] = uniformDataPair;
+	}
+	else if (uniformType === "Vec4fv")
+	{
+		uniformDataPair = new UniformVec4fvDataPair(this.gl, uniformName);
+		this.uniformsArrayGeneral.push(uniformDataPair);
+		this.uniformsMapGeneral[uniformName] = uniformDataPair;
+	}
+	else if (uniformType === "Vec3fv")
+	{
+		uniformDataPair = new UniformVec3fvDataPair(this.gl, uniformName);
+		this.uniformsArrayGeneral.push(uniformDataPair);
+		this.uniformsMapGeneral[uniformName] = uniformDataPair;
+	}
+	else if (uniformType === "Vec2fv")
+	{
+		uniformDataPair = new UniformVec2fvDataPair(this.gl, uniformName);
+		this.uniformsArrayGeneral.push(uniformDataPair);
+		this.uniformsMapGeneral[uniformName] = uniformDataPair;
+	}
+	else if (uniformType === "1f")
+	{
+		uniformDataPair = new Uniform1fDataPair(this.gl, uniformName);
+		this.uniformsArrayGeneral.push(uniformDataPair);
+		this.uniformsMapGeneral[uniformName] = uniformDataPair;
+	}
+	else if (uniformType === "1i")
+	{
+		uniformDataPair = new Uniform1iDataPair(this.gl, uniformName);
+		this.uniformsArrayGeneral.push(uniformDataPair);
+		this.uniformsMapGeneral[uniformName] = uniformDataPair;
+	}
+	
+	return uniformDataPair;
+};
+
+/**
+ * 어떤 일을 하고 있습니까?
+ * @param shaderName 변수
+ * @returns shader
+ */
+PostFxShader.prototype.newUniformDataPairLocal = function(uniformType, uniformName)
+{
+	var uniformDataPair;//
+	if (uniformType === "Matrix4fv")
+	{
+		uniformDataPair = new UniformMatrix4fvDataPair(this.gl, uniformName);
+		this.uniformsArrayLocal.push(uniformDataPair);
+		this.uniformsMapLocal[uniformName] = uniformDataPair;
+	}
+	else if (uniformType === "Vec4fv")
+	{
+		uniformDataPair = new UniformVec4fvDataPair(this.gl, uniformName);
+		this.uniformsArrayLocal.push(uniformDataPair);
+		this.uniformsMapLocal[uniformName] = uniformDataPair;
+	}
+	else if (uniformType === "Vec3fv")
+	{
+		uniformDataPair = new UniformVec3fvDataPair(this.gl, uniformName);
+		this.uniformsArrayLocal.push(uniformDataPair);
+		this.uniformsMapLocal[uniformName] = uniformDataPair;
+	}
+	else if (uniformType === "Vec2fv")
+	{
+		uniformDataPair = new UniformVec2fvDataPair(this.gl, uniformName);
+		this.uniformsArrayLocal.push(uniformDataPair);
+		this.uniformsMapLocal[uniformName] = uniformDataPair;
+	}
+	else if (uniformType === "1f")
+	{
+		uniformDataPair = new Uniform1fDataPair(this.gl, uniformName);
+		this.uniformsArrayLocal.push(uniformDataPair);
+		this.uniformsMapLocal[uniformName] = uniformDataPair;
+	}
+	else if (uniformType === "1i")
+	{
+		uniformDataPair = new Uniform1iDataPair(this.gl, uniformName);
+		this.uniformsArrayLocal.push(uniformDataPair);
+		this.uniformsMapLocal[uniformName] = uniformDataPair;
+	}
+	
+	return uniformDataPair;
+};
+
+/**
+ * 어떤 일을 하고 있습니까?
+ * @param shaderName 변수
+ */
+PostFxShader.prototype.createUniformGenerals = function(gl, shader, sceneState)
+{
+	// Here create all generals uniforms, if exist, of the shader.
+	var uniformDataPair;
+	var uniformLocation;
+
+	// 1. ModelViewProjectionMatrixRelToEye.              
+	uniformLocation = gl.getUniformLocation(shader.program, "ModelViewProjectionMatrixRelToEye");
+	if (uniformLocation !== null && uniformLocation !== undefined)
+	{
+		uniformDataPair = shader.newUniformDataPair("Matrix4fv", "mvpMat4RelToEye");
+		uniformDataPair.uniformLocation = uniformLocation;
+		uniformDataPair.matrix4fv = sceneState.modelViewProjRelToEyeMatrix._floatArrays;
+	}
+	
+	// 1. ModelViewProjectionMatrix.
+	uniformLocation = gl.getUniformLocation(shader.program, "ModelViewProjectionMatrix");
+	if (uniformLocation !== null && uniformLocation !== undefined)
+	{
+		uniformDataPair = shader.newUniformDataPair("Matrix4fv", "mvpMat4");
+		uniformDataPair.uniformLocation = uniformLocation;
+		uniformDataPair.matrix4fv = sceneState.modelViewProjMatrix._floatArrays;
+	}
+	
+	// 2. modelViewMatrixRelToEye.
+	uniformLocation = gl.getUniformLocation(shader.program, "modelViewMatrixRelToEye");
+	if (uniformLocation !== null && uniformLocation !== undefined)
+	{
+		uniformDataPair = shader.newUniformDataPair("Matrix4fv", "mvMat4RelToEye");
+		uniformDataPair.uniformLocation = uniformLocation;
+		uniformDataPair.matrix4fv = sceneState.modelViewRelToEyeMatrix._floatArrays;
+	}
+	
+	// 3. modelViewMatrix.
+	uniformLocation = gl.getUniformLocation(shader.program, "modelViewMatrix");
+	if (uniformLocation !== null && uniformLocation !== undefined)
+	{
+		uniformDataPair = shader.newUniformDataPair("Matrix4fv", "modelViewMatrix");
+		uniformDataPair.uniformLocation = uniformLocation;
+		uniformDataPair.matrix4fv = sceneState.modelViewMatrix._floatArrays;
+	}
+	
+	// 3.1. modelViewMatrixInv.
+	uniformLocation = gl.getUniformLocation(shader.program, "modelViewMatrixInv");
+	if (uniformLocation !== null && uniformLocation !== undefined)
+	{
+		uniformDataPair = shader.newUniformDataPair("Matrix4fv", "modelViewMatrixInv");
+		uniformDataPair.uniformLocation = uniformLocation;
+		var mvMatInv = sceneState.getModelViewMatrixInv();
+		uniformDataPair.matrix4fv = mvMatInv._floatArrays;
+	}
+	
+	// 4. projectionMatrix.
+	uniformLocation = gl.getUniformLocation(shader.program, "projectionMatrix");
+	if (uniformLocation !== null && uniformLocation !== undefined)
+	{
+		uniformDataPair = shader.newUniformDataPair("Matrix4fv", "pMat4");
+		uniformDataPair.uniformLocation = uniformLocation;
+		uniformDataPair.matrix4fv = sceneState.projectionMatrix._floatArrays;
+	}
+	
+	// 5. normalMatrix4.
+	uniformLocation = gl.getUniformLocation(shader.program, "normalMatrix4");
+	if (uniformLocation !== null && uniformLocation !== undefined)
+	{
+		uniformDataPair = shader.newUniformDataPair("Matrix4fv", "normalMat4");
+		uniformDataPair.uniformLocation = uniformLocation;
+		uniformDataPair.matrix4fv = sceneState.normalMatrix4._floatArrays;
+	}
+	
+	// 6. encodedCameraPositionMCHigh.
+	uniformLocation = gl.getUniformLocation(shader.program, "encodedCameraPositionMCHigh");
+	if (uniformLocation !== null && uniformLocation !== undefined)
+	{
+		uniformDataPair = shader.newUniformDataPair("Vec3fv", "encodedCamPosHigh");
+		uniformDataPair.uniformLocation = uniformLocation;
+		uniformDataPair.vec3fv = sceneState.encodedCamPosHigh;
+	}
+	
+	// 7. encodedCameraPositionMCLow.
+	uniformLocation = gl.getUniformLocation(shader.program, "encodedCameraPositionMCLow");
+	if (uniformLocation !== null && uniformLocation !== undefined)
+	{
+		uniformDataPair = shader.newUniformDataPair("Vec3fv", "encodedCamPosLow");
+		uniformDataPair.uniformLocation = uniformLocation;
+		uniformDataPair.vec3fv = sceneState.encodedCamPosLow;
+	}
+	
+	// 10. fovy.
+	uniformLocation = gl.getUniformLocation(shader.program, "fov");
+	if (uniformLocation !== null && uniformLocation !== undefined)
+	{
+		uniformDataPair = shader.newUniformDataPair("1f", "fovyRad");
+		uniformDataPair.uniformLocation = uniformLocation;
+		uniformDataPair.floatValue = sceneState.camera.frustum.fovyRad;
+	}
+	
+	// 10.1 tangentOfHalfFovy.
+	uniformLocation = gl.getUniformLocation(shader.program, "tangentOfHalfFovy");
+	if (uniformLocation !== null && uniformLocation !== undefined)
+	{
+		uniformDataPair = shader.newUniformDataPair("1f", "tangentOfHalfFovy");
+		uniformDataPair.uniformLocation = uniformLocation;
+		uniformDataPair.floatValue = sceneState.camera.frustum.tangentOfHalfFovy;
+	}
+	
+	// 11. aspectRatio.
+	uniformLocation = gl.getUniformLocation(shader.program, "aspectRatio");
+	if (uniformLocation !== null && uniformLocation !== undefined)
+	{
+		uniformDataPair = shader.newUniformDataPair("1f", "aspectRatio");
+		uniformDataPair.uniformLocation = uniformLocation;
+		uniformDataPair.floatValue = sceneState.camera.frustum.aspectRatio;
+	}
+	
+	// 12. drawBuffWidht.
+	uniformLocation = gl.getUniformLocation(shader.program, "screenWidth");
+	if (uniformLocation !== null && uniformLocation !== undefined)
+	{
+		uniformDataPair = shader.newUniformDataPair("1f", "drawBuffWidht");
+		uniformDataPair.uniformLocation = uniformLocation;
+		uniformDataPair.floatValue = sceneState.drawingBufferWidth;
+	}
+	
+	// 13. drawBuffHeight.
+	uniformLocation = gl.getUniformLocation(shader.program, "screenHeight");
+	if (uniformLocation !== null && uniformLocation !== undefined)
+	{
+		uniformDataPair = shader.newUniformDataPair("1f", "drawBuffHeight");
+		uniformDataPair.uniformLocation = uniformLocation;
+		uniformDataPair.floatValue = sceneState.drawingBufferHeight;
+	}
+	
+	// 14. depthTex.
+	uniformLocation = gl.getUniformLocation(shader.program, "depthTex");
+	if (uniformLocation !== null && uniformLocation !== undefined)
+	{
+		uniformDataPair = shader.newUniformDataPair("1i", "depthTex");
+		uniformDataPair.uniformLocation = uniformLocation;
+		uniformDataPair.intValue = 0;
+	}
+	
+	// 15. noiseTex.
+	uniformLocation = gl.getUniformLocation(shader.program, "noiseTex");
+	if (uniformLocation !== null && uniformLocation !== undefined)
+	{
+		uniformDataPair = shader.newUniformDataPair("1i", "noiseTex");
+		uniformDataPair.uniformLocation = uniformLocation;
+		uniformDataPair.intValue = 1;
+	}
+	
+	// 16. diffuseTex.
+	uniformLocation = gl.getUniformLocation(shader.program, "diffuseTex");
+	if (uniformLocation !== null && uniformLocation !== undefined)
+	{
+		uniformDataPair = shader.newUniformDataPair("1i", "diffuseTex");
+		uniformDataPair.uniformLocation = uniformLocation;
+		uniformDataPair.intValue = 2;
+	}
+	
+	// 16.1 shadowMapTex.
+	uniformLocation = gl.getUniformLocation(shader.program, "shadowMapTex");
+	if (uniformLocation !== null && uniformLocation !== undefined)
+	{
+		uniformDataPair = shader.newUniformDataPair("1i", "shadowMapTex");
+		uniformDataPair.uniformLocation = uniformLocation;
+		uniformDataPair.intValue = 3;
+	}
+	
+	// 16.2 shadowMapTex2.
+	uniformLocation = gl.getUniformLocation(shader.program, "shadowMapTex2");
+	if (uniformLocation !== null && uniformLocation !== undefined)
+	{
+		uniformDataPair = shader.newUniformDataPair("1i", "shadowMapTex2");
+		uniformDataPair.uniformLocation = uniformLocation;
+		uniformDataPair.intValue = 4;
+	}
+	
+	// 17. specularColor.
+	uniformLocation = gl.getUniformLocation(shader.program, "specularColor");
+	if (uniformLocation !== null && uniformLocation !== undefined)
+	{
+		uniformDataPair = shader.newUniformDataPair("Vec3fv", "specularColor");
+		uniformDataPair.uniformLocation = uniformLocation;
+		uniformDataPair.vec3fv = sceneState.specularColor;
+	}
+	
+	// 17. ambientColor.
+	uniformLocation = gl.getUniformLocation(shader.program, "ambientColor");
+	if (uniformLocation !== null && uniformLocation !== undefined)
+	{
+		uniformDataPair = shader.newUniformDataPair("Vec3fv", "ambientColor");
+		uniformDataPair.uniformLocation = uniformLocation;
+		uniformDataPair.vec3fv = sceneState.ambientColor;
+	}
+	
+	// 18. ssaoRadius.
+	uniformLocation = gl.getUniformLocation(shader.program, "radius");
+	if (uniformLocation !== null && uniformLocation !== undefined)
+	{
+		uniformDataPair = shader.newUniformDataPair("1f", "radius");
+		uniformDataPair.uniformLocation = uniformLocation;
+		uniformDataPair.floatValue = sceneState.ssaoRadius;
+	}
+	
+	// 19. ambientReflectionCoef.
+	uniformLocation = gl.getUniformLocation(shader.program, "ambientReflectionCoef");
+	if (uniformLocation !== null && uniformLocation !== undefined)
+	{
+		uniformDataPair = shader.newUniformDataPair("1f", "ambientReflectionCoef");
+		uniformDataPair.uniformLocation = uniformLocation;
+		uniformDataPair.floatValue = sceneState.ambientReflectionCoef;
+	}
+	
+	// 20. diffuseReflectionCoef.
+	uniformLocation = gl.getUniformLocation(shader.program, "diffuseReflectionCoef");
+	if (uniformLocation !== null && uniformLocation !== undefined)
+	{
+		uniformDataPair = shader.newUniformDataPair("1f", "diffuseReflectionCoef");
+		uniformDataPair.uniformLocation = uniformLocation;
+		uniformDataPair.floatValue = sceneState.diffuseReflectionCoef;
+	}
+	
+	// 21. specularReflectionCoef.
+	uniformLocation = gl.getUniformLocation(shader.program, "specularReflectionCoef");
+	if (uniformLocation !== null && uniformLocation !== undefined)
+	{
+		uniformDataPair = shader.newUniformDataPair("1f", "specularReflectionCoef");
+		uniformDataPair.uniformLocation = uniformLocation;
+		uniformDataPair.floatValue = sceneState.specularReflectionCoef;
+	}
+	
+	// 22. shininessValue.
+	uniformLocation = gl.getUniformLocation(shader.program, "shininessValue");
+	if (uniformLocation !== null && uniformLocation !== undefined)
+	{
+		uniformDataPair = shader.newUniformDataPair("1f", "shininessValue");
+		uniformDataPair.uniformLocation = uniformLocation;
+		uniformDataPair.floatValue = sceneState.shininessValue;
+	}
+	
+	// 23. ssaoNoiseScale2.
+	uniformLocation = gl.getUniformLocation(shader.program, "noiseScale");
+	if (uniformLocation !== null && uniformLocation !== undefined)
+	{
+		uniformDataPair = shader.newUniformDataPair("Vec2fv", "ssaoNoiseScale2");
+		uniformDataPair.uniformLocation = uniformLocation;
+		uniformDataPair.vec2fv = sceneState.ssaoNoiseScale2;
+	}
+	
+	// 24. ssaoKernel16.
+	uniformLocation = gl.getUniformLocation(shader.program, "kernel");
+	if (uniformLocation !== null && uniformLocation !== undefined)
+	{
+		uniformDataPair = shader.newUniformDataPair("Vec3fv", "ssaoKernel16");
+		uniformDataPair.uniformLocation = uniformLocation;
+		uniformDataPair.vec3fv = sceneState.ssaoKernel16;
+	}
+	
+	// Set the camera.
+	this.camera = sceneState.camera;
+};
+
+/**
+ * 어떤 일을 하고 있습니까?
+ * @param shaderName 변수
+ */
+PostFxShader.prototype.bindAttribLocations = function(gl, shader)
+{
+	gl.bindAttribLocation(shader.program, 0, "position");
+	gl.bindAttribLocation(shader.program, 1, "normal");
+	gl.bindAttribLocation(shader.program, 2, "texCoord");
+	gl.bindAttribLocation(shader.program, 3, "color4");
+};
+
+/**
+ * 어떤 일을 하고 있습니까?
+ * @param shaderName 변수
+ */
+PostFxShader.prototype.createUniformLocals = function(gl, shader, sceneState)
+{
+	// Here create all local uniforms, if exist, of the shader.
+	var uniformDataPair;
+	var uniformLocation;
+	
+	shader.buildingRotMatrix_loc = gl.getUniformLocation(shader.program, "buildingRotMatrix");
+	shader.buildingPosHIGH_loc = gl.getUniformLocation(shader.program, "buildingPosHIGH");
+	shader.buildingPosLOW_loc = gl.getUniformLocation(shader.program, "buildingPosLOW");
+	shader.sunMatrix_loc = gl.getUniformLocation(shader.program, "sunMatrix");
+	
+	shader.refMatrixType_loc = gl.getUniformLocation(shader.program, "refMatrixType");
+	shader.refMatrix_loc = gl.getUniformLocation(shader.program, "RefTransfMatrix");
+	shader.refTranslationVec_loc = gl.getUniformLocation(shader.program, "refTranslationVec");
+	shader.aditionalMov_loc = gl.getUniformLocation(shader.program, "aditionalPosition");
+	
+	shader.hasTexture_loc = gl.getUniformLocation(shader.program, "hasTexture");
+	shader.textureFlipYAxis_loc = gl.getUniformLocation(shader.program, "textureFlipYAxis");
+	shader.kernel16_loc = gl.getUniformLocation(shader.program, "kernel");
+	//shader.kernel32_loc = gl.getUniformLocation(shader.program, "kernel32");
+	shader.noiseScale2_loc = gl.getUniformLocation(shader.program, "noiseScale");
+	
+	shader.sunPosHigh_loc = gl.getUniformLocation(shader.program, "sunPosHIGH");
+	shader.sunPosLow_loc = gl.getUniformLocation(shader.program, "sunPosLOW");
+	
+	shader.shadowMapWidth_loc = gl.getUniformLocation(shader.program, "shadowMapWidth");
+	shader.shadowMapHeight_loc = gl.getUniformLocation(shader.program, "shadowMapHeight");
+	
+	shader.sunDirWC_loc = gl.getUniformLocation(shader.program, "sunDirWC");
+	shader.sunIdx_loc = gl.getUniformLocation(shader.program, "sunIdx");
+	
+	// Attributtes.*
+	shader.position3_loc = gl.getAttribLocation(shader.program, "position");
+	shader.texCoord2_loc = gl.getAttribLocation(shader.program, "texCoord");
+	shader.normal3_loc = gl.getAttribLocation(shader.program, "normal");
+	shader.color4_loc = gl.getAttribLocation(shader.program, "color4");
+	
+	
+	shader.bUse1Color_loc = gl.getUniformLocation(shader.program, "bUse1Color");
+	shader.oneColor4_loc = gl.getUniformLocation(shader.program, "oneColor4");
+	shader.bApplySsao_loc = gl.getUniformLocation(shader.program, "bApplySsao");
+	shader.bApplyShadow_loc = gl.getUniformLocation(shader.program, "bApplyShadow");
+	shader.bSilhouette_loc = gl.getUniformLocation(shader.program, "bSilhouette");
+	
+	// clippingPlanes.
+	shader.bApplyClippingPlanes_loc = gl.getUniformLocation(shader.program, "bApplyClippingPlanes");
+	shader.clippingPlanesCount_loc = gl.getUniformLocation(shader.program, "clippingPlanesCount");
+	shader.clippingPlanes_loc = gl.getUniformLocation(shader.program, "clippingPlanes");
+	
+	// compression data, for shaders with data compressed.
+	// compressionMaxPoint & compressionMinPoint: for refObjects, this is the octree's size.
+	shader.posDataByteSize_loc = gl.getUniformLocation(shader.program, "posDataByteSize");
+	shader.texCoordByteSize_loc = gl.getUniformLocation(shader.program, "texCoordByteSize");
+	shader.compressionMaxPoint_loc = gl.getUniformLocation(shader.program, "compressionMaxPoint");
+	shader.compressionMinPoint_loc = gl.getUniformLocation(shader.program, "compressionMinPoint");
+	
+	shader.bApplySpecularLighting_loc = gl.getUniformLocation(shader.program, "bApplySpecularLighting");
+	shader.colorType_loc = gl.getUniformLocation(shader.program, "colorType");
+	shader.externalAlpha_loc = gl.getUniformLocation(shader.program, "externalAlpha");
+	
+	//uniform float fixPointSize;
+	//uniform bool bUseFixPointSize;
+	shader.fixPointSize_loc = gl.getUniformLocation(shader.program, "fixPointSize");
+	shader.bUseFixPointSize_loc = gl.getUniformLocation(shader.program, "bUseFixPointSize");
+	
+	// Camera frustum near & far.
+	// frustumNear.
+	shader.frustumNear_loc = gl.getUniformLocation(shader.program, "near");
+
+	// frustumFar.
+	shader.frustumFar_loc = gl.getUniformLocation(shader.program, "far");
+	
+	shader.scaleLC_loc = gl.getUniformLocation(shader.program, "scaleLC");
+	shader.colorMultiplier_loc = gl.getUniformLocation(shader.program, "colorMultiplier");
+	shader.modelViewProjectionMatrixInv_loc = gl.getUniformLocation(shader.program, "modelViewProjectionMatrixInv");
+	shader.projectionMatrixInv_loc = gl.getUniformLocation(shader.program, "projectionMatrixInv");
+	shader.modelViewMatrixRelToEyeInv_loc = gl.getUniformLocation(shader.program, "modelViewMatrixRelToEyeInv");
+
+	shader.uRenderType_loc = gl.getUniformLocation(shader.program, "uRenderType");
+	shader.uTime_loc = gl.getUniformLocation(shader.program, "uTime");
+};
+
+'use strict';
+
+/**
+ * 어떤 일을 하고 있습니까?
+ * @class PostFxShadersManager
+ */
+var PostFxShadersManager = function(options) 
+{
+	if (!(this instanceof PostFxShadersManager)) 
+	{
+		throw new Error(Messages.CONSTRUCT_ERROR);
+	}
+	this.gl;
+	this.pFx_shaders_array = []; // old.
+	this.shadersMap = {};
+	
+	// preCreated shaders.
+	this.modelRefShader;
+	this.modelRefSilhouetteShader;
+	this.lodBuildingShader;
+	
+	this.currentShaderUsing = undefined; // current active shader.
+
+	this.bUseLogarithmicDepth = false;
+
+	if (options)
+	{
+		if (options.useLogarithmicDepth)
+		{ this.bUseLogarithmicDepth = options.useLogarithmicDepth; }
+	}
+};
+
+/**
+ * 어떤 일을 하고 있습니까?
+ * @param shaderName 변수
+ * @returns shader
+ */
+PostFxShadersManager.prototype.newShader = function(shaderName)
+{
+	var shader = new PostFxShader(this.gl);
+	shader.name = shaderName;
+	shader.shaderManager = this;
+	this.shadersMap[shaderName] = shader;
+	return shader;
+};
+
+/**
+ * Returns true if the shader is the this.currentShaderUsing.
+ * @returns shader
+ */
+PostFxShadersManager.prototype.getCurrentShader = function() 
+{
+	return this.currentShaderUsing;
+};
+
+
+/**
+ * Returns the current active shader.
+ * @param {PostFxShader} shader
+ * @returns {BOOL}}
+ */
+PostFxShadersManager.prototype.isCurrentShader = function(shader) 
+{
+	return (this.currentShaderUsing === shader);
+};
+
+/**
+ * Returns the current active shader.
+ * @param {PostFxShader} shader
+ * @returns {BOOL}}
+ */
+PostFxShadersManager.prototype.useProgram = function(shader) 
+{
+	if (!this.isCurrentShader(shader))
+	{
+		shader.useProgram();
+		this.currentShaderUsing = shader;
+	}
+};
+
+/**
+ * 어떤 일을 하고 있습니까?
+ * @param gl 변수
+ * @param source 변수
+ * @param type 변수
+ * @param typeString 변수
+ * @returns shader
+ */
+PostFxShadersManager.prototype.getShader = function(shaderName) 
+{
+	return this.shadersMap[shaderName];
+};
+
+/**
+ * 어떤 일을 하고 있습니까?
+ * @param gl 변수
+ * @param source 변수
+ * @param type 변수
+ * @param typeString 변수
+ * @returns shader
+ */
+PostFxShadersManager.prototype.createShaderProgram = function(gl, vertexSource, fragmentSource, shaderName, magoManager) 
+{
+	var shader = this.newShader(shaderName);
+	shader.program = gl.createProgram();
+	shader.shader_vertex = this.createShader(gl, vertexSource, gl.VERTEX_SHADER, "VERTEX");
+	shader.shader_fragment = this.createShader(gl, fragmentSource, gl.FRAGMENT_SHADER, "FRAGMENT");
+
+	gl.attachShader(shader.program, shader.shader_vertex);
+	gl.attachShader(shader.program, shader.shader_fragment);
+	shader.bindAttribLocations(gl, shader); // Do this before linkProgram.
+	gl.linkProgram(shader.program);
+			
+	shader.createUniformGenerals(gl, shader, magoManager.sceneState);
+	shader.createUniformLocals(gl, shader, magoManager.sceneState);
+	
+	
+	// keep shader locations.
+	var numAttributes = gl.getProgramParameter(shader.program, gl.ACTIVE_ATTRIBUTES);
+	for (var i = 0; i < numAttributes; i++) 
+	{
+		var attribute = gl.getActiveAttrib(shader.program, i);
+		shader[attribute.name] = gl.getAttribLocation(shader.program, attribute.name);
+	}
+	var numUniforms = gl.getProgramParameter(shader.program, gl.ACTIVE_UNIFORMS);
+	for (var i = 0; i < numUniforms; i++) 
+	{
+		var uniform = gl.getActiveUniform(shader.program, i);
+		shader[uniform.name] = gl.getUniformLocation(shader.program, uniform.name);
+	}
+
+	return shader;
+};
+
+/**
+ * 어떤 일을 하고 있습니까?
+ * @param gl 변수
+ * @param source 변수
+ * @param type 변수
+ * @param typeString 변수
+ * @returns shader
+ */
+PostFxShadersManager.prototype.createShader = function(gl, source, type, typeString) 
+{
+	// Source from internet.
+	var shader = gl.createShader(type);
+	gl.shaderSource(shader, source);
+	gl.compileShader(shader);
+	if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) 
+	{
+		alert("ERROR IN "+typeString+ " SHADER : " + gl.getShaderInfoLog(shader));
+		return false;
+	}
+	return shader;
+};
+
+/**
+ * 어떤 일을 하고 있습니까?
+ * @param gl 변수
+ */
+PostFxShadersManager.prototype.createDefaultShaders = function(gl, sceneState) 
+{
+	this.modelRefSilhouetteShader = this.createSilhouetteShaderModelRef(gl); // 14.
+	this.triPolyhedronShader = this.createSsaoShaderBox(gl); // 12.
+	
+	//this.invertedBoxShader = this.createInvertedBoxShader(gl); // TEST.
+};
+
+/**
+ * 어떤 일을 하고 있습니까?
+ */
+PostFxShadersManager.prototype.getModelRefSilhouetteShader = function() 
+{
+	return this.modelRefSilhouetteShader;
+};
+
+/**
+ * 어떤 일을 하고 있습니까?
+ */
+PostFxShadersManager.prototype.getTriPolyhedronDepthShader = function() 
+{
+	return this.triPolyhedronDepthShader;
+};
+
+/**
+ * 어떤 일을 하고 있습니까?
+ */
+PostFxShadersManager.prototype.getTriPolyhedronShader = function() 
+{
+	return this.triPolyhedronShader;
+};
+
+/**
+ * 어떤 일을 하고 있습니까?
+ */
+PostFxShadersManager.prototype.getInvertedBoxShader = function() 
+{
+	return this.invertedBoxShader;
+};
+
+// 14) Silhouette shader.
+/**
+ * 어떤 일을 하고 있습니까?
+ * @param gl 변수
+ */
+PostFxShadersManager.prototype.createSilhouetteShaderModelRef = function(gl) 
+{
+	// 14.
+	var shader = new PostFxShader(this.gl);
+	shader.name = "SilhouetteShaderModelRef";
+	this.pFx_shaders_array.push(undefined);
+
+	var ssao_vs_source = ShaderSource.SilhouetteVS;
+	var ssao_fs_source = ShaderSource.SilhouetteFS;
+
+	shader.program = gl.createProgram();
+	shader.shader_vertex = this.createShader(gl, ssao_vs_source, gl.VERTEX_SHADER, "VERTEX");
+	shader.shader_fragment = this.createShader(gl, ssao_fs_source, gl.FRAGMENT_SHADER, "FRAGMENT");
+
+	gl.attachShader(shader.program, shader.shader_vertex);
+	gl.attachShader(shader.program, shader.shader_fragment);
+	shader.bindAttribLocations(gl, shader); // Do this before linkProgram.
+	gl.linkProgram(shader.program);
+
+	shader.cameraPosHIGH_loc = gl.getUniformLocation(shader.program, "encodedCameraPositionMCHigh");
+	shader.cameraPosLOW_loc = gl.getUniformLocation(shader.program, "encodedCameraPositionMCLow");
+	shader.buildingPosHIGH_loc = gl.getUniformLocation(shader.program, "buildingPosHIGH");
+	shader.buildingPosLOW_loc = gl.getUniformLocation(shader.program, "buildingPosLOW");
+
+	shader.modelViewProjectionMatrix4RelToEye_loc = gl.getUniformLocation(shader.program, "ModelViewProjectionMatrixRelToEye");
+	shader.refMatrix_loc = gl.getUniformLocation(shader.program, "RefTransfMatrix");
+	shader.buildingRotMatrix_loc = gl.getUniformLocation(shader.program, "buildingRotMatrix");
+	shader.refMatrixType_loc = gl.getUniformLocation(shader.program, "refMatrixType");
+	shader.refTranslationVec_loc = gl.getUniformLocation(shader.program, "refTranslationVec");
+
+	shader.position3_loc = gl.getAttribLocation(shader.program, "position");
+	shader.attribLocationCacheObj.position = gl.getAttribLocation(shader.program, "position");
+
+	shader.aditionalMov_loc = gl.getUniformLocation(shader.program, "aditionalPosition");
+
+	shader.color4Aux_loc = gl.getUniformLocation(shader.program, "vColor4Aux");
+	shader.camSpacePixelTranslation_loc = gl.getUniformLocation(shader.program, "camSpacePixelTranslation");
+	shader.screenSize_loc = gl.getUniformLocation(shader.program, "screenSize");
+	shader.ProjectionMatrix_loc = gl.getUniformLocation(shader.program, "ProjectionMatrix");
+	shader.ModelViewMatrixRelToEye_loc = gl.getUniformLocation(shader.program, "ModelViewMatrixRelToEye");
+	
+	return shader;
+};
+
+// box Shader.
+/**
+ * 어떤 일을 하고 있습니까?
+ * @param gl 변수
+ */
+PostFxShadersManager.prototype.createSsaoShaderBox = function(gl) 
+{
+	// 8.
+	var shader = new PostFxShader(this.gl);
+	this.pFx_shaders_array.push(shader);
+
+	var ssao_vs_source = ShaderSource.BoxSsaoVS;
+	var ssao_fs_source = ShaderSource.BoxSsaoFS;
+
+	shader.program = gl.createProgram();
+	shader.shader_vertex = this.createShader(gl, ssao_vs_source, gl.VERTEX_SHADER, "VERTEX");
+	shader.shader_fragment = this.createShader(gl, ssao_fs_source, gl.FRAGMENT_SHADER, "FRAGMENT");
+
+	gl.attachShader(shader.program, shader.shader_vertex);
+	gl.attachShader(shader.program, shader.shader_fragment);
+	shader.bindAttribLocations(gl, shader); // Do this before linkProgram.
+	gl.linkProgram(shader.program);
+
+	shader.cameraPosHIGH_loc = gl.getUniformLocation(shader.program, "encodedCameraPositionMCHigh");
+	shader.cameraPosLOW_loc = gl.getUniformLocation(shader.program, "encodedCameraPositionMCLow");
+	shader.buildingPosHIGH_loc = gl.getUniformLocation(shader.program, "buildingPosHIGH");
+	shader.buildingPosLOW_loc = gl.getUniformLocation(shader.program, "buildingPosLOW");
+
+	shader.modelViewMatrix4RelToEye_loc = gl.getUniformLocation(shader.program, "modelViewMatrixRelToEye");
+	shader.modelViewProjectionMatrix4RelToEye_loc = gl.getUniformLocation(shader.program, "ModelViewProjectionMatrixRelToEye");
+	shader.normalMatrix4_loc = gl.getUniformLocation(shader.program, "normalMatrix4");
+	shader.projectionMatrix4_loc = gl.getUniformLocation(shader.program, "projectionMatrix");
+	shader.modelViewMatrix4_loc = gl.getUniformLocation(shader.program, "modelViewMatrix");
+	//shader.refMatrix_loc = gl.getUniformLocation(shader.program, "RefTransfMatrix");
+	shader.buildingRotMatrix_loc = gl.getUniformLocation(shader.program, "buildingRotMatrix");
+	shader.bUse1Color_loc = gl.getUniformLocation(shader.program, "bUse1Color");
+	shader.oneColor4_loc = gl.getUniformLocation(shader.program, "oneColor4");
+	shader.bUseNormal_loc = gl.getUniformLocation(shader.program, "bUseNormal");
+	shader.bScale_loc = gl.getUniformLocation(shader.program, "bScale");
+	shader.scale_loc = gl.getUniformLocation(shader.program, "scale");
+
+
+	
+	gl.bindAttribLocation(shader.program, 0, "position");
+	gl.bindAttribLocation(shader.program, 1, "normal");
+	gl.bindAttribLocation(shader.program, 2, "texCoord");
+	gl.bindAttribLocation(shader.program, 3, "color4");
+	
+	
+	shader.position3_loc = gl.getAttribLocation(shader.program, "position");
+	//shader.texCoord2_loc = gl.getAttribLocation(shader.program, "texCoord");
+	shader.normal3_loc = gl.getAttribLocation(shader.program, "normal");
+	shader.color4_loc = gl.getAttribLocation(shader.program, "color4");
+	
+	
+	shader.attribLocationCacheObj.position = gl.getAttribLocation(shader.program, "position");
+	shader.attribLocationCacheObj.normal = gl.getAttribLocation(shader.program, "normal");
+	shader.attribLocationCacheObj.color4 = gl.getAttribLocation(shader.program, "color4");
+
+	//
+	shader.aditionalMov_loc = gl.getUniformLocation(shader.program, "aditionalPosition");
+
+	// ssao uniforms.*
+	shader.noiseScale2_loc = gl.getUniformLocation(shader.program, "noiseScale");
+	shader.kernel16_loc = gl.getUniformLocation(shader.program, "kernel");
+
+	// uniform values.
+	shader.near_loc = gl.getUniformLocation(shader.program, "near");
+	shader.far_loc = gl.getUniformLocation(shader.program, "far");
+	shader.fov_loc = gl.getUniformLocation(shader.program, "fov");
+	shader.aspectRatio_loc = gl.getUniformLocation(shader.program, "aspectRatio");
+
+	shader.screenWidth_loc = gl.getUniformLocation(shader.program, "screenWidth");
+	shader.screenHeight_loc = gl.getUniformLocation(shader.program, "screenHeight");
+
+	shader.hasTexture_loc = gl.getUniformLocation(shader.program, "hasTexture");
+	shader.color4Aux_loc = gl.getUniformLocation(shader.program, "vColor4Aux");
+
+	// uniform samplers.
+	shader.depthTex_loc = gl.getUniformLocation(shader.program, "depthTex");
+	shader.noiseTex_loc = gl.getUniformLocation(shader.program, "noiseTex");
+	shader.diffuseTex_loc = gl.getUniformLocation(shader.program, "diffuseTex");
+
+	// ModelReference.*
+	shader.useRefTransfMatrix_loc = gl.getUniformLocation(shader.program, "useRefTransfMatrix");
+	shader.useTexture_loc = gl.getUniformLocation(shader.program, "useTexture");
+	shader.invertNormals_loc  = gl.getUniformLocation(shader.program, "invertNormals");
+	
+	return shader;
+};
+
+// InvertedBox.
+/**
+ * 어떤 일을 하고 있습니까?
+ * @param gl 변수
+ */
+PostFxShadersManager.prototype.createInvertedBoxShader = function(gl) 
+{
+	var shader = new PostFxShader(this.gl);
+	this.pFx_shaders_array.push(undefined); // old.
+
+	var ssao_vs_source = ShaderSource.InvertedBoxVS;
+	var ssao_fs_source = ShaderSource.InvertedBoxFS;
+
+	shader.program = gl.createProgram();
+	shader.shader_vertex = this.createShader(gl, ssao_vs_source, gl.VERTEX_SHADER, "VERTEX");
+	shader.shader_fragment = this.createShader(gl, ssao_fs_source, gl.FRAGMENT_SHADER, "FRAGMENT");
+
+	gl.attachShader(shader.program, shader.shader_vertex);
+	gl.attachShader(shader.program, shader.shader_fragment);
+	shader.bindAttribLocations(gl, shader); // Do this before linkProgram.
+	gl.linkProgram(shader.program);
+
+	shader.cameraPosHIGH_loc = gl.getUniformLocation(shader.program, "encodedCameraPositionMCHigh"); // sceneState.
+	shader.cameraPosLOW_loc = gl.getUniformLocation(shader.program, "encodedCameraPositionMCLow"); // sceneState.
+	shader.buildingPosHIGH_loc = gl.getUniformLocation(shader.program, "buildingPosHIGH");
+	shader.buildingPosLOW_loc = gl.getUniformLocation(shader.program, "buildingPosLOW");
+
+	shader.modelViewMatrix4RelToEye_loc = gl.getUniformLocation(shader.program, "modelViewMatrixRelToEye"); // sceneState.
+	shader.modelViewProjectionMatrix4RelToEye_loc = gl.getUniformLocation(shader.program, "ModelViewProjectionMatrixRelToEye"); // sceneState.
+	shader.normalMatrix4_loc = gl.getUniformLocation(shader.program, "normalMatrix4"); // sceneState.
+	shader.projectionMatrix4_loc = gl.getUniformLocation(shader.program, "projectionMatrix"); // sceneState.
+	shader.refMatrix_loc = gl.getUniformLocation(shader.program, "RefTransfMatrix");
+	
+	shader.buildingRotMatrix_loc = gl.getUniformLocation(shader.program, "buildingRotMatrix");
+	shader.refMatrixType_loc = gl.getUniformLocation(shader.program, "refMatrixType");
+	shader.refTranslationVec_loc = gl.getUniformLocation(shader.program, "refTranslationVec");
+
+	shader.position3_loc = gl.getAttribLocation(shader.program, "position");
+	shader.texCoord2_loc = gl.getAttribLocation(shader.program, "texCoord");
+	shader.normal3_loc = gl.getAttribLocation(shader.program, "normal");
+	
+	shader.attribLocationCacheObj.position = gl.getAttribLocation(shader.program, "position");
+	shader.attribLocationCacheObj.texCoord = gl.getAttribLocation(shader.program, "texCoord");
+	shader.attribLocationCacheObj.normal = gl.getAttribLocation(shader.program, "normal");
+	//
+	shader.aditionalMov_loc = gl.getUniformLocation(shader.program, "aditionalPosition");
+
+	// ssao uniforms.*
+	shader.noiseScale2_loc = gl.getUniformLocation(shader.program, "noiseScale");
+	shader.kernel16_loc = gl.getUniformLocation(shader.program, "kernel");
+
+	// uniform values.
+	shader.near_loc = gl.getUniformLocation(shader.program, "near"); // sceneState.
+	shader.far_loc = gl.getUniformLocation(shader.program, "far"); // sceneState.
+	shader.fov_loc = gl.getUniformLocation(shader.program, "fov"); // sceneState.
+	shader.aspectRatio_loc = gl.getUniformLocation(shader.program, "aspectRatio"); // sceneState.
+
+	shader.screenWidth_loc = gl.getUniformLocation(shader.program, "screenWidth"); // sceneState.
+	shader.screenHeight_loc = gl.getUniformLocation(shader.program, "screenHeight"); // sceneState.
+	
+	shader.shininessValue_loc = gl.getUniformLocation(shader.program, "shininessValue");
+
+	shader.hasTexture_loc = gl.getUniformLocation(shader.program, "hasTexture");
+	shader.color4Aux_loc = gl.getUniformLocation(shader.program, "vColor4Aux");
+	shader.textureFlipYAxis_loc = gl.getUniformLocation(shader.program, "textureFlipYAxis");
+
+	// uniform samplers.
+	shader.depthTex_loc = gl.getUniformLocation(shader.program, "depthTex");
+	shader.noiseTex_loc = gl.getUniformLocation(shader.program, "noiseTex");
+	shader.diffuseTex_loc = gl.getUniformLocation(shader.program, "diffuseTex"); 
+	
+	// lighting.
+	shader.specularColor_loc = gl.getUniformLocation(shader.program, "specularColor");
+	shader.ssaoRadius_loc = gl.getUniformLocation(shader.program, "radius");  
+
+	shader.ambientReflectionCoef_loc = gl.getUniformLocation(shader.program, "ambientReflectionCoef");
+	shader.diffuseReflectionCoef_loc = gl.getUniformLocation(shader.program, "diffuseReflectionCoef");
+	shader.specularReflectionCoef_loc = gl.getUniformLocation(shader.program, "specularReflectionCoef");
+	
+	return shader;
+};
+'use strict';
+var ShaderSource = {};
+ShaderSource.atmosphereFS = "#ifdef GL_ES\n\
+    precision highp float;\n\
+#endif\n\
+\n\
+uniform sampler2D depthTex;\n\
+uniform sampler2D noiseTex;  \n\
+uniform sampler2D diffuseTex;\n\
+uniform bool textureFlipYAxis;\n\
+uniform bool bIsMakingDepth;\n\
+varying vec3 vNormal;\n\
+uniform mat4 projectionMatrix;\n\
+uniform mat4 m;\n\
+uniform vec2 noiseScale;\n\
+uniform float near;\n\
+uniform float far;            \n\
+uniform float fov;\n\
+uniform float aspectRatio;    \n\
+uniform float screenWidth;    \n\
+uniform float screenHeight;    \n\
+uniform float shininessValue;\n\
+uniform vec3 kernel[16];   \n\
+\n\
+uniform vec4 oneColor4;\n\
+uniform highp int colorType; // 0= oneColor, 1= attribColor, 2= texture.\n\
+\n\
+varying vec2 vTexCoord;   \n\
+varying vec3 vLightWeighting;\n\
+\n\
+varying vec3 diffuseColor;\n\
+uniform vec3 specularColor;\n\
+varying vec3 vertexPos;\n\
+varying float depthValue;\n\
+varying vec3 v3Pos;\n\
+varying vec3 camPos;\n\
+varying vec4 vcolor4;\n\
+\n\
+const int kernelSize = 16;  \n\
+uniform float radius;      \n\
+\n\
+uniform float ambientReflectionCoef;\n\
+uniform float diffuseReflectionCoef;  \n\
+uniform float specularReflectionCoef; \n\
+uniform float externalAlpha;\n\
+const float equatorialRadius = 6378137.0;\n\
+const float polarRadius = 6356752.3142;\n\
+const float PI = 3.1415926535897932384626433832795;\n\
+const float PI_2 = 1.57079632679489661923; \n\
+const float PI_4 = 0.785398163397448309616;\n\
+\n\
+float unpackDepth(const in vec4 rgba_depth)\n\
+{\n\
+    const vec4 bit_shift = vec4(0.000000059605, 0.000015258789, 0.00390625, 1.0);\n\
+    float depth = dot(rgba_depth, bit_shift);\n\
+    return depth;\n\
+} \n\
+\n\
+vec4 packDepth(const in float depth)\n\
+{\n\
+    const vec4 bit_shift = vec4(16777216.0, 65536.0, 256.0, 1.0);\n\
+    const vec4 bit_mask  = vec4(0.0, 0.00390625, 0.00390625, 0.00390625); \n\
+    vec4 res = fract(depth * bit_shift);\n\
+    res -= res.xxyz * bit_mask;\n\
+    return res;  \n\
+}               \n\
+\n\
+//linear view space depth\n\
+float getDepth(vec2 coord)\n\
+{\n\
+    return unpackDepth(texture2D(depthTex, coord.xy));\n\
+}    \n\
+\n\
+void main()\n\
+{  \n\
+	if(bIsMakingDepth)\n\
+	{\n\
+		gl_FragColor = packDepth(-depthValue);\n\
+	}\n\
+	else{\n\
+		vec4 textureColor = oneColor4;\n\
+		if(colorType == 0)\n\
+		{\n\
+			textureColor = oneColor4;\n\
+			\n\
+			if(textureColor.w == 0.0)\n\
+			{\n\
+				discard;\n\
+			}\n\
+		}\n\
+		else if(colorType == 2)\n\
+		{\n\
+			//if(textureFlipYAxis)\n\
+			//{\n\
+			//	textureColor = texture2D(diffuseTex, vec2(vTexCoord.s, 1.0 - vTexCoord.t));\n\
+			//}\n\
+			//else{\n\
+			//	textureColor = texture2D(diffuseTex, vec2(vTexCoord.s, vTexCoord.t));\n\
+			//}\n\
+			\n\
+			if(textureColor.w == 0.0)\n\
+			{\n\
+				discard;\n\
+			}\n\
+		}\n\
+		else{\n\
+			textureColor = oneColor4;\n\
+		}\n\
+		\n\
+		gl_FragColor = vcolor4; \n\
+	}\n\
+}";
+ShaderSource.atmosphereVS = "attribute vec3 position;\n\
+attribute vec3 normal;\n\
+attribute vec4 color4;\n\
+attribute vec2 texCoord;\n\
+\n\
+uniform sampler2D diffuseTex;\n\
+uniform mat4 projectionMatrix;  \n\
+uniform mat4 modelViewMatrix;\n\
+uniform mat4 modelViewMatrixRelToEye; \n\
+uniform mat4 ModelViewProjectionMatrixRelToEye;\n\
+uniform mat4 ModelViewProjectionMatrix;\n\
+uniform mat4 normalMatrix4;\n\
+uniform mat4 buildingRotMatrix;  \n\
+uniform vec3 buildingPosHIGH;\n\
+uniform vec3 buildingPosLOW;\n\
+uniform vec3 encodedCameraPositionMCHigh;\n\
+uniform vec3 encodedCameraPositionMCLow;\n\
+uniform vec3 aditionalPosition;\n\
+uniform vec4 oneColor4;\n\
+uniform bool bUse1Color;\n\
+uniform bool hasTexture;\n\
+uniform bool bIsMakingDepth;\n\
+uniform float near;\n\
+uniform float far;\n\
+\n\
+varying vec3 vNormal;\n\
+varying vec3 v3Pos;\n\
+varying vec2 vTexCoord;   \n\
+varying vec3 uAmbientColor;\n\
+varying vec3 vLightWeighting;\n\
+varying vec4 vcolor4;\n\
+varying vec3 vertexPos;\n\
+varying float depthValue;\n\
+varying vec3 camPos;\n\
+\n\
+const float equatorialRadius = 6378137.0;\n\
+const float polarRadius = 6356752.3142;\n\
+const float PI = 3.1415926535897932384626433832795;\n\
+const float PI_2 = 1.57079632679489661923; \n\
+const float PI_4 = 0.785398163397448309616;\n\
+\n\
+void main()\n\
+{	\n\
+    vec3 objPosHigh = buildingPosHIGH;\n\
+    vec3 objPosLow = buildingPosLOW.xyz + position.xyz;\n\
+    vec3 highDifference = objPosHigh.xyz - encodedCameraPositionMCHigh.xyz;\n\
+    vec3 lowDifference = objPosLow.xyz - encodedCameraPositionMCLow.xyz;\n\
+    vec4 pos4 = vec4(highDifference.xyz + lowDifference.xyz, 1.0);\n\
+	vNormal = (normalMatrix4 * vec4(normal, 1.0)).xyz;\n\
+\n\
+	if(bIsMakingDepth)\n\
+	{\n\
+		depthValue = (modelViewMatrixRelToEye * pos4).z/far;\n\
+	}\n\
+	else\n\
+	{\n\
+		vTexCoord = texCoord;\n\
+	}\n\
+    gl_Position = ModelViewProjectionMatrixRelToEye * pos4;\n\
+	camPos = encodedCameraPositionMCHigh.xyz + encodedCameraPositionMCLow.xyz;\n\
+	v3Pos = vec3((modelViewMatrixRelToEye * pos4).xyz);\n\
+\n\
+	// Calculate color.\n\
+	float distToCam = length(vec3(v3Pos));\n\
+	vec3 camDir = normalize(vec3(v3Pos.x, v3Pos.y, v3Pos.z));\n\
+	vec3 normal = vNormal;\n\
+	float angRad = acos(dot(camDir, normal));\n\
+	float angDeg = angRad*180.0/PI;\n\
+	/*\n\
+	if(angDeg > 130.0)\n\
+		textureColor = vec4(1.0, 0.0, 0.0, 1.0);\n\
+	else if(angDeg > 120.0)\n\
+		textureColor = vec4(0.0, 1.0, 0.0, 1.0);\n\
+	else if(angDeg > 110.0)\n\
+		textureColor = vec4(0.0, 0.0, 1.0, 1.0);\n\
+	else if(angDeg > 100.0)\n\
+		textureColor = vec4(1.0, 1.0, 0.0, 1.0);\n\
+	else if(angDeg > 90.0)\n\
+		textureColor = vec4(1.0, 0.0, 1.0, 1.0);\n\
+		*/\n\
+		\n\
+	//textureColor = vec4(vNormal, 1.0);\n\
+\n\
+	//float maxAngDeg = 100.5;\n\
+	float maxAngDeg = 101.2;\n\
+	float minAngDeg = 90.0;\n\
+\n\
+	float A = 1.0/(maxAngDeg-minAngDeg);\n\
+	float B = -A*minAngDeg;\n\
+	float alphaReal = A*angDeg+B;\n\
+	float alpha2 = alphaReal*alphaReal;\n\
+	float alpha = alpha2*alpha2;\n\
+	if(alpha < 0.0 )\n\
+	alpha = 0.0;\n\
+	else if(alpha > 2.0 )\n\
+	alpha = 2.0;\n\
+	\n\
+	float alphaPlusPerDist = 4.0*(distToCam/equatorialRadius);\n\
+	if(alphaPlusPerDist > 1.0)\n\
+	alphaPlusPerDist = 1.0;\n\
+\n\
+	float extra = (1.0-alpha);\n\
+	if(extra < 0.0)\n\
+	extra = 0.0;\n\
+\n\
+	float extraPerDist = (1.0-alphaPlusPerDist); // near -> more blue.\n\
+\n\
+	alpha *= alphaPlusPerDist;\n\
+	vcolor4 = vec4(alpha*0.75, alpha*0.88 + extra*0.4 + extraPerDist*0.1, alpha + extra*2.5 + extraPerDist*0.8, alpha);\n\
+}";
+ShaderSource.BlendingCubeFS = "	precision lowp float;\n\
+	varying vec4 vColor;\n\
+\n\
+	void main()\n\
+    {\n\
+		gl_FragColor = vColor;\n\
+	}";
+ShaderSource.BlendingCubeVS = "attribute vec3 position;\n\
+uniform mat4 ModelViewProjectionMatrixRelToEye;\n\
+uniform vec3 encodedCameraPositionMCHigh;\n\
+uniform vec3 encodedCameraPositionMCLow;\n\
+attribute vec4 color;\n\
+varying vec4 vColor;\n\
+\n\
+void main()\n\
+{\n\
+    vec3 highDifference = -encodedCameraPositionMCHigh.xyz;\n\
+    vec3 lowDifference = position.xyz - encodedCameraPositionMCLow.xyz;\n\
+    vec4 pos = vec4(position.xyz, 1.0);\n\
+\n\
+    vColor=color;\n\
+\n\
+    gl_Position = ModelViewProjectionMatrixRelToEye * pos;\n\
+}";
+ShaderSource.BlurFS = "#ifdef GL_ES\n\
+    precision highp float;\n\
+    #endif\n\
+uniform sampler2D colorTex;\n\
+uniform vec2 texelSize;\n\
+varying vec2 vTexCoord; 	 	\n\
+\n\
+void main()\n\
+{\n\
+    vec3 result = vec3(0.0);\n\
+    for (int i = 0; i < 4; ++i) {\n\
+        for (int j = 0; j < 4; ++j) {\n\
+            vec2 offset = vec2(texelSize.x * float(j), texelSize.y * float(i));\n\
+            result += texture2D(colorTex, vTexCoord + offset).rgb;\n\
+        }\n\
+    }\n\
+            \n\
+    gl_FragColor.rgb = vec3(result * 0.0625); \n\
+    gl_FragColor.a = 1.0;\n\
+}\n\
+";
+ShaderSource.BlurVS = "attribute vec4 position;\n\
+attribute vec2 texCoord;\n\
+\n\
+uniform mat4 projectionMatrix;\n\
+uniform mat4 modelViewMatrix;  \n\
+\n\
+varying vec2 vTexCoord;\n\
+\n\
+void main()\n\
+{	\n\
+    vTexCoord = texCoord;\n\
+    \n\
+    gl_Position = projectionMatrix * modelViewMatrix * position;\n\
+}\n\
+";
+ShaderSource.BoxSsaoFS = "#ifdef GL_ES\n\
+    precision highp float;\n\
+#endif\n\
+uniform sampler2D depthTex;\n\
+uniform sampler2D noiseTex;  \n\
+uniform sampler2D diffuseTex;\n\
+uniform bool hasTexture;\n\
+varying vec3 vNormal;\n\
+uniform mat4 projectionMatrix;\n\
+uniform mat4 m;\n\
+uniform vec2 noiseScale;\n\
+uniform float near;\n\
+uniform float far;            \n\
+uniform float fov;\n\
+uniform float aspectRatio;    \n\
+uniform float screenWidth;    \n\
+uniform float screenHeight;    \n\
+uniform vec3 kernel[16];   \n\
+uniform vec4 vColor4Aux;\n\
+uniform bool bUseNormal;\n\
+\n\
+varying vec2 vTexCoord;   \n\
+varying vec3 vLightWeighting;\n\
+varying vec4 vcolor4;\n\
+\n\
+const int kernelSize = 16;  \n\
+const float radius = 0.5;      \n\
+\n\
+float unpackDepth(const in vec4 rgba_depth)\n\
+{\n\
+    const vec4 bit_shift = vec4(0.000000059605, 0.000015258789, 0.00390625, 1.0);\n\
+    float depth = dot(rgba_depth, bit_shift);\n\
+    return depth;\n\
+}                \n\
+\n\
+vec3 getViewRay(vec2 tc)\n\
+{\n\
+    float hfar = 2.0 * tan(fov/2.0) * far;\n\
+    float wfar = hfar * aspectRatio;    \n\
+    vec3 ray = vec3(wfar * (tc.x - 0.5), hfar * (tc.y - 0.5), -far);    \n\
+    return ray;                      \n\
+}         \n\
+            \n\
+//linear view space depth\n\
+float getDepth(vec2 coord)\n\
+{                          \n\
+    return unpackDepth(texture2D(depthTex, coord.xy));\n\
+}    \n\
+\n\
+void main()\n\
+{ \n\
+	vec4 textureColor;\n\
+	textureColor = vcolor4;  \n\
+	if(bUseNormal)\n\
+    {\n\
+		vec2 screenPos = vec2(gl_FragCoord.x / screenWidth, gl_FragCoord.y / screenHeight);		                 \n\
+		float linearDepth = getDepth(screenPos);          \n\
+		vec3 origin = getViewRay(screenPos) * linearDepth;   \n\
+		vec3 normal2 = vNormal;   \n\
+				\n\
+		vec3 rvec = texture2D(noiseTex, screenPos.xy * noiseScale).xyz * 2.0 - 1.0;\n\
+		vec3 tangent = normalize(rvec - normal2 * dot(rvec, normal2));\n\
+		vec3 bitangent = cross(normal2, tangent);\n\
+		mat3 tbn = mat3(tangent, bitangent, normal2);        \n\
+		\n\
+		float occlusion = 0.0;\n\
+		for(int i = 0; i < kernelSize; ++i)\n\
+		{    	 \n\
+			vec3 sample = origin + (tbn * kernel[i]) * radius;\n\
+			vec4 offset = projectionMatrix * vec4(sample, 1.0);		\n\
+			offset.xy /= offset.w;\n\
+			offset.xy = offset.xy * 0.5 + 0.5;        \n\
+			float sampleDepth = -sample.z/far;\n\
+			float depthBufferValue = getDepth(offset.xy);				              \n\
+			float range_check = abs(linearDepth - depthBufferValue)+radius*0.998;\n\
+			if (range_check < radius*1.001 && depthBufferValue <= sampleDepth)\n\
+			{\n\
+				occlusion +=  1.0;\n\
+			}\n\
+			\n\
+		}   \n\
+			\n\
+		occlusion = 1.0 - occlusion / float(kernelSize);\n\
+									\n\
+		vec3 lightPos = vec3(10.0, 10.0, 10.0);\n\
+		vec3 L = normalize(lightPos);\n\
+		float DiffuseFactor = dot(normal2, L);\n\
+		float NdotL = abs(DiffuseFactor);\n\
+		vec3 diffuse = vec3(NdotL);\n\
+		vec3 ambient = vec3(1.0);\n\
+		gl_FragColor.rgb = vec3((textureColor.xyz)*vLightWeighting * occlusion); \n\
+		gl_FragColor.a = 1.0; \n\
+	}\n\
+	else\n\
+	{\n\
+		gl_FragColor.rgb = vec3(textureColor.xyz); \n\
+		gl_FragColor.a = 1.0; \n\
+	}	\n\
+}\n\
+";
+ShaderSource.BoxSsaoVS = "attribute vec3 position;\n\
+attribute vec3 normal;\n\
+attribute vec2 texCoord;\n\
+attribute vec4 color4;\n\
+\n\
+uniform mat4 projectionMatrix;  \n\
+uniform mat4 modelViewMatrix;\n\
+uniform mat4 modelViewMatrixRelToEye; \n\
+uniform mat4 ModelViewProjectionMatrixRelToEye;\n\
+uniform mat4 normalMatrix4;\n\
+uniform mat4 buildingRotMatrix;  \n\
+uniform vec3 buildingPosHIGH;\n\
+uniform vec3 buildingPosLOW;\n\
+uniform vec3 encodedCameraPositionMCHigh;\n\
+uniform vec3 encodedCameraPositionMCLow;\n\
+uniform vec3 aditionalPosition;\n\
+uniform vec4 oneColor4;\n\
+uniform bool bUse1Color;\n\
+uniform bool bUseNormal;\n\
+uniform vec3 scale;\n\
+uniform bool bScale;\n\
+\n\
+varying vec3 vNormal;\n\
+varying vec2 vTexCoord;  \n\
+varying vec3 uAmbientColor;\n\
+varying vec3 vLightWeighting;\n\
+varying vec4 vcolor4;\n\
+\n\
+void main()\n\
+{	\n\
+    vec4 position2 = vec4(position.xyz, 1.0);\n\
+    if(bScale)\n\
+    {\n\
+        position2.x *= scale.x;\n\
+        position2.y *= scale.y;\n\
+        position2.z *= scale.z;\n\
+    }\n\
+    vec4 rotatedPos = buildingRotMatrix * vec4(position2.xyz + aditionalPosition.xyz, 1.0);\n\
+    vec3 objPosHigh = buildingPosHIGH;\n\
+    vec3 objPosLow = buildingPosLOW.xyz + rotatedPos.xyz;\n\
+    vec3 highDifference = objPosHigh.xyz - encodedCameraPositionMCHigh.xyz;\n\
+    vec3 lowDifference = objPosLow.xyz - encodedCameraPositionMCLow.xyz;\n\
+    vec4 pos4 = vec4(highDifference.xyz + lowDifference.xyz, 1.0);\n\
+    if(bUseNormal)\n\
+    {\n\
+		vec4 rotatedNormal = buildingRotMatrix * vec4(normal.xyz, 1.0);\n\
+		vLightWeighting = vec3(1.0, 1.0, 1.0);\n\
+		uAmbientColor = vec3(0.8, 0.8, 0.8);\n\
+		vec3 uLightingDirection = vec3(0.5, 0.5, 0.5);\n\
+		vec3 directionalLightColor = vec3(0.6, 0.6, 0.6);\n\
+		vNormal = (normalMatrix4 * vec4(rotatedNormal.x, rotatedNormal.y, rotatedNormal.z, 1.0)).xyz;\n\
+		float directionalLightWeighting = max(dot(vNormal, uLightingDirection), 0.0);\n\
+		vLightWeighting = uAmbientColor + directionalLightColor * directionalLightWeighting;\n\
+	}\n\
+    if(bUse1Color)\n\
+    {\n\
+        vcolor4 = oneColor4;\n\
+    }\n\
+    else\n\
+    {\n\
+        vcolor4 = color4;\n\
+    }\n\
+\n\
+    gl_Position = ModelViewProjectionMatrixRelToEye * pos4;\n\
+}\n\
+";
+ShaderSource.CloudFS = "precision lowp float;\n\
+varying vec3 vColor;\n\
+\n\
+void main()\n\
+{\n\
+    gl_FragColor = vec4(vColor, 1.);\n\
+}";
+ShaderSource.CloudVS = "attribute vec3 position;\n\
+uniform mat4 ModelViewProjectionMatrixRelToEye;\n\
+uniform vec3 cloudPosHIGH;\n\
+uniform vec3 cloudPosLOW;\n\
+uniform vec3 encodedCameraPositionMCHigh;\n\
+uniform vec3 encodedCameraPositionMCLow;\n\
+attribute vec3 color;\n\
+varying vec3 vColor;\n\
+\n\
+void main()\n\
+{\n\
+    vec3 objPosHigh = cloudPosHIGH;\n\
+    vec3 objPosLow = cloudPosLOW.xyz + position.xyz;\n\
+    vec3 highDifference = objPosHigh.xyz - encodedCameraPositionMCHigh.xyz;\n\
+    vec3 lowDifference = objPosLow.xyz - encodedCameraPositionMCLow.xyz;\n\
+    vec4 pos = vec4(highDifference.xyz + lowDifference.xyz, 1.0);\n\
+\n\
+    vColor=color;\n\
+\n\
+    gl_Position = ModelViewProjectionMatrixRelToEye * pos;\n\
+}";
+ShaderSource.ColorFS = "precision mediump float;\n\
+uniform int byteColor_r;\n\
+uniform int byteColor_g;\n\
+uniform int byteColor_b;\n\
+\n\
+void main()\n\
+{\n\
+    float byteMaxValue = 255.0;\n\
+\n\
+    gl_FragColor = vec4(float(byteColor_r)/byteMaxValue, float(byteColor_g)/byteMaxValue, float(byteColor_b)/byteMaxValue, 1);\n\
+}\n\
+";
+ShaderSource.ColorSelectionSsaoFS = "precision highp float;\n\
+uniform vec4 oneColor4;\n\
+\n\
+void main()\n\
+{          \n\
+    gl_FragColor = oneColor4;\n\
+}\n\
+";
+ShaderSource.ColorSelectionSsaoVS = "attribute vec3 position;\n\
+\n\
+uniform mat4 buildingRotMatrix;\n\
+uniform mat4 ModelViewProjectionMatrixRelToEye;\n\
+uniform mat4 RefTransfMatrix;\n\
+uniform vec3 buildingPosHIGH;\n\
+uniform vec3 buildingPosLOW;\n\
+uniform vec3 encodedCameraPositionMCHigh;\n\
+uniform vec3 encodedCameraPositionMCLow;\n\
+uniform vec3 aditionalPosition;\n\
+uniform vec3 refTranslationVec;\n\
+uniform int refMatrixType; // 0= identity, 1= translate, 2= transform\n\
+\n\
+void main()\n\
+{\n\
+    vec4 rotatedPos;\n\
+	if(refMatrixType == 0)\n\
+	{\n\
+		rotatedPos = buildingRotMatrix * vec4(position.xyz, 1.0) + vec4(aditionalPosition.xyz, 0.0);\n\
+	}\n\
+	else if(refMatrixType == 1)\n\
+	{\n\
+		rotatedPos = buildingRotMatrix * vec4(position.xyz + refTranslationVec.xyz, 1.0) + vec4(aditionalPosition.xyz, 0.0);\n\
+	}\n\
+	else if(refMatrixType == 2)\n\
+	{\n\
+		rotatedPos = RefTransfMatrix * vec4(position.xyz, 1.0) + vec4(aditionalPosition.xyz, 0.0);\n\
+	}\n\
+\n\
+    vec3 objPosHigh = buildingPosHIGH;\n\
+    vec3 objPosLow = buildingPosLOW.xyz + rotatedPos.xyz;\n\
+    vec3 highDifference = objPosHigh.xyz - encodedCameraPositionMCHigh.xyz;\n\
+    vec3 lowDifference = objPosLow.xyz - encodedCameraPositionMCLow.xyz;\n\
+    vec4 pos4 = vec4(highDifference.xyz + lowDifference.xyz, 1.0);\n\
+    \n\
+    gl_PointSize = 10.0;\n\
+    gl_Position = ModelViewProjectionMatrixRelToEye * pos4;\n\
+}\n\
+";
+ShaderSource.ColorVS = "attribute vec3 position;\n\
+uniform mat4 ModelViewProjectionMatrixRelToEye;\n\
+uniform vec3 buildingPosHIGH;\n\
+uniform vec3 buildingPosLOW;\n\
+uniform vec3 encodedCameraPositionMCHigh;\n\
+uniform vec3 encodedCameraPositionMCLow;\n\
+uniform mat4 RefTransfMatrix;\n\
+\n\
+void main()\n\
+{\n\
+    vec4 rotatedPos = RefTransfMatrix * vec4(position.xyz, 1.0);\n\
+    vec3 objPosHigh = buildingPosHIGH;\n\
+    vec3 objPosLow = buildingPosLOW.xyz + rotatedPos.xyz;\n\
+    vec3 highDifference = objPosHigh.xyz - encodedCameraPositionMCHigh.xyz;\n\
+    vec3 lowDifference = objPosLow.xyz - encodedCameraPositionMCLow.xyz;\n\
+    vec4 pos = vec4(highDifference.xyz + lowDifference.xyz, 1.0);\n\
+    \n\
+    gl_Position = ModelViewProjectionMatrixRelToEye * pos;\n\
+}\n\
+";
+ShaderSource.draw_frag = "precision mediump float;\n\
+\n\
+uniform sampler2D u_wind;\n\
+uniform vec2 u_wind_min;\n\
+uniform vec2 u_wind_max;\n\
+uniform bool u_flipTexCoordY_windMap;\n\
+uniform bool u_colorScale;\n\
+\n\
+varying vec2 v_particle_pos;\n\
+\n\
+void main() {\n\
+	vec2 windMapTexCoord = v_particle_pos;\n\
+	if(u_flipTexCoordY_windMap)\n\
+	{\n\
+		windMapTexCoord.y = 1.0 - windMapTexCoord.y;\n\
+	}\n\
+    vec2 velocity = mix(u_wind_min, u_wind_max, texture2D(u_wind, windMapTexCoord).rg);\n\
+    float speed_t = length(velocity) / length(u_wind_max);\n\
+\n\
+	\n\
+	if(u_colorScale)\n\
+	{\n\
+		speed_t *= 1.5;\n\
+		if(speed_t > 1.0)speed_t = 1.0;\n\
+		float b = 1.0 - speed_t;\n\
+		float g;\n\
+		if(speed_t > 0.5)\n\
+		{\n\
+			g = 2.0-2.0*speed_t;\n\
+		}\n\
+		else{\n\
+			g = 2.0*speed_t;\n\
+		}\n\
+		float r = speed_t;\n\
+		gl_FragColor = vec4(r,g,b,1.0);\n\
+	}\n\
+	else{\n\
+		float intensity = speed_t*3.0;\n\
+		if(intensity > 1.0)\n\
+			intensity = 1.0;\n\
+		gl_FragColor = vec4(intensity,intensity,intensity,1.0);\n\
+	}\n\
+}\n\
+";
+ShaderSource.draw_frag3D = "precision highp float;\n\
+\n\
+uniform sampler2D u_wind;\n\
+uniform vec2 u_wind_min;\n\
+uniform vec2 u_wind_max;\n\
+uniform bool u_flipTexCoordY_windMap;\n\
+uniform bool u_colorScale;\n\
+uniform float u_tailAlpha;\n\
+uniform float u_externAlpha;\n\
+\n\
+varying vec2 v_particle_pos;\n\
+\n\
+vec3 getRainbowColor_byHeight(float height)\n\
+{\n\
+	float minHeight_rainbow = 0.0;\n\
+	float maxHeight_rainbow = 1.0;\n\
+	float gray = (height - minHeight_rainbow)/(maxHeight_rainbow - minHeight_rainbow);\n\
+	if (gray > 1.0){ gray = 1.0; }\n\
+	else if (gray<0.0){ gray = 0.0; }\n\
+	\n\
+	float r, g, b;\n\
+	\n\
+	if(gray < 0.16666)\n\
+	{\n\
+		b = 0.0;\n\
+		g = gray*6.0;\n\
+		r = 1.0;\n\
+	}\n\
+	else if(gray >= 0.16666 && gray < 0.33333)\n\
+	{\n\
+		b = 0.0;\n\
+		g = 1.0;\n\
+		r = 2.0 - gray*6.0;\n\
+	}\n\
+	else if(gray >= 0.33333 && gray < 0.5)\n\
+	{\n\
+		b = -2.0 + gray*6.0;\n\
+		g = 1.0;\n\
+		r = 0.0;\n\
+	}\n\
+	else if(gray >= 0.5 && gray < 0.66666)\n\
+	{\n\
+		b = 1.0;\n\
+		g = 4.0 - gray*6.0;\n\
+		r = 0.0;\n\
+	}\n\
+	else if(gray >= 0.66666 && gray < 0.83333)\n\
+	{\n\
+		b = 1.0;\n\
+		g = 0.0;\n\
+		r = -4.0 + gray*6.0;\n\
+	}\n\
+	else if(gray >= 0.83333)\n\
+	{\n\
+		b = 6.0 - gray*6.0;\n\
+		g = 0.0;\n\
+		r = 1.0;\n\
+	}\n\
+	\n\
+	float aux = r;\n\
+	r = b;\n\
+	b = aux;\n\
+	\n\
+	//b = -gray + 1.0;\n\
+	//if (gray > 0.5)\n\
+	//{\n\
+	//	g = -gray*2.0 + 2.0; \n\
+	//}\n\
+	//else \n\
+	//{\n\
+	//	g = gray*2.0;\n\
+	//}\n\
+	//r = gray;\n\
+	vec3 resultColor = vec3(r, g, b);\n\
+    return resultColor;\n\
+} \n\
+\n\
+void main() {\n\
+	vec2 windMapTexCoord = v_particle_pos;\n\
+	if(u_flipTexCoordY_windMap)\n\
+	{\n\
+		windMapTexCoord.y = 1.0 - windMapTexCoord.y;\n\
+	}\n\
+    vec2 velocity = mix(u_wind_min, u_wind_max, texture2D(u_wind, windMapTexCoord).rg);\n\
+    float speed_t = length(velocity) / length(u_wind_max);\n\
+\n\
+	\n\
+	if(u_colorScale)\n\
+	{\n\
+		speed_t *= 1.5;\n\
+		if(speed_t > 1.0)speed_t = 1.0;\n\
+		float b = 1.0 - speed_t;\n\
+		float g;\n\
+		if(speed_t > 0.5)\n\
+		{\n\
+			g = 2.0-2.0*speed_t;\n\
+		}\n\
+		else{\n\
+			g = 2.0*speed_t;\n\
+		}\n\
+		vec3 col3 = getRainbowColor_byHeight(speed_t);\n\
+		float r = speed_t;\n\
+		gl_FragColor = vec4(col3.x, col3.y, col3.z ,u_tailAlpha*u_externAlpha);\n\
+	}\n\
+	else{\n\
+		float intensity = speed_t*3.0;\n\
+		if(intensity > 1.0)\n\
+			intensity = 1.0;\n\
+		gl_FragColor = vec4(intensity,intensity,intensity,u_tailAlpha*u_externAlpha);\n\
+	}\n\
+}";
+ShaderSource.draw_vert = "precision mediump float;\n\
+\n\
+attribute float a_index;\n\
+\n\
+uniform sampler2D u_particles;\n\
+uniform float u_particles_res;\n\
+\n\
+varying vec2 v_particle_pos;\n\
+\n\
+void main() {\n\
+    vec4 color = texture2D(u_particles, vec2(\n\
+        fract(a_index / u_particles_res),\n\
+        floor(a_index / u_particles_res) / u_particles_res));\n\
+\n\
+    // decode current particle position from the pixel's RGBA value\n\
+    v_particle_pos = vec2(\n\
+        color.r / 255.0 + color.b,\n\
+        color.g / 255.0 + color.a);\n\
+\n\
+    gl_PointSize = 1.0;\n\
+    gl_Position = vec4(2.0 * v_particle_pos.x - 1.0, 1.0 - 2.0 * v_particle_pos.y, 0, 1);\n\
+}\n\
+";
+ShaderSource.draw_vert3D = "precision highp float;\n\
+\n\
+// This shader draws windParticles in 3d directly from positions on u_particles image.***\n\
+attribute float a_index;\n\
+\n\
+uniform sampler2D u_particles;\n\
+uniform float u_particles_res;\n\
+uniform mat4 buildingRotMatrix;\n\
+uniform mat4 ModelViewProjectionMatrix;\n\
+uniform mat4 ModelViewProjectionMatrixRelToEye;\n\
+uniform vec3 buildingPosHIGH;\n\
+uniform vec3 buildingPosLOW;\n\
+uniform vec3 encodedCameraPositionMCHigh;\n\
+uniform vec3 encodedCameraPositionMCLow;\n\
+uniform vec3 u_camPosWC;\n\
+uniform vec3 u_geoCoordRadiansMax;\n\
+uniform vec3 u_geoCoordRadiansMin;\n\
+uniform float pendentPointSize;\n\
+uniform float u_tailAlpha;\n\
+uniform float u_layerAltitude;\n\
+\n\
+varying vec2 v_particle_pos;\n\
+\n\
+#define M_PI 3.1415926535897932384626433832795\n\
+\n\
+vec2 splitValue(float value)\n\
+{\n\
+	float doubleHigh;\n\
+	vec2 resultSplitValue;\n\
+	if (value >= 0.0) \n\
+	{\n\
+		doubleHigh = floor(value / 65536.0) * 65536.0; //unsigned short max\n\
+		resultSplitValue.x = doubleHigh;\n\
+		resultSplitValue.y = value - doubleHigh;\n\
+	}\n\
+	else \n\
+	{\n\
+		doubleHigh = floor(-value / 65536.0) * 65536.0;\n\
+		resultSplitValue.x = -doubleHigh;\n\
+		resultSplitValue.y = value + doubleHigh;\n\
+	}\n\
+	\n\
+	return resultSplitValue;\n\
+}\n\
+	\n\
+vec3 geographicToWorldCoord(float lonRad, float latRad, float alt)\n\
+{\n\
+	// defined in the LINZ standard LINZS25000 (Standard for New Zealand Geodetic Datum 2000)\n\
+	// https://www.linz.govt.nz/data/geodetic-system/coordinate-conversion/geodetic-datum-conversions/equations-used-datum\n\
+	// a = semi-major axis.\n\
+	// e2 = firstEccentricitySquared.\n\
+	// v = a / sqrt(1 - e2 * sin2(lat)).\n\
+	// x = (v+h)*cos(lat)*cos(lon).\n\
+	// y = (v+h)*cos(lat)*sin(lon).\n\
+	// z = [v*(1-e2)+h]*sin(lat).\n\
+	float equatorialRadius = 6378137.0; // meters.\n\
+	float firstEccentricitySquared = 6.69437999014E-3;\n\
+	float cosLon = cos(lonRad);\n\
+	float cosLat = cos(latRad);\n\
+	float sinLon = sin(lonRad);\n\
+	float sinLat = sin(latRad);\n\
+	float a = equatorialRadius;\n\
+	float e2 = firstEccentricitySquared;\n\
+	float v = a/sqrt(1.0 - e2 * sinLat * sinLat);\n\
+	float h = alt;\n\
+	\n\
+	float x = (v+h)*cosLat*cosLon;\n\
+	float y = (v+h)*cosLat*sinLon;\n\
+	float z = (v*(1.0-e2)+h)*sinLat;\n\
+	\n\
+	\n\
+	vec3 resultCartesian = vec3(x, y, z);\n\
+	\n\
+	return resultCartesian;\n\
+}\n\
+\n\
+void main() {\n\
+	\n\
+    vec4 color = texture2D(u_particles, vec2(\n\
+        fract(a_index / u_particles_res),\n\
+        floor(a_index / u_particles_res) / u_particles_res));\n\
+\n\
+    // decode current particle position from the pixel's RGBA value\n\
+    v_particle_pos = vec2(\n\
+        color.r / 255.0 + color.b,\n\
+        color.g / 255.0 + color.a);\n\
+\n\
+	// Now, must calculate geographic coords of the pos2d.***\n\
+	float altitude = u_layerAltitude;\n\
+	float minLonRad = u_geoCoordRadiansMin.x;\n\
+	float maxLonRad = u_geoCoordRadiansMax.x;\n\
+	float minLatRad = u_geoCoordRadiansMin.y;\n\
+	float maxLatRad = u_geoCoordRadiansMax.y;\n\
+	float lonRadRange = maxLonRad - minLonRad;\n\
+	float latRadRange = maxLatRad - minLatRad;\n\
+	float longitudeRad = -minLonRad + v_particle_pos.x * lonRadRange;\n\
+	float latitudeRad = maxLatRad - v_particle_pos.y * latRadRange;\n\
+	\n\
+	// Now, calculate worldPosition of the geographicCoords (lon, lat, alt).***\n\
+	//vec3 posWC = geographicToWorldCoord(longitudeRad, latitudeRad, altitude);\n\
+	//vec4 posCC = vec4((posWC - encodedCameraPositionMCHigh) - encodedCameraPositionMCLow, 1.0);\n\
+	\n\
+	// Alternative.\n\
+	\n\
+	vec3 buildingPos = buildingPosHIGH + buildingPosLOW;\n\
+	float radius = length(buildingPos);\n\
+	float distortion = cos((minLatRad + v_particle_pos.y * latRadRange ));\n\
+	float xOffset = (v_particle_pos.x - 0.5)*distortion * lonRadRange * radius;\n\
+	float yOffset = (0.5 - v_particle_pos.y) * latRadRange * radius;\n\
+	vec4 rotatedPos = buildingRotMatrix * vec4(xOffset, yOffset, 0.0, 1.0);\n\
+	\n\
+	\n\
+	vec4 posWC = vec4((rotatedPos.xyz+buildingPosLOW) +( buildingPosHIGH ), 1.0);\n\
+	vec4 posCC = vec4((rotatedPos.xyz+buildingPosLOW- encodedCameraPositionMCLow) +( buildingPosHIGH- encodedCameraPositionMCHigh), 1.0);\n\
+	\n\
+	// Now calculate the position on camCoord.***\n\
+	//gl_Position = ModelViewProjectionMatrix * posWC;\n\
+	gl_Position = ModelViewProjectionMatrixRelToEye * posCC;\n\
+	//gl_Position = vec4(2.0 * v_particle_pos.x - 1.0, 1.0 - 2.0 * v_particle_pos.y, 0, 1);\n\
+	//gl_Position = vec4(v_particle_pos.x, v_particle_pos.y, 0, 1);\n\
+	\n\
+	// Now calculate the point size.\n\
+	float dist = distance(vec4(u_camPosWC.xyz, 1.0), vec4(posWC.xyz, 1.0));\n\
+	gl_PointSize = (1.0 + pendentPointSize/(dist))*u_tailAlpha; \n\
+	\n\
+	if(gl_PointSize > 10.0)\n\
+	gl_PointSize = 10.0;\n\
+}\n\
+\n\
+\n\
+\n\
+\n\
+\n\
+\n\
+\n\
+\n\
+\n\
+\n\
+\n\
+\n\
+";
+ShaderSource.filterSilhouetteFS = "precision mediump float;\n\
+\n\
+uniform sampler2D depthTex;\n\
+uniform sampler2D noiseTex;  \n\
+uniform mat4 projectionMatrix;\n\
+uniform vec2 noiseScale;\n\
+uniform float near;\n\
+uniform float far;            \n\
+uniform float fov;\n\
+uniform float aspectRatio;    \n\
+uniform float screenWidth;    \n\
+uniform float screenHeight;    \n\
+uniform vec3 kernel[16];   \n\
+\n\
+\n\
+const int kernelSize = 16;  \n\
+uniform float radius;      \n\
+\n\
+uniform bool bApplySsao;\n\
+\n\
+float unpackDepth(const in vec4 rgba_depth)\n\
+{\n\
+    const vec4 bit_shift = vec4(0.000000059605, 0.000015258789, 0.00390625, 1.0);\n\
+    float depth = dot(rgba_depth, bit_shift);\n\
+    return depth;\n\
+}                \n\
+\n\
+vec3 getViewRay(vec2 tc)\n\
+{\n\
+    float hfar = 2.0 * tan(fov/2.0) * far;\n\
+    float wfar = hfar * aspectRatio;    \n\
+    vec3 ray = vec3(wfar * (tc.x - 0.5), hfar * (tc.y - 0.5), -far);    \n\
+    return ray;                      \n\
+}         \n\
+            \n\
+//linear view space depth\n\
+float getDepth(vec2 coord)\n\
+{\n\
+    return unpackDepth(texture2D(depthTex, coord.xy));\n\
+}    \n\
+\n\
+void main()\n\
+{\n\
+	float occlusion = 0.0;\n\
+	vec3 normal2 = vec3(0.0, 0.0, 1.0);\n\
+	float radiusAux = radius * 5.0;\n\
+	if(bApplySsao)\n\
+	{          \n\
+		vec2 screenPos = vec2(gl_FragCoord.x / screenWidth, gl_FragCoord.y / screenHeight);		                 \n\
+		float linearDepth = getDepth(screenPos); \n\
+		vec3 origin = getViewRay(screenPos) * linearDepth;   \n\
+\n\
+		vec3 rvec = texture2D(noiseTex, screenPos.xy * noiseScale).xyz * 2.0 - 1.0;\n\
+		vec3 tangent = normalize(rvec - normal2 * dot(rvec, normal2));\n\
+		vec3 bitangent = cross(normal2, tangent);\n\
+		mat3 tbn = mat3(tangent, bitangent, normal2);        \n\
+		\n\
+		for(int i = 0; i < kernelSize; ++i)\n\
+		{    	 \n\
+			//vec3 sample = origin + (tbn * kernel[i]) * radiusAux;\n\
+			vec3 sample = origin + (kernel[i]) * radiusAux;\n\
+			vec4 offset = projectionMatrix * vec4(sample, 1.0);		\n\
+			offset.xy /= offset.w;\n\
+			offset.xy = offset.xy * 0.5 + 0.5;        \n\
+			float sampleDepth = -sample.z/far;\n\
+			if(sampleDepth > 0.49)\n\
+				continue;\n\
+			float depthBufferValue = getDepth(offset.xy);\n\
+			float range_check = abs(linearDepth - depthBufferValue)+radiusAux*0.998;\n\
+			if (range_check > radius*1.001 && depthBufferValue <= sampleDepth)\n\
+			{\n\
+				occlusion +=  1.0;\n\
+			}\n\
+		}   \n\
+		\n\
+		if(occlusion > float(kernelSize)*0.4)\n\
+		{\n\
+			occlusion = occlusion / float(kernelSize);\n\
+		}\n\
+		else{\n\
+			occlusion = 0.0;\n\
+		}\n\
+		//occlusion = 1.0 - occlusion / float(kernelSize);\n\
+	}\n\
+	else{\n\
+		occlusion = 0.0;\n\
+	}\n\
+\n\
+    vec4 finalColor;\n\
+	finalColor = vec4(1.0, 1.0, 1.0, occlusion*0.9);\n\
+    gl_FragColor = finalColor; \n\
+}\n\
+";
+ShaderSource.ImageViewerRectangleShaderFS = "#ifdef GL_ES\n\
+    precision highp float;\n\
+#endif\n\
+\n\
+uniform sampler2D depthTex;\n\
+uniform sampler2D noiseTex;  \n\
+uniform sampler2D diffuseTex;\n\
+uniform bool textureFlipYAxis;\n\
+varying vec3 vNormal;\n\
+uniform mat4 projectionMatrix;\n\
+uniform mat4 m;\n\
+uniform vec2 noiseScale;\n\
+uniform float near;\n\
+uniform float far;            \n\
+uniform float fov;\n\
+uniform float aspectRatio;    \n\
+uniform float screenWidth;    \n\
+uniform float screenHeight;    \n\
+uniform float shininessValue;\n\
+uniform vec3 kernel[16];   \n\
+uniform vec4 oneColor4;\n\
+varying vec4 aColor4; // color from attributes\n\
+uniform bool bApplyScpecularLighting;\n\
+uniform highp int colorType; // 0= oneColor, 1= attribColor, 2= texture.\n\
+\n\
+varying vec2 vTexCoord;   \n\
+varying vec3 vLightWeighting;\n\
+\n\
+varying vec3 diffuseColor;\n\
+uniform vec3 specularColor;\n\
+varying vec3 vertexPos;\n\
+\n\
+const int kernelSize = 16;  \n\
+uniform float radius;      \n\
+\n\
+uniform float ambientReflectionCoef;\n\
+uniform float diffuseReflectionCoef;  \n\
+uniform float specularReflectionCoef; \n\
+varying float applySpecLighting;\n\
+uniform bool bApplySsao;\n\
+uniform float externalAlpha;\n\
+\n\
+float unpackDepth(const in vec4 rgba_depth)\n\
+{\n\
+    const vec4 bit_shift = vec4(0.000000059605, 0.000015258789, 0.00390625, 1.0);\n\
+    float depth = dot(rgba_depth, bit_shift);\n\
+    return depth;\n\
+}  \n\
+\n\
+float UnpackDepth32( in vec4 pack )\n\
+{\n\
+    float depth = dot( pack, 1.0 / vec4(1.0, 256.0, 256.0*256.0, 16777216.0) ); // 256.0*256.0*256.0 = 16777216.0\n\
+    return depth * (16777216.0) / (16777216.0 - 1.0);\n\
+}              \n\
+\n\
+vec3 getViewRay(vec2 tc)\n\
+{\n\
+    float hfar = 2.0 * tan(fov/2.0) * far;\n\
+    float wfar = hfar * aspectRatio;    \n\
+    vec3 ray = vec3(wfar * (tc.x - 0.5), hfar * (tc.y - 0.5), -far);    \n\
+    return ray;                      \n\
+}         \n\
+            \n\
+//linear view space depth\n\
+float getDepth(vec2 coord)\n\
+{\n\
+    return UnpackDepth32(texture2D(depthTex, coord.xy));\n\
+}    \n\
+\n\
+void main()\n\
+{\n\
+	vec4 textureColor = texture2D(diffuseTex, vec2(vTexCoord.s, vTexCoord.t));\n\
+	float alfa = externalAlpha;\n\
+	float depth = UnpackDepth32(textureColor);\n\
+	\n\
+    vec4 finalColor;\n\
+	finalColor = vec4(depth, depth, depth, alfa);\n\
+\n\
+	//finalColor = vec4(vNormal, 1.0); // test to render normal color coded.***\n\
+    gl_FragColor = finalColor; \n\
+}";
+ShaderSource.ImageViewerRectangleShaderVS = "	attribute vec3 position;\n\
+	attribute vec3 normal;\n\
+	attribute vec2 texCoord;\n\
+	attribute vec4 color4;\n\
+	\n\
+	uniform mat4 buildingRotMatrix; \n\
+	uniform mat4 projectionMatrix;  \n\
+	uniform mat4 modelViewMatrix;\n\
+	uniform mat4 modelViewMatrixRelToEye; \n\
+	uniform mat4 ModelViewProjectionMatrixRelToEye;\n\
+	uniform mat4 RefTransfMatrix;\n\
+	uniform mat4 normalMatrix4;\n\
+	uniform vec3 buildingPosHIGH;\n\
+	uniform vec3 buildingPosLOW;\n\
+	uniform vec3 encodedCameraPositionMCHigh;\n\
+	uniform vec3 encodedCameraPositionMCLow;\n\
+	uniform vec3 aditionalPosition;\n\
+	uniform vec3 refTranslationVec;\n\
+	uniform int refMatrixType; // 0= identity, 1= translate, 2= transform\n\
+	uniform bool bApplySpecularLighting;\n\
+	uniform highp int colorType; // 0= oneColor, 1= attribColor, 2= texture.\n\
+\n\
+	varying vec3 vNormal;\n\
+	varying vec2 vTexCoord;  \n\
+	varying vec3 uAmbientColor;\n\
+	varying vec3 vLightWeighting;\n\
+	varying vec3 vertexPos;\n\
+	varying float applySpecLighting;\n\
+	varying vec4 aColor4; // color from attributes\n\
+	\n\
+	void main()\n\
+    {	\n\
+		vec4 rotatedPos;\n\
+		mat3 currentTMat;\n\
+		if(refMatrixType == 0)\n\
+		{\n\
+			rotatedPos = buildingRotMatrix * vec4(position.xyz, 1.0) + vec4(aditionalPosition.xyz, 0.0);\n\
+			currentTMat = mat3(buildingRotMatrix);\n\
+		}\n\
+		else if(refMatrixType == 1)\n\
+		{\n\
+			rotatedPos = buildingRotMatrix * vec4(position.xyz + refTranslationVec.xyz, 1.0) + vec4(aditionalPosition.xyz, 0.0);\n\
+			currentTMat = mat3(buildingRotMatrix);\n\
+		}\n\
+		else if(refMatrixType == 2)\n\
+		{\n\
+			rotatedPos = RefTransfMatrix * vec4(position.xyz, 1.0) + vec4(aditionalPosition.xyz, 0.0);\n\
+			currentTMat = mat3(RefTransfMatrix);\n\
+		}\n\
+\n\
+		vec3 objPosHigh = buildingPosHIGH;\n\
+		vec3 objPosLow = buildingPosLOW.xyz + rotatedPos.xyz;\n\
+		vec3 highDifference = objPosHigh.xyz - encodedCameraPositionMCHigh.xyz;\n\
+		vec3 lowDifference = objPosLow.xyz - encodedCameraPositionMCLow.xyz;\n\
+		vec4 pos4 = vec4(highDifference.xyz + lowDifference.xyz, 1.0);\n\
+\n\
+		//vertexPos = vec3(modelViewMatrixRelToEye * pos4);\n\
+		vec3 rotatedNormal = currentTMat * normal;\n\
+		vLightWeighting = vec3(1.0, 1.0, 1.0);\n\
+		uAmbientColor = vec3(0.8);\n\
+		vec3 uLightingDirection = vec3(0.6, 0.6, 0.6);\n\
+		vec3 directionalLightColor = vec3(0.7, 0.7, 0.7);\n\
+		vNormal = (normalMatrix4 * vec4(rotatedNormal.x, rotatedNormal.y, rotatedNormal.z, 1.0)).xyz;\n\
+		vTexCoord = texCoord;\n\
+		float directionalLightWeighting = max(dot(vNormal, uLightingDirection), 0.0);\n\
+		vLightWeighting = uAmbientColor + directionalLightColor * directionalLightWeighting;\n\
+		\n\
+		if(bApplySpecularLighting)\n\
+			applySpecLighting = 1.0;\n\
+		else\n\
+			applySpecLighting = -1.0;\n\
+\n\
+        gl_Position = ModelViewProjectionMatrixRelToEye * pos4;\n\
+		\n\
+		if(colorType == 1)\n\
+			aColor4 = color4;\n\
+	}";
+ShaderSource.InvertedBoxFS = "#ifdef GL_ES\n\
+    precision highp float;\n\
+#endif\n\
+\n\
+uniform sampler2D depthTex;\n\
+uniform sampler2D noiseTex;  \n\
+uniform sampler2D diffuseTex;\n\
+uniform bool hasTexture;\n\
+uniform bool textureFlipYAxis;\n\
+varying vec3 vNormal;\n\
+uniform mat4 projectionMatrix;\n\
+uniform mat4 m;\n\
+uniform vec2 noiseScale;\n\
+uniform float near;\n\
+uniform float far;            \n\
+uniform float fov;\n\
+uniform float aspectRatio;    \n\
+uniform float screenWidth;    \n\
+uniform float screenHeight;    \n\
+uniform float shininessValue;\n\
+uniform vec3 kernel[16];   \n\
+uniform vec4 vColor4Aux;\n\
+\n\
+varying vec2 vTexCoord;   \n\
+varying vec3 vLightWeighting;\n\
+\n\
+varying vec3 diffuseColor;\n\
+uniform vec3 specularColor;\n\
+varying vec3 vertexPos;\n\
+\n\
+const int kernelSize = 16;  \n\
+uniform float radius;      \n\
+\n\
+uniform float ambientReflectionCoef;\n\
+uniform float diffuseReflectionCoef;  \n\
+uniform float specularReflectionCoef; \n\
+\n\
+float unpackDepth(const in vec4 rgba_depth)\n\
+{\n\
+    const vec4 bit_shift = vec4(0.000000059605, 0.000015258789, 0.00390625, 1.0);\n\
+    float depth = dot(rgba_depth, bit_shift);\n\
+    return depth;\n\
+}                \n\
+\n\
+vec3 getViewRay(vec2 tc)\n\
+{\n\
+    float hfar = 2.0 * tan(fov/2.0) * far;\n\
+    float wfar = hfar * aspectRatio;    \n\
+    vec3 ray = vec3(wfar * (tc.x - 0.5), hfar * (tc.y - 0.5), -far);    \n\
+    return ray;                      \n\
+}         \n\
+            \n\
+//linear view space depth\n\
+float getDepth(vec2 coord)\n\
+{\n\
+    return unpackDepth(texture2D(depthTex, coord.xy));\n\
+}    \n\
+\n\
+void main()\n\
+{          \n\
+    vec2 screenPos = vec2(gl_FragCoord.x / screenWidth, gl_FragCoord.y / screenHeight);		                 \n\
+    float linearDepth = getDepth(screenPos);          \n\
+    vec3 origin = getViewRay(screenPos) * linearDepth;   \n\
+\n\
+    vec3 normal2 = vNormal;\n\
+            \n\
+    vec3 rvec = texture2D(noiseTex, screenPos.xy * noiseScale).xyz * 2.0 - 1.0;\n\
+    vec3 tangent = normalize(rvec - normal2 * dot(rvec, normal2));\n\
+    vec3 bitangent = cross(normal2, tangent);\n\
+    mat3 tbn = mat3(tangent, bitangent, normal2);        \n\
+    \n\
+    float occlusion = 0.0;\n\
+    for(int i = 0; i < kernelSize; ++i)\n\
+    {    	 \n\
+        vec3 sample = origin + (tbn * kernel[i]) * radius;\n\
+        vec4 offset = projectionMatrix * vec4(sample, 1.0);		\n\
+        offset.xy /= offset.w;\n\
+        offset.xy = offset.xy * 0.5 + 0.5;        \n\
+        float sampleDepth = -sample.z/far;\n\
+		if(sampleDepth > 0.49)\n\
+			continue;\n\
+        float depthBufferValue = getDepth(offset.xy);				              \n\
+        float range_check = abs(linearDepth - depthBufferValue)+radius*0.998;\n\
+        if (range_check < radius*1.001 && depthBufferValue <= sampleDepth)\n\
+        {\n\
+            occlusion +=  1.0;\n\
+        }\n\
+    }   \n\
+        \n\
+    occlusion = 1.0 - occlusion / float(kernelSize);\n\
+\n\
+    vec3 lightPos = vec3(20.0, 60.0, 20.0);\n\
+    vec3 L = normalize(lightPos - vertexPos);\n\
+    float lambertian = max(dot(normal2, L), 0.0);\n\
+    float specular = 0.0;\n\
+    if(lambertian > 0.0)\n\
+    {\n\
+        vec3 R = reflect(-L, normal2);      // Reflected light vector\n\
+        vec3 V = normalize(-vertexPos); // Vector to viewer\n\
+        \n\
+        // Compute the specular term\n\
+        float specAngle = max(dot(R, V), 0.0);\n\
+        specular = pow(specAngle, shininessValue);\n\
+    }\n\
+	\n\
+	if(lambertian < 0.5)\n\
+    {\n\
+		lambertian = 0.5;\n\
+	}\n\
+\n\
+    vec4 textureColor;\n\
+    if(hasTexture)\n\
+    {\n\
+        if(textureFlipYAxis)\n\
+        {\n\
+            textureColor = texture2D(diffuseTex, vec2(vTexCoord.s, 1.0 - vTexCoord.t));\n\
+        }\n\
+        else{\n\
+            textureColor = texture2D(diffuseTex, vec2(vTexCoord.s, vTexCoord.t));\n\
+        }\n\
+		\n\
+        if(textureColor.w == 0.0)\n\
+        {\n\
+            discard;\n\
+        }\n\
+    }\n\
+    else{\n\
+        textureColor = vColor4Aux;\n\
+    }\n\
+	\n\
+	vec3 ambientColor = vec3(textureColor.x, textureColor.y, textureColor.z);\n\
+\n\
+    gl_FragColor = vec4((ambientReflectionCoef * ambientColor + diffuseReflectionCoef * lambertian * textureColor.xyz + specularReflectionCoef * specular * specularColor)*vLightWeighting * occlusion, 1.0); \n\
+}\n\
+";
+ShaderSource.InvertedBoxVS = "	attribute vec3 position;\n\
+	attribute vec3 normal;\n\
+	attribute vec2 texCoord;\n\
+	\n\
+	uniform mat4 buildingRotMatrix; \n\
+	uniform mat4 projectionMatrix;  \n\
+	uniform mat4 modelViewMatrix;\n\
+	uniform mat4 modelViewMatrixRelToEye; \n\
+	uniform mat4 ModelViewProjectionMatrixRelToEye;\n\
+	uniform mat4 RefTransfMatrix;\n\
+	uniform mat4 normalMatrix4;\n\
+	uniform vec3 buildingPosHIGH;\n\
+	uniform vec3 buildingPosLOW;\n\
+	uniform vec3 encodedCameraPositionMCHigh;\n\
+	uniform vec3 encodedCameraPositionMCLow;\n\
+	uniform vec3 aditionalPosition;\n\
+	uniform vec3 refTranslationVec;\n\
+	uniform int refMatrixType; // 0= identity, 1= translate, 2= transform\n\
+\n\
+	varying vec3 vNormal;\n\
+	varying vec2 vTexCoord;  \n\
+	varying vec3 uAmbientColor;\n\
+	varying vec3 vLightWeighting;\n\
+	varying vec3 vertexPos;\n\
+	\n\
+	void main()\n\
+    {	\n\
+		vec4 rotatedPos;\n\
+		mat3 currentTMat;\n\
+		if(refMatrixType == 0)\n\
+		{\n\
+			rotatedPos = buildingRotMatrix * vec4(position.xyz, 1.0) + vec4(aditionalPosition.xyz, 0.0);\n\
+			currentTMat = mat3(buildingRotMatrix);\n\
+		}\n\
+		else if(refMatrixType == 1)\n\
+		{\n\
+			rotatedPos = buildingRotMatrix * vec4(position.xyz + refTranslationVec.xyz, 1.0) + vec4(aditionalPosition.xyz, 0.0);\n\
+			currentTMat = mat3(buildingRotMatrix);\n\
+		}\n\
+		else if(refMatrixType == 2)\n\
+		{\n\
+			rotatedPos = RefTransfMatrix * vec4(position.xyz, 1.0) + vec4(aditionalPosition.xyz, 0.0);\n\
+			currentTMat = mat3(RefTransfMatrix);\n\
+		}\n\
+\n\
+		vec3 objPosHigh = buildingPosHIGH;\n\
+		vec3 objPosLow = buildingPosLOW.xyz + rotatedPos.xyz;\n\
+		vec3 highDifference = objPosHigh.xyz - encodedCameraPositionMCHigh.xyz;\n\
+		vec3 lowDifference = objPosLow.xyz - encodedCameraPositionMCLow.xyz;\n\
+		vec4 pos4 = vec4(highDifference.xyz + lowDifference.xyz, 1.0);\n\
+\n\
+		vertexPos = vec3(modelViewMatrixRelToEye * pos4);\n\
+		vec3 rotatedNormal = currentTMat * normal;\n\
+		vLightWeighting = vec3(1.0, 1.0, 1.0);\n\
+		uAmbientColor = vec3(0.8);\n\
+		vec3 uLightingDirection = vec3(0.6, 0.6, 0.6);\n\
+		vec3 directionalLightColor = vec3(0.7, 0.7, 0.7);\n\
+		vNormal = (normalMatrix4 * vec4(rotatedNormal.x, rotatedNormal.y, rotatedNormal.z, 1.0)).xyz;\n\
+		vTexCoord = texCoord;\n\
+		float directionalLightWeighting = max(dot(vNormal, uLightingDirection), 0.0);\n\
+		vLightWeighting = uAmbientColor + directionalLightColor * directionalLightWeighting;\n\
+\n\
+        gl_Position = ModelViewProjectionMatrixRelToEye * pos4;\n\
+	}\n\
+";
+ShaderSource.ModelRefSsaoFS = "\n\
+#ifdef GL_ES\n\
+    precision highp float;\n\
+#endif\n\
+\n\
+#define %USE_LOGARITHMIC_DEPTH%\n\
+#ifdef USE_LOGARITHMIC_DEPTH\n\
+#extension GL_EXT_frag_depth : enable\n\
+#endif\n\
+\n\
+uniform sampler2D depthTex;\n\
+uniform sampler2D noiseTex;  \n\
+uniform sampler2D diffuseTex;\n\
+uniform sampler2D shadowMapTex;\n\
+uniform sampler2D shadowMapTex2;\n\
+uniform bool textureFlipYAxis;\n\
+uniform mat4 projectionMatrix;\n\
+uniform mat4 m;\n\
+uniform vec2 noiseScale;\n\
+uniform float near;\n\
+uniform float far;            \n\
+uniform float fov;\n\
+uniform float tangentOfHalfFovy;\n\
+uniform float aspectRatio;    \n\
+uniform float screenWidth;    \n\
+uniform float screenHeight;   \n\
+uniform float shadowMapWidth;    \n\
+uniform float shadowMapHeight; \n\
+uniform float shininessValue;\n\
+uniform vec3 kernel[16];   \n\
+uniform vec4 oneColor4;\n\
+\n\
+uniform bool bApplyScpecularLighting;\n\
+uniform highp int colorType; // 0= oneColor, 1= attribColor, 2= texture.\n\
+\n\
+uniform vec3 specularColor;\n\
+uniform vec3 ambientColor;\n\
+\n\
+const int kernelSize = 16;  \n\
+uniform float radius;      \n\
+\n\
+uniform float ambientReflectionCoef;\n\
+uniform float diffuseReflectionCoef;  \n\
+uniform float specularReflectionCoef; \n\
+uniform bool bApplySsao;\n\
+uniform bool bApplyShadow;\n\
+uniform float externalAlpha;\n\
+uniform vec4 colorMultiplier;\n\
+uniform bool bUseLogarithmicDepth;\n\
+\n\
+//uniform int sunIdx;\n\
+\n\
+// clipping planes.***\n\
+//uniform bool bApplyClippingPlanes;\n\
+//uniform int clippingPlanesCount;\n\
+//uniform vec4 clippingPlanes[6];\n\
+\n\
+varying vec3 vNormal;\n\
+varying vec4 vColor4; // color from attributes\n\
+varying vec2 vTexCoord;   \n\
+varying vec3 vLightWeighting;\n\
+varying vec3 diffuseColor;\n\
+varying vec3 vertexPos;\n\
+varying float applySpecLighting;\n\
+varying vec4 vPosRelToLight; \n\
+varying vec3 vLightDir; \n\
+varying vec3 vNormalWC;\n\
+varying float currSunIdx; \n\
+varying float discardFrag;\n\
+\n\
+varying float flogz;\n\
+varying float Fcoef_half;\n\
+\n\
+float unpackDepth(const in vec4 rgba_depth)\n\
+{\n\
+    const vec4 bit_shift = vec4(0.000000059605, 0.000015258789, 0.00390625, 1.0);// original.***\n\
+    float depth = dot(rgba_depth, bit_shift);\n\
+    return depth;\n\
+}  \n\
+\n\
+\n\
+float UnpackDepth32( in vec4 pack )\n\
+{\n\
+	float depth = dot( pack, vec4(1.0, 0.00390625, 0.000015258789, 0.000000059605) );\n\
+    return depth * 1.000000059605;// 1.000000059605 = (16777216.0) / (16777216.0 - 1.0);\n\
+}             \n\
+\n\
+vec3 getViewRay(vec2 tc)\n\
+{\n\
+	/*\n\
+	// The \"far\" for depthTextures if fixed in \"RenderShowDepthVS\" shader.\n\
+	float farForDepth = 30000.0;\n\
+	float hfar = 2.0 * tangentOfHalfFovy * farForDepth;\n\
+    float wfar = hfar * aspectRatio;    \n\
+    vec3 ray = vec3(wfar * (tc.x - 0.5), hfar * (tc.y - 0.5), -farForDepth);  \n\
+	*/	\n\
+	\n\
+	\n\
+	float hfar = 2.0 * tangentOfHalfFovy * far;\n\
+    float wfar = hfar * aspectRatio;    \n\
+    vec3 ray = vec3(wfar * (tc.x - 0.5), hfar * (tc.y - 0.5), -far);    \n\
+	\n\
+    return ray;                      \n\
+}         \n\
+            \n\
+//linear view space depth\n\
+float getDepth(vec2 coord)\n\
+{\n\
+	return unpackDepth(texture2D(depthTex, coord.xy));\n\
+}   \n\
+\n\
+float getDepthShadowMap(vec2 coord)\n\
+{\n\
+	// currSunIdx\n\
+	if(currSunIdx > 0.0 && currSunIdx < 1.0)\n\
+	{\n\
+		return UnpackDepth32(texture2D(shadowMapTex, coord.xy));\n\
+	}\n\
+    else if(currSunIdx > 1.0 && currSunIdx < 2.0)\n\
+	{\n\
+		return UnpackDepth32(texture2D(shadowMapTex2, coord.xy));\n\
+	}\n\
+	else\n\
+		return -1.0;\n\
+}  \n\
+\n\
+bool clipVertexByPlane(in vec4 plane, in vec3 point)\n\
+{\n\
+	float dist = plane.x * point.x + plane.y * point.y + plane.z * point.z + plane.w;\n\
+	\n\
+	if(dist < 0.0)\n\
+	return true;\n\
+	else return false;\n\
+}\n\
+\n\
+void main()\n\
+{\n\
+	//gl_FragColor = vColor4; \n\
+	//return;\n\
+	// 1rst, check if there are clipping planes.\n\
+	/*\n\
+	if(bApplyClippingPlanes)\n\
+	{\n\
+		bool discardFrag = true;\n\
+		for(int i=0; i<6; i++)\n\
+		{\n\
+			vec4 plane = clippingPlanes[i];\n\
+			if(!clipVertexByPlane(plane, vertexPos))\n\
+			{\n\
+				discardFrag = false;\n\
+				break;\n\
+			}\n\
+			if(i >= clippingPlanesCount)\n\
+			break;\n\
+		}\n\
+		\n\
+		if(discardFrag)\n\
+		discard;\n\
+	}\n\
+	*/\n\
+\n\
+	//bool testBool = false;\n\
+	float occlusion = 1.0; // ambient occlusion.***\n\
+	float shadow_occlusion = 1.0;\n\
+	vec3 normal2 = vNormal;	\n\
+		\n\
+	if(bApplySsao)\n\
+	{        \n\
+		////float farForDepth = 30000.0;\n\
+		vec2 screenPos = vec2(gl_FragCoord.x / screenWidth, gl_FragCoord.y / screenHeight);\n\
+		float linearDepth = getDepth(screenPos);  \n\
+		vec3 ray = getViewRay(screenPos); // The \"far\" for depthTextures if fixed in \"RenderShowDepthVS\" shader.\n\
+		vec3 origin = ray * linearDepth;  \n\
+		float tolerance = radius/far; // original.***\n\
+		////float tolerance = radius/(far-near);// test.***\n\
+		////float tolerance = radius/farForDepth;\n\
+\n\
+		vec3 rvec = texture2D(noiseTex, screenPos.xy * noiseScale).xyz * 2.0 - 1.0;\n\
+		vec3 tangent = normalize(rvec - normal2 * dot(rvec, normal2));\n\
+		vec3 bitangent = cross(normal2, tangent);\n\
+		mat3 tbn = mat3(tangent, bitangent, normal2);   \n\
+		float minDepthBuffer;\n\
+		float maxDepthBuffer;\n\
+		for(int i = 0; i < kernelSize; ++i)\n\
+		{    	 \n\
+			vec3 sample = origin + (tbn * vec3(kernel[i].x*1.0, kernel[i].y*1.0, kernel[i].z)) * radius*2.0;\n\
+			vec4 offset = projectionMatrix * vec4(sample, 1.0);					\n\
+			offset.xy /= offset.w;\n\
+			offset.xy = offset.xy * 0.5 + 0.5;  				\n\
+			float sampleDepth = -sample.z/far;// original.***\n\
+			////float sampleDepth = -sample.z/(far-near);// test.***\n\
+			////float sampleDepth = -sample.z/farForDepth;\n\
+\n\
+			float depthBufferValue = getDepth(offset.xy);\n\
+\n\
+			if(depthBufferValue > 0.00391 && depthBufferValue < 0.00393)\n\
+			{\n\
+				if (depthBufferValue < sampleDepth-tolerance*1000.0)\n\
+				{\n\
+					occlusion +=  0.5;\n\
+				}\n\
+				\n\
+				continue;\n\
+			}			\n\
+			\n\
+			if (depthBufferValue < sampleDepth-tolerance)\n\
+			{\n\
+				occlusion +=  1.0;\n\
+			}\n\
+		} \n\
+\n\
+		occlusion = 1.0 - occlusion / float(kernelSize);	\n\
+	}\n\
+	\n\
+    // Do specular lighting.***\n\
+	float lambertian;\n\
+	float specular;\n\
+	\n\
+	if(applySpecLighting> 0.0)\n\
+	{\n\
+		vec3 L;\n\
+		if(bApplyShadow)\n\
+		{\n\
+			L = vLightDir;// test.***\n\
+			lambertian = max(dot(normal2, L), 0.0); // original.***\n\
+			//lambertian = max(dot(vNormalWC, L), 0.0); // test.\n\
+		}\n\
+		else\n\
+		{\n\
+			vec3 lightPos = vec3(1.0, 1.0, 1.0);\n\
+			L = normalize(lightPos - vertexPos);\n\
+			lambertian = max(dot(normal2, L), 0.0);\n\
+		}\n\
+		\n\
+		specular = 0.0;\n\
+		if(lambertian > 0.0)\n\
+		{\n\
+			vec3 R = reflect(-L, normal2);      // Reflected light vector\n\
+			vec3 V = normalize(-vertexPos); // Vector to viewer\n\
+			\n\
+			// Compute the specular term\n\
+			float specAngle = max(dot(R, V), 0.0);\n\
+			specular = pow(specAngle, shininessValue);\n\
+			\n\
+			if(specular > 1.0)\n\
+			{\n\
+				specular = 1.0;\n\
+			}\n\
+		}\n\
+		\n\
+		if(lambertian < 0.5)\n\
+		{\n\
+			lambertian = 0.5;\n\
+		}\n\
+\n\
+	}\n\
+	\n\
+	if(bApplyShadow)\n\
+	{\n\
+		if(currSunIdx > 0.0)\n\
+		{\n\
+			float ligthAngle = dot(vLightDir, vNormalWC);\n\
+			if(ligthAngle > 0.0)\n\
+			{\n\
+				// The angle between the light direction & face normal is less than 90 degree, so, the face is in shadow.***\n\
+				shadow_occlusion = 0.5;\n\
+			}\n\
+			else\n\
+			{\n\
+				vec3 posRelToLight = vPosRelToLight.xyz / vPosRelToLight.w;\n\
+				float tolerance = 0.9963;\n\
+				posRelToLight = posRelToLight * 0.5 + 0.5; // transform to [0,1] range\n\
+				if(posRelToLight.x >= 0.0 && posRelToLight.x <= 1.0)\n\
+				{\n\
+					if(posRelToLight.y >= 0.0 && posRelToLight.y <= 1.0)\n\
+					{\n\
+						float depthRelToLight = getDepthShadowMap(posRelToLight.xy);\n\
+						if(posRelToLight.z > depthRelToLight*tolerance )\n\
+						{\n\
+							shadow_occlusion = 0.5;\n\
+						}\n\
+					}\n\
+				}\n\
+\n\
+				// test. Calculate the zone inside the pixel.************************************\n\
+				//https://docs.microsoft.com/ko-kr/windows/win32/dxtecharts/cascaded-shadow-maps\n\
+			}\n\
+		}\n\
+	}\n\
+	\n\
+\n\
+    vec4 textureColor;\n\
+    if(colorType == 2)\n\
+    {\n\
+        if(textureFlipYAxis)\n\
+        {\n\
+            textureColor = texture2D(diffuseTex, vec2(vTexCoord.s, 1.0 - vTexCoord.t));\n\
+        }\n\
+        else{\n\
+            textureColor = texture2D(diffuseTex, vec2(vTexCoord.s, vTexCoord.t));\n\
+        }\n\
+		\n\
+        if(textureColor.w == 0.0)\n\
+        {\n\
+            discard;\n\
+        }\n\
+    }\n\
+    else if(colorType == 0)\n\
+	{\n\
+        textureColor = oneColor4;\n\
+    }\n\
+	else if(colorType == 1)\n\
+	{\n\
+        textureColor = vColor4;\n\
+    }\n\
+	\n\
+	//textureColor = vec4(0.85, 0.85, 0.85, 1.0);\n\
+	\n\
+	vec3 ambientColorAux = vec3(textureColor.x*ambientColor.x, textureColor.y*ambientColor.y, textureColor.z*ambientColor.z);\n\
+	float alfa = textureColor.w * externalAlpha;\n\
+\n\
+    vec4 finalColor;\n\
+	if(applySpecLighting> 0.0)\n\
+	{\n\
+		finalColor = vec4((ambientReflectionCoef * ambientColorAux + \n\
+							diffuseReflectionCoef * lambertian * textureColor.xyz + \n\
+							specularReflectionCoef * specular * specularColor)*vLightWeighting * occlusion * shadow_occlusion, alfa); \n\
+	}\n\
+	else{\n\
+		finalColor = vec4((textureColor.xyz) * occlusion * shadow_occlusion, alfa);\n\
+	}\n\
+	\n\
+	//if(testBool)\n\
+	//finalColor *= vec4(0.99, 0.33, 0.32, 1.0);\n\
+	\n\
+	finalColor *= colorMultiplier;\n\
+\n\
+\n\
+	//finalColor = vec4(linearDepth, linearDepth, linearDepth, 1.0); // test to render depth color coded.***\n\
+    gl_FragColor = finalColor; \n\
+	#ifdef USE_LOGARITHMIC_DEPTH\n\
+	if(bUseLogarithmicDepth)\n\
+	{\n\
+		gl_FragDepthEXT = log2(flogz) * Fcoef_half;\n\
+	}\n\
+	#endif\n\
+}";
+ShaderSource.ModelRefSsaoVS = "\n\
+	attribute vec3 position;\n\
+	attribute vec3 normal;\n\
+	attribute vec2 texCoord;\n\
+	attribute vec4 color4;\n\
+	\n\
+	uniform mat4 buildingRotMatrix; \n\
+	uniform mat4 projectionMatrix;  \n\
+	uniform mat4 modelViewMatrix;\n\
+	uniform mat4 modelViewMatrixRelToEye; \n\
+	uniform mat4 ModelViewProjectionMatrixRelToEye;\n\
+	uniform mat4 RefTransfMatrix;\n\
+	uniform mat4 normalMatrix4;\n\
+	uniform mat4 sunMatrix[2]; \n\
+	uniform vec3 buildingPosHIGH;\n\
+	uniform vec3 buildingPosLOW;\n\
+	uniform float near;\n\
+	uniform float far;\n\
+	uniform vec3 scaleLC;\n\
+	uniform vec3 sunPosHIGH[2];\n\
+	uniform vec3 sunPosLOW[2];\n\
+	uniform int sunIdx;\n\
+	uniform vec3 sunDirWC;\n\
+	uniform vec3 encodedCameraPositionMCHigh;\n\
+	uniform vec3 encodedCameraPositionMCLow;\n\
+	uniform vec3 aditionalPosition;\n\
+	uniform vec3 refTranslationVec;\n\
+	uniform int refMatrixType; // 0= identity, 1= translate, 2= transform\n\
+	uniform bool bApplySpecularLighting;\n\
+	uniform highp int colorType; // 0= oneColor, 1= attribColor, 2= texture.\n\
+	\n\
+	uniform bool bApplyShadow;\n\
+	uniform bool bUseLogarithmicDepth;\n\
+	\n\
+	// clipping planes.***\n\
+	uniform mat4 clippingPlanesRotMatrix; \n\
+	uniform vec3 clippingPlanesPosHIGH;\n\
+	uniform vec3 clippingPlanesPosLOW;\n\
+	uniform bool bApplyClippingPlanes;\n\
+	uniform int clippingPlanesCount;\n\
+	uniform vec4 clippingPlanes[6];\n\
+\n\
+	varying vec3 vNormal;\n\
+	varying vec2 vTexCoord;  \n\
+	varying vec3 uAmbientColor;\n\
+	varying vec3 vLightWeighting;\n\
+	varying vec3 vertexPos;\n\
+	varying float applySpecLighting;\n\
+	varying vec4 vColor4; // color from attributes\n\
+	varying vec4 vPosRelToLight; \n\
+	varying vec3 vLightDir; \n\
+	varying vec3 vNormalWC; \n\
+	varying float currSunIdx;  \n\
+	varying float discardFrag;\n\
+	varying float flogz;\n\
+	varying float Fcoef_half;\n\
+	\n\
+	bool clipVertexByPlane(in vec4 plane, in vec3 point)\n\
+	{\n\
+		float dist = plane.x * point.x + plane.y * point.y + plane.z * point.z + plane.w;\n\
+		\n\
+		if(dist < 0.0)\n\
+		return true;\n\
+		else return false;\n\
+	}\n\
+	\n\
+	void main()\n\
+    {	\n\
+		vec4 scaledPos = vec4(position.x * scaleLC.x, position.y * scaleLC.y, position.z * scaleLC.z, 1.0);\n\
+		vec4 rotatedPos;\n\
+		mat3 currentTMat;\n\
+		if(refMatrixType == 0)\n\
+		{\n\
+			rotatedPos = buildingRotMatrix * vec4(scaledPos.xyz, 1.0) + vec4(aditionalPosition.xyz, 0.0);\n\
+			currentTMat = mat3(buildingRotMatrix);\n\
+		}\n\
+		else if(refMatrixType == 1)\n\
+		{\n\
+			rotatedPos = buildingRotMatrix * vec4(scaledPos.xyz + refTranslationVec.xyz, 1.0) + vec4(aditionalPosition.xyz, 0.0);\n\
+			currentTMat = mat3(buildingRotMatrix);\n\
+		}\n\
+		else if(refMatrixType == 2)\n\
+		{\n\
+			rotatedPos = RefTransfMatrix * vec4(scaledPos.xyz, 1.0) + vec4(aditionalPosition.xyz, 0.0);\n\
+			currentTMat = mat3(RefTransfMatrix);\n\
+		}\n\
+\n\
+		vec3 objPosHigh = buildingPosHIGH;\n\
+		vec3 objPosLow = buildingPosLOW.xyz + rotatedPos.xyz;\n\
+		vec3 highDifference = objPosHigh.xyz - encodedCameraPositionMCHigh.xyz;\n\
+		vec3 lowDifference = objPosLow.xyz - encodedCameraPositionMCLow.xyz;\n\
+		vec4 pos4 = vec4(highDifference.xyz + lowDifference.xyz, 1.0);\n\
+		vec3 rotatedNormal = currentTMat * normal;\n\
+		\n\
+		// Check if clipping.********************************************\n\
+		if(bApplyClippingPlanes)\n\
+		{\n\
+			discardFrag = 1.0; // true.\n\
+			for(int i=0; i<6; i++)\n\
+			{\n\
+				vec4 plane = clippingPlanes[i];\n\
+				\n\
+				// calculate any point of the plane.\n\
+				\n\
+				\n\
+				if(!clipVertexByPlane(plane, vertexPos))\n\
+				{\n\
+					discardFrag = -1.0; // false.\n\
+					break;\n\
+				}\n\
+				if(i >= clippingPlanesCount)\n\
+				break;\n\
+			}\n\
+			\n\
+			//if(discardFrag)\n\
+			//discard;\n\
+		}\n\
+		//----------------------------------------------------------------\n\
+		\n\
+		vec3 uLightingDirection = vec3(-0.1320580393075943, -0.9903827905654907, 0.041261956095695496); \n\
+		uAmbientColor = vec3(1.0);\n\
+		vNormalWC = rotatedNormal;\n\
+		vNormal = normalize((normalMatrix4 * vec4(rotatedNormal.x, rotatedNormal.y, rotatedNormal.z, 1.0)).xyz); // original.***\n\
+		vTexCoord = texCoord;\n\
+		vLightDir = vec3(-0.1320580393075943, -0.9903827905654907, 0.041261956095695496);\n\
+		vec3 directionalLightColor = vec3(0.7, 0.7, 0.7);\n\
+		float directionalLightWeighting = 1.0;\n\
+		\n\
+		currSunIdx = -1.0; // initially no apply shadow.\n\
+		if(bApplyShadow)\n\
+		{\n\
+			//vLightDir = normalize(vec3(normalMatrix4 * vec4(sunDirWC.xyz, 1.0)).xyz); // test.***\n\
+			vLightDir = sunDirWC;\n\
+			vNormalWC = rotatedNormal;\n\
+						\n\
+			// the sun lights count are 2.\n\
+			\n\
+			vec3 currSunPosLOW;\n\
+			vec3 currSunPosHIGH;\n\
+			mat4 currSunMatrix;\n\
+			if(sunIdx == 0)\n\
+			{\n\
+				currSunPosLOW = sunPosLOW[0];\n\
+				currSunPosHIGH = sunPosHIGH[0];\n\
+				currSunMatrix = sunMatrix[0];\n\
+				currSunIdx = 0.5;\n\
+			}\n\
+			else if(sunIdx == 1)\n\
+			{\n\
+				currSunPosLOW = sunPosLOW[1];\n\
+				currSunPosHIGH = sunPosHIGH[1];\n\
+				currSunMatrix = sunMatrix[1];\n\
+				currSunIdx = 1.5;\n\
+			}\n\
+			\n\
+			// Calculate the vertex relative to light.***\n\
+			vec3 highDifferenceSun = objPosHigh.xyz - currSunPosHIGH.xyz;\n\
+			vec3 lowDifferenceSun = objPosLow.xyz - currSunPosLOW.xyz;\n\
+			vec4 pos4Sun = vec4(highDifferenceSun.xyz + lowDifferenceSun.xyz, 1.0);\n\
+			vPosRelToLight = currSunMatrix * pos4Sun;\n\
+			\n\
+			uLightingDirection = sunDirWC; \n\
+			//directionalLightColor = vec3(0.9, 0.9, 0.9);\n\
+			directionalLightWeighting = max(dot(rotatedNormal, -sunDirWC), 0.0);\n\
+		}\n\
+		else\n\
+		{\n\
+			uAmbientColor = vec3(0.8);\n\
+			uLightingDirection = normalize(vec3(0.6, 0.6, 0.6));\n\
+			directionalLightWeighting = max(dot(vNormal, uLightingDirection), 0.0);\n\
+		}\n\
+\n\
+		vLightWeighting = uAmbientColor + directionalLightColor * directionalLightWeighting;\n\
+		\n\
+		if(bApplySpecularLighting)\n\
+			applySpecLighting = 1.0;\n\
+		else\n\
+			applySpecLighting = -1.0;\n\
+\n\
+        gl_Position = ModelViewProjectionMatrixRelToEye * pos4;\n\
+		vec4 orthoPos = modelViewMatrixRelToEye * pos4;\n\
+		vertexPos = orthoPos.xyz;\n\
+		if(bUseLogarithmicDepth)\n\
+		{\n\
+			// logarithmic zBuffer:\n\
+			// https://outerra.blogspot.com/2013/07/logarithmic-depth-buffer-optimizations.html\n\
+			float Fcoef = 2.0 / log2(far + 1.0);\n\
+			gl_Position.z = log2(max(1e-6, 1.0 + gl_Position.w)) * Fcoef - 1.0;\n\
+\n\
+			flogz = 1.0 + gl_Position.w;\n\
+			Fcoef_half = 0.5 * Fcoef;\n\
+\n\
+			// https://www.gamasutra.com/blogs/BranoKemen/20090812/85207/Logarithmic_Depth_Buffer.php\n\
+			// z = log(C*z + 1) / log(C*Far + 1) * w\n\
+			/*\n\
+			if(orthoPos.z < 0.0)\n\
+			{\n\
+				float z = gl_Position.z;\n\
+				float C = 0.001;\n\
+				float w = gl_Position.w;\n\
+				//gl_Position.z = (2.0*log(C*w + 1.0) / log(C*far + 1.0) - 1.0) * w; // https://outerra.blogspot.com/2009/08/logarithmic-z-buffer.html\n\
+				gl_Position.z = 2.0*log(z/near) / log(far/near)-1.0; // another way.\n\
+				gl_Position.z *= w;\n\
+			}\n\
+			*/\n\
+			//https://www.shaderific.com/blog/2014/3/13/tutorial-how-to-update-a-shader-for-opengl-es-30\n\
+		}\n\
+		\n\
+		if(colorType == 1)\n\
+			vColor4 = color4;\n\
+\n\
+		//if(orthoPos.z < 0.0)\n\
+		//aColor4 = vec4(1.0, 0.0, 0.0, 1.0);\n\
+		//else\n\
+		//aColor4 = vec4(0.0, 1.0, 0.0, 1.0);\n\
+		gl_PointSize = 5.0;\n\
+	}";
+ShaderSource.OrthogonalDepthShaderFS = "#ifdef GL_ES\n\
+precision highp float;\n\
+#endif\n\
+uniform float near;\n\
+uniform float far;\n\
+\n\
+varying float depth;  \n\
+\n\
+vec4 packDepth(const in float depth)\n\
+{\n\
+    const vec4 bit_shift = vec4(16777216.0, 65536.0, 256.0, 1.0);\n\
+    const vec4 bit_mask  = vec4(0.0, 0.00390625, 0.00390625, 0.00390625); \n\
+    //vec4 res = fract(depth * bit_shift); // Is not precise.\n\
+	vec4 res = mod(depth * bit_shift * vec4(255), vec4(256) ) / vec4(255); // Is better.\n\
+    res -= res.xxyz * bit_mask;\n\
+    return res;  \n\
+}\n\
+\n\
+vec4 PackDepth32( in float depth )\n\
+{\n\
+    depth *= (16777216.0 - 1.0) / (16777216.0);\n\
+    vec4 encode = fract( depth * vec4(1.0, 256.0, 256.0*256.0, 16777216.0) );// 256.0*256.0*256.0 = 16777216.0\n\
+    return vec4( encode.xyz - encode.yzw / 256.0, encode.w ) + 1.0/512.0;\n\
+}\n\
+\n\
+void main()\n\
+{     \n\
+    gl_FragData[0] = PackDepth32(depth);\n\
+	//gl_FragData[0] = packDepth(-depth);\n\
+}";
+ShaderSource.OrthogonalDepthShaderVS = "attribute vec3 position;\n\
+\n\
+uniform mat4 buildingRotMatrix; \n\
+uniform mat4 modelViewMatrixRelToEye; \n\
+uniform mat4 RefTransfMatrix;\n\
+uniform mat4 ModelViewProjectionMatrixRelToEye;\n\
+uniform vec3 buildingPosHIGH;\n\
+uniform vec3 buildingPosLOW;\n\
+uniform vec3 encodedCameraPositionMCHigh;\n\
+uniform vec3 encodedCameraPositionMCLow;\n\
+uniform float near;\n\
+uniform float far;\n\
+uniform vec3 aditionalPosition;\n\
+uniform vec3 refTranslationVec;\n\
+uniform int refMatrixType; // 0= identity, 1= translate, 2= transform\n\
+\n\
+varying float depth;\n\
+  \n\
+void main()\n\
+{	\n\
+	vec4 rotatedPos;\n\
+\n\
+	if(refMatrixType == 0)\n\
+	{\n\
+		rotatedPos = buildingRotMatrix * vec4(position.xyz, 1.0) + vec4(aditionalPosition.xyz, 0.0);\n\
+	}\n\
+	else if(refMatrixType == 1)\n\
+	{\n\
+		rotatedPos = buildingRotMatrix * vec4(position.xyz + refTranslationVec.xyz, 1.0) + vec4(aditionalPosition.xyz, 0.0);\n\
+	}\n\
+	else if(refMatrixType == 2)\n\
+	{\n\
+		rotatedPos = RefTransfMatrix * vec4(position.xyz, 1.0) + vec4(aditionalPosition.xyz, 0.0);\n\
+	}\n\
+\n\
+    vec3 objPosHigh = buildingPosHIGH;\n\
+    vec3 objPosLow = buildingPosLOW.xyz + rotatedPos.xyz;\n\
+    vec3 highDifference = objPosHigh.xyz - encodedCameraPositionMCHigh.xyz;\n\
+    vec3 lowDifference = objPosLow.xyz - encodedCameraPositionMCLow.xyz;\n\
+    vec4 pos4 = vec4(highDifference.xyz + lowDifference.xyz, 1.0);\n\
+    \n\
+    //linear depth in camera space (0..far)\n\
+    //depth = (modelViewMatrixRelToEye * pos4).z/far; // original.***\n\
+\n\
+	gl_Position = ModelViewProjectionMatrixRelToEye * pos4;\n\
+	depth = gl_Position.z*0.5+0.5;\n\
+}\n\
+";
+ShaderSource.PngImageFS = "precision highp float;\n\
+varying vec2 v_texcoord;\n\
+uniform bool textureFlipYAxis;\n\
+uniform sampler2D u_texture;\n\
+uniform highp int colorType; // 0= oneColor, 1= attribColor, 2= texture.\n\
+uniform vec4 oneColor4;\n\
+\n\
+\n\
+varying vec2 imageSizeInPixels;\n\
+\n\
+void main()\n\
+{\n\
+    vec4 textureColor;\n\
+\n\
+	// 1rst, check if the texture.w != 0.\n\
+	if(textureFlipYAxis)\n\
+	{\n\
+		textureColor = texture2D(u_texture, vec2(v_texcoord.s, 1.0 - v_texcoord.t));\n\
+	}\n\
+	else\n\
+	{\n\
+		textureColor = texture2D(u_texture, v_texcoord);\n\
+	}\n\
+	//if(textureColor.w < 0.005)\n\
+	if(textureColor.w == 0.0)\n\
+	{\n\
+		discard;\n\
+	}\n\
+	if(colorType == 2)\n\
+	{\n\
+		// do nothing.\n\
+	}\n\
+	else if( colorType == 0)\n\
+	{\n\
+		textureColor = oneColor4;\n\
+	}\n\
+\n\
+    gl_FragColor = textureColor;\n\
+}";
+ShaderSource.PngImageVS = "attribute vec4 position;\n\
+attribute vec2 texCoord;\n\
+uniform mat4 buildingRotMatrix;\n\
+uniform mat4 modelViewMatrixRelToEye;  \n\
+uniform mat4 ModelViewProjectionMatrixRelToEye;  \n\
+uniform mat4 projectionMatrix;\n\
+uniform vec3 buildingPosHIGH;\n\
+uniform vec3 buildingPosLOW;\n\
+uniform vec3 encodedCameraPositionMCHigh;\n\
+uniform vec3 encodedCameraPositionMCLow;\n\
+uniform vec2 scale2d;\n\
+uniform vec2 size2d;\n\
+uniform vec3 aditionalOffset;\n\
+uniform vec2 imageSize;\n\
+uniform float screenWidth;    \n\
+uniform float screenHeight;\n\
+uniform bool bUseOriginalImageSize;\n\
+varying vec2 v_texcoord;\n\
+varying vec2 imageSizeInPixels;\n\
+\n\
+void main()\n\
+{\n\
+    vec4 position2 = vec4(position.xyz, 1.0);\n\
+    vec4 rotatedPos = buildingRotMatrix * vec4(position2.xyz, 1.0);\n\
+    vec3 objPosHigh = buildingPosHIGH;\n\
+    vec3 objPosLow = buildingPosLOW.xyz + rotatedPos.xyz;\n\
+    vec3 highDifference = objPosHigh.xyz - encodedCameraPositionMCHigh.xyz;\n\
+    vec3 lowDifference = objPosLow.xyz - encodedCameraPositionMCLow.xyz;\n\
+    vec4 pos4 = vec4(highDifference.xyz + lowDifference.xyz, 1.0);\n\
+	\n\
+	//imageSizeInPixels = vec2(imageSize.x, imageSize.y);\n\
+	\n\
+	float order_w = position.w;\n\
+	float sense = 1.0;\n\
+	int orderInt = 0;\n\
+	if(order_w > 0.0)\n\
+	{\n\
+		sense = -1.0;\n\
+		if(order_w < 1.5)\n\
+		{\n\
+			orderInt = 1;\n\
+		}\n\
+		else{\n\
+			orderInt = 2;\n\
+		}\n\
+	}\n\
+	else\n\
+	{\n\
+		sense = 1.0;\n\
+		if(order_w > -1.5)\n\
+		{\n\
+			orderInt = -1;\n\
+		}\n\
+		else{\n\
+			orderInt = -2;\n\
+		}\n\
+	}\n\
+	\n\
+    v_texcoord = texCoord;\n\
+	vec4 projected = ModelViewProjectionMatrixRelToEye * pos4;\n\
+	//vec4 projected2 = modelViewMatrixRelToEye * pos4;\n\
+\n\
+	// Now, calculate the pixelSize in the plane of the projected point.\n\
+	float pixelWidthRatio = 2. / (screenWidth * projectionMatrix[0][0]);\n\
+	// alternative : float pixelWidthRatio = 2. / (screenHeight * projectionMatrix[1][1]);\n\
+	float pixelWidth = projected.w * pixelWidthRatio;\n\
+	\n\
+	if(projected.w < 5.0)\n\
+		pixelWidth = 5.0 * pixelWidthRatio;\n\
+	\n\
+	vec4 offset;\n\
+	float offsetX;\n\
+	float offsetY;\n\
+	if(bUseOriginalImageSize)\n\
+	{\n\
+		offsetX = pixelWidth*imageSize.x/2.0;\n\
+		offsetY = pixelWidth*imageSize.y/2.0;\n\
+	}\n\
+	else{\n\
+		offsetX = pixelWidth*size2d.x/2.0;\n\
+		offsetY = pixelWidth*size2d.y/2.0;\n\
+	}\n\
+	\n\
+	// Offset our position along the normal\n\
+	if(orderInt == 1)\n\
+	{\n\
+		offset = vec4(-offsetX*scale2d.x, 0.0, 0.0, 1.0);\n\
+	}\n\
+	else if(orderInt == -1)\n\
+	{\n\
+		offset = vec4(offsetX*scale2d.x, 0.0, 0.0, 1.0);\n\
+	}\n\
+	else if(orderInt == 2)\n\
+	{\n\
+		offset = vec4(-offsetX*scale2d.x, offsetY*4.0*scale2d.y, 0.0, 1.0);\n\
+	}\n\
+	else if(orderInt == -2)\n\
+	{\n\
+		offset = vec4(offsetX*scale2d.x, offsetY*4.0*scale2d.y, 0.0, 1.0);\n\
+	}\n\
+\n\
+	gl_Position = projected + offset + vec4(aditionalOffset.x*pixelWidth, aditionalOffset.y*pixelWidth, aditionalOffset.z*pixelWidth, 0.0); \n\
+}\n\
+\n\
+\n\
+\n\
+\n\
+\n\
+\n\
+\n\
+\n\
+\n\
+\n\
+\n\
+\n\
+\n\
+\n\
+\n\
+\n\
+\n\
+\n\
+\n\
+\n\
+\n\
+\n\
+\n\
+\n\
+\n\
+\n\
+\n\
+\n\
+\n\
+\n\
+\n\
+\n\
+";
+ShaderSource.PointCloudDepthFS = "#ifdef GL_ES\n\
+precision highp float;\n\
+#endif\n\
+uniform float near;\n\
+uniform float far;\n\
+\n\
+// clipping planes.***\n\
+uniform bool bApplyClippingPlanes;\n\
+uniform int clippingPlanesCount;\n\
+uniform vec4 clippingPlanes[6];\n\
+\n\
+varying float depth;  \n\
+\n\
+vec4 packDepth(const in float depth)\n\
+{\n\
+    const vec4 bit_shift = vec4(16777216.0, 65536.0, 256.0, 1.0);\n\
+    const vec4 bit_mask  = vec4(0.0, 0.00390625, 0.00390625, 0.00390625); \n\
+    vec4 res = fract(depth * bit_shift);\n\
+    res -= res.xxyz * bit_mask;\n\
+    return res;  \n\
+}\n\
+\n\
+vec4 PackDepth32( in float depth )\n\
+{\n\
+    depth *= (16777216.0 - 1.0) / (16777216.0);\n\
+    vec4 encode = fract( depth * vec4(1.0, 256.0, 256.0*256.0, 16777216.0) );// 256.0*256.0*256.0 = 16777216.0\n\
+    return vec4( encode.xyz - encode.yzw / 256.0, encode.w ) + 1.0/512.0;\n\
+}\n\
+\n\
+void main()\n\
+{     \n\
+    gl_FragData[0] = packDepth(-depth);\n\
+	//gl_FragData[0] = PackDepth32(depth);\n\
+}";
+ShaderSource.PointCloudDepthVS = "attribute vec3 position;\n\
+uniform mat4 ModelViewProjectionMatrixRelToEye;\n\
+uniform mat4 modelViewMatrixRelToEye; \n\
+uniform vec3 buildingPosHIGH;\n\
+uniform vec3 buildingPosLOW;\n\
+uniform mat4 buildingRotMatrix;\n\
+uniform vec3 encodedCameraPositionMCHigh;\n\
+uniform vec3 encodedCameraPositionMCLow;\n\
+uniform float near;\n\
+uniform float far;\n\
+uniform bool bPositionCompressed;\n\
+uniform vec3 minPosition;\n\
+uniform vec3 bboxSize;\n\
+attribute vec4 color4;\n\
+uniform bool bUse1Color;\n\
+uniform vec4 oneColor4;\n\
+uniform float fixPointSize;\n\
+uniform float maxPointSize;\n\
+uniform float minPointSize;\n\
+uniform float pendentPointSize;\n\
+uniform bool bUseFixPointSize;\n\
+varying vec4 vColor;\n\
+//varying float glPointSize;\n\
+varying float depth;  \n\
+\n\
+void main()\n\
+{\n\
+	vec3 realPos;\n\
+	vec4 rotatedPos;\n\
+	if(bPositionCompressed)\n\
+	{\n\
+		float maxShort = 65535.0;\n\
+		realPos = vec3(float(position.x)/maxShort*bboxSize.x + minPosition.x, float(position.y)/maxShort*bboxSize.y + minPosition.y, float(position.z)/maxShort*bboxSize.z + minPosition.z);\n\
+	}\n\
+	else\n\
+	{\n\
+		realPos = position;\n\
+	}\n\
+	rotatedPos = buildingRotMatrix * vec4(realPos.xyz, 1.0);\n\
+    vec3 objPosHigh = buildingPosHIGH;\n\
+    vec3 objPosLow = buildingPosLOW.xyz + rotatedPos.xyz;\n\
+    vec3 highDifference = objPosHigh.xyz - encodedCameraPositionMCHigh.xyz;\n\
+    vec3 lowDifference = objPosLow.xyz - encodedCameraPositionMCLow.xyz;\n\
+    vec4 pos = vec4(highDifference.xyz + lowDifference.xyz, 1.0);\n\
+	\n\
+    if(bUse1Color)\n\
+	{\n\
+		vColor=oneColor4;\n\
+	}\n\
+	else\n\
+		vColor=color4;\n\
+	\n\
+    gl_Position = ModelViewProjectionMatrixRelToEye * pos;\n\
+	float z_b = gl_Position.z/gl_Position.w;\n\
+	float z_n = 2.0 * z_b - 1.0;\n\
+    float z_e = 2.0 * near * far / (far + near - z_n * (far - near));\n\
+	gl_PointSize = minPointSize + pendentPointSize/z_e; // Original.***\n\
+    if(gl_PointSize > maxPointSize)\n\
+        gl_PointSize = maxPointSize;\n\
+	if(gl_PointSize < 2.0)\n\
+		gl_PointSize = 2.0;\n\
+		\n\
+	depth = (modelViewMatrixRelToEye * pos).z/far; // original.***\n\
+}\n\
+";
+ShaderSource.PointCloudFS = "	precision lowp float;\n\
+	uniform vec4 uStrokeColor;\n\
+	varying vec4 vColor;\n\
+	varying float glPointSize;\n\
+	uniform int uPointAppereance; // square, circle, romboide,...\n\
+	uniform int uStrokeSize;\n\
+\n\
+	void main()\n\
+    {\n\
+		vec2 pt = gl_PointCoord - vec2(0.5);\n\
+		float distSquared = pt.x*pt.x+pt.y*pt.y;\n\
+		if(distSquared > 0.25)\n\
+			discard;\n\
+\n\
+		vec4 finalColor = vColor;\n\
+		float strokeDist = 0.1;\n\
+		if(glPointSize > 10.0)\n\
+		strokeDist = 0.15;\n\
+\n\
+		if(uStrokeSize > 0)\n\
+		{\n\
+			if(distSquared >= strokeDist)\n\
+			{\n\
+				finalColor = uStrokeColor;\n\
+			}\n\
+		}\n\
+		gl_FragColor = finalColor;\n\
+	}";
+ShaderSource.PointCloudSsaoFS = "#ifdef GL_ES\n\
+    precision highp float;\n\
+#endif\n\
+\n\
+uniform sampler2D depthTex;\n\
+uniform mat4 projectionMatrix;\n\
+uniform float near;\n\
+uniform float far;            \n\
+uniform float fov;\n\
+uniform float aspectRatio;    \n\
+uniform float screenWidth;    \n\
+uniform float screenHeight;    \n\
+uniform vec3 kernel[16];   \n\
+uniform vec4 oneColor4;\n\
+varying vec4 aColor4; // color from attributes\n\
+varying vec4 vColor;\n\
+varying float glPointSize;\n\
+\n\
+const int kernelSize = 16;  \n\
+uniform float radius;      \n\
+\n\
+uniform bool bApplySsao;\n\
+uniform float externalAlpha;\n\
+\n\
+float unpackDepth(const in vec4 rgba_depth)\n\
+{\n\
+    const vec4 bit_shift = vec4(0.000000059605, 0.000015258789, 0.00390625, 1.0);\n\
+    float depth = dot(rgba_depth, bit_shift);\n\
+    return depth;\n\
+}                \n\
+\n\
+vec3 getViewRay(vec2 tc)\n\
+{\n\
+    float hfar = 2.0 * tan(fov/2.0) * far;\n\
+    float wfar = hfar * aspectRatio;    \n\
+    vec3 ray = vec3(wfar * (tc.x - 0.5), hfar * (tc.y - 0.5), -far);    \n\
+    return ray;                      \n\
+}         \n\
+            \n\
+//linear view space depth\n\
+float getDepth(vec2 coord)\n\
+{\n\
+    return unpackDepth(texture2D(depthTex, coord.xy));\n\
+}    \n\
+\n\
+void main()\n\
+{\n\
+	vec2 pt = gl_PointCoord - vec2(0.5);\n\
+	if(pt.x*pt.x+pt.y*pt.y > 0.25)\n\
+		discard;\n\
+	\n\
+	float occlusion = 0.0;\n\
+	if(bApplySsao)\n\
+	{          \n\
+		vec2 screenPos = vec2(gl_FragCoord.x / screenWidth, gl_FragCoord.y / screenHeight);\n\
+		float linearDepth = getDepth(screenPos);\n\
+		vec3 origin = getViewRay(screenPos) * linearDepth;\n\
+		float radiusAux = glPointSize/1.9;\n\
+		radiusAux = 1.5;\n\
+		vec2 screenPosAdjacent;\n\
+		\n\
+		for(int j = 0; j < 1; ++j)\n\
+		{\n\
+			radiusAux = 1.5 *(float(j)+1.0);\n\
+			for(int i = 0; i < 8; ++i)\n\
+			{    	 \n\
+				if(i == 0)\n\
+					screenPosAdjacent = vec2((gl_FragCoord.x - radiusAux)/ screenWidth, (gl_FragCoord.y - radiusAux) / screenHeight);\n\
+				else if(i == 1)\n\
+					screenPosAdjacent = vec2((gl_FragCoord.x)/ screenWidth, (gl_FragCoord.y - radiusAux) / screenHeight);\n\
+				else if(i == 2)\n\
+					screenPosAdjacent = vec2((gl_FragCoord.x + radiusAux)/ screenWidth, (gl_FragCoord.y - radiusAux) / screenHeight);\n\
+				else if(i == 3)\n\
+					screenPosAdjacent = vec2((gl_FragCoord.x + radiusAux)/ screenWidth, (gl_FragCoord.y) / screenHeight);\n\
+				else if(i == 4)\n\
+					screenPosAdjacent = vec2((gl_FragCoord.x + radiusAux)/ screenWidth, (gl_FragCoord.y + radiusAux) / screenHeight);\n\
+				else if(i == 5)\n\
+					screenPosAdjacent = vec2((gl_FragCoord.x)/ screenWidth, (gl_FragCoord.y + radiusAux) / screenHeight);\n\
+				else if(i == 6)\n\
+					screenPosAdjacent = vec2((gl_FragCoord.x - radiusAux)/ screenWidth, (gl_FragCoord.y + radiusAux) / screenHeight);\n\
+				else if(i == 7)\n\
+					screenPosAdjacent = vec2((gl_FragCoord.x - radiusAux)/ screenWidth, (gl_FragCoord.y) / screenHeight);\n\
+				float depthBufferValue = getDepth(screenPosAdjacent);\n\
+				float range_check = abs(linearDepth - depthBufferValue)*far;\n\
+				if (range_check > 1.5 && depthBufferValue > linearDepth)\n\
+				{\n\
+					if (range_check < 20.0)\n\
+						occlusion +=  1.0;\n\
+				}\n\
+			}   \n\
+		}   \n\
+			\n\
+		if(occlusion > 6.0)\n\
+			occlusion = 8.0;\n\
+		//else occlusion = 0.0;\n\
+		occlusion = 1.0 - occlusion / 8.0;\n\
+	}\n\
+	else{\n\
+		occlusion = 1.0;\n\
+	}\n\
+\n\
+    vec4 finalColor;\n\
+	finalColor = vec4((vColor.xyz) * occlusion, externalAlpha);\n\
+	//finalColor = vec4(vec3(0.8, 0.8, 0.8) * occlusion, externalAlpha);\n\
+    gl_FragColor = finalColor; \n\
+}";
+ShaderSource.PointCloudSsaoFS_rainbow = "#ifdef GL_ES\n\
+    precision highp float;\n\
+#endif\n\
+\n\
+uniform sampler2D depthTex;\n\
+uniform mat4 projectionMatrix;\n\
+uniform float near;\n\
+uniform float far;            \n\
+uniform float fov;\n\
+uniform float aspectRatio;    \n\
+uniform float screenWidth;    \n\
+uniform float screenHeight;    \n\
+uniform vec3 kernel[16];   \n\
+uniform vec4 oneColor4;\n\
+uniform bool bUseColorCodingByHeight;\n\
+uniform float minHeight_rainbow;   \n\
+uniform float maxHeight_rainbow;  \n\
+varying vec4 aColor4; // color from attributes\n\
+varying vec4 vColor;\n\
+varying float glPointSize;\n\
+varying float realHeigh;\n\
+\n\
+const int kernelSize = 16;  \n\
+uniform float radius;      \n\
+\n\
+uniform bool bApplySsao;\n\
+uniform float externalAlpha;\n\
+\n\
+float unpackDepth(const in vec4 rgba_depth)\n\
+{\n\
+    const vec4 bit_shift = vec4(0.000000059605, 0.000015258789, 0.00390625, 1.0);\n\
+    float depth = dot(rgba_depth, bit_shift);\n\
+    return depth;\n\
+}                \n\
+\n\
+vec3 getViewRay(vec2 tc)\n\
+{\n\
+    float hfar = 2.0 * tan(fov/2.0) * far;\n\
+    float wfar = hfar * aspectRatio;    \n\
+    vec3 ray = vec3(wfar * (tc.x - 0.5), hfar * (tc.y - 0.5), -far);    \n\
+    return ray;                      \n\
+}         \n\
+            \n\
+//linear view space depth\n\
+float getDepth(vec2 coord)\n\
+{\n\
+    return unpackDepth(texture2D(depthTex, coord.xy));\n\
+}  \n\
+\n\
+vec3 getRainbowColor_byHeight(float height)\n\
+{\n\
+	float gray = (height - minHeight_rainbow)/(maxHeight_rainbow - minHeight_rainbow);\n\
+	if (gray > 1.0){ gray = 1.0; }\n\
+	else if (gray<0.0){ gray = 0.0; }\n\
+	\n\
+	float r, g, b;\n\
+	\n\
+	if(gray < 0.16666)\n\
+	{\n\
+		b = 0.0;\n\
+		g = gray*6.0;\n\
+		r = 1.0;\n\
+	}\n\
+	else if(gray >= 0.16666 && gray < 0.33333)\n\
+	{\n\
+		b = 0.0;\n\
+		g = 1.0;\n\
+		r = 2.0 - gray*6.0;\n\
+	}\n\
+	else if(gray >= 0.33333 && gray < 0.5)\n\
+	{\n\
+		b = -2.0 + gray*6.0;\n\
+		g = 1.0;\n\
+		r = 0.0;\n\
+	}\n\
+	else if(gray >= 0.5 && gray < 0.66666)\n\
+	{\n\
+		b = 1.0;\n\
+		g = 4.0 - gray*6.0;\n\
+		r = 0.0;\n\
+	}\n\
+	else if(gray >= 0.66666 && gray < 0.83333)\n\
+	{\n\
+		b = 1.0;\n\
+		g = 0.0;\n\
+		r = -4.0 + gray*6.0;\n\
+	}\n\
+	else if(gray >= 0.83333)\n\
+	{\n\
+		b = 6.0 - gray*6.0;\n\
+		g = 0.0;\n\
+		r = 1.0;\n\
+	}\n\
+	\n\
+	float aux = r;\n\
+	r = b;\n\
+	b = aux;\n\
+	\n\
+	//b = -gray + 1.0;\n\
+	//if (gray > 0.5)\n\
+	//{\n\
+	//	g = -gray*2.0 + 2.0; \n\
+	//}\n\
+	//else \n\
+	//{\n\
+	//	g = gray*2.0;\n\
+	//}\n\
+	//r = gray;\n\
+	vec3 resultColor = vec3(r, g, b);\n\
+    return resultColor;\n\
+}   \n\
+\n\
+void main()\n\
+{\n\
+	float occlusion = 0.0;\n\
+	if(bApplySsao)\n\
+	{          \n\
+		vec2 screenPos = vec2(gl_FragCoord.x / screenWidth, gl_FragCoord.y / screenHeight);\n\
+		float linearDepth = getDepth(screenPos);\n\
+		vec3 origin = getViewRay(screenPos) * linearDepth;\n\
+		float radiusAux = glPointSize/1.9;\n\
+		radiusAux = 1.5;\n\
+		vec2 screenPosAdjacent;\n\
+		\n\
+		for(int j = 0; j < 1; ++j)\n\
+		{\n\
+			radiusAux = 1.5 *(float(j)+1.0);\n\
+			for(int i = 0; i < 8; ++i)\n\
+			{    	 \n\
+				if(i == 0)\n\
+					screenPosAdjacent = vec2((gl_FragCoord.x - radiusAux)/ screenWidth, (gl_FragCoord.y - radiusAux) / screenHeight);\n\
+				else if(i == 1)\n\
+					screenPosAdjacent = vec2((gl_FragCoord.x)/ screenWidth, (gl_FragCoord.y - radiusAux) / screenHeight);\n\
+				else if(i == 2)\n\
+					screenPosAdjacent = vec2((gl_FragCoord.x + radiusAux)/ screenWidth, (gl_FragCoord.y - radiusAux) / screenHeight);\n\
+				else if(i == 3)\n\
+					screenPosAdjacent = vec2((gl_FragCoord.x + radiusAux)/ screenWidth, (gl_FragCoord.y) / screenHeight);\n\
+				else if(i == 4)\n\
+					screenPosAdjacent = vec2((gl_FragCoord.x + radiusAux)/ screenWidth, (gl_FragCoord.y + radiusAux) / screenHeight);\n\
+				else if(i == 5)\n\
+					screenPosAdjacent = vec2((gl_FragCoord.x)/ screenWidth, (gl_FragCoord.y + radiusAux) / screenHeight);\n\
+				else if(i == 6)\n\
+					screenPosAdjacent = vec2((gl_FragCoord.x - radiusAux)/ screenWidth, (gl_FragCoord.y + radiusAux) / screenHeight);\n\
+				else if(i == 7)\n\
+					screenPosAdjacent = vec2((gl_FragCoord.x - radiusAux)/ screenWidth, (gl_FragCoord.y) / screenHeight);\n\
+				float depthBufferValue = getDepth(screenPosAdjacent);\n\
+				float range_check = abs(linearDepth - depthBufferValue)*far;\n\
+				if (range_check > 1.5 && depthBufferValue > linearDepth)\n\
+				{\n\
+					if (range_check < 20.0)\n\
+						occlusion +=  1.0;\n\
+				}\n\
+			}   \n\
+		}   \n\
+			\n\
+		if(occlusion > 6.0)\n\
+			occlusion = 8.0;\n\
+		//else occlusion = 0.0;\n\
+		occlusion = 1.0 - occlusion / 8.0;\n\
+	}\n\
+	else{\n\
+		occlusion = 1.0;\n\
+	}\n\
+\n\
+    vec4 finalColor;\n\
+	if(bUseColorCodingByHeight)\n\
+	{\n\
+		float rainbow = 0.5;\n\
+		float texCol = 0.5;\n\
+		vec3 rainbowColor3 = getRainbowColor_byHeight(realHeigh);\n\
+		vec3 blendedColor3 = vec3(vColor.x * texCol + rainbowColor3.r * rainbow, vColor.y * texCol + rainbowColor3.g * rainbow, vColor.z * texCol + rainbowColor3.b * rainbow);\n\
+		finalColor = vec4(blendedColor3 * occlusion, externalAlpha);\n\
+	}\n\
+	else\n\
+		finalColor = vec4((vColor.xyz) * occlusion, externalAlpha);\n\
+	//finalColor = vec4(vec3(0.8, 0.8, 0.8) * occlusion, externalAlpha);\n\
+    gl_FragColor = finalColor; \n\
+}\n\
+\n\
+\n\
+\n\
+\n\
+\n\
+\n\
+\n\
+\n\
+\n\
+\n\
+\n\
+\n\
+\n\
+\n\
+\n\
+\n\
+\n\
+";
+ShaderSource.PointCloudVS = "attribute vec3 position;\n\
+attribute vec3 normal;\n\
+attribute vec2 texCoord;\n\
+attribute vec4 color4;\n\
+uniform mat4 ModelViewProjectionMatrixRelToEye;\n\
+uniform vec3 buildingPosHIGH;\n\
+uniform vec3 buildingPosLOW;\n\
+uniform mat4 buildingRotMatrix;\n\
+uniform vec3 encodedCameraPositionMCHigh;\n\
+uniform vec3 encodedCameraPositionMCLow;\n\
+uniform float near;\n\
+uniform float far;\n\
+uniform bool bPositionCompressed;\n\
+uniform vec3 minPosition;\n\
+uniform vec3 bboxSize;\n\
+uniform bool bUse1Color;\n\
+uniform vec4 oneColor4;\n\
+uniform float fixPointSize;\n\
+uniform float maxPointSize;\n\
+uniform float minPointSize;\n\
+uniform float pendentPointSize;\n\
+uniform bool bUseFixPointSize;\n\
+uniform bool bUseColorCodingByHeight;\n\
+uniform bool bUseLogarithmicDepth;\n\
+varying vec4 vColor;\n\
+varying float glPointSize;\n\
+\n\
+void main()\n\
+{\n\
+	vec3 realPos;\n\
+	vec4 rotatedPos;\n\
+	if(bPositionCompressed)\n\
+	{\n\
+		float maxShort = 65535.0;\n\
+		realPos = vec3(float(position.x)/maxShort*bboxSize.x + minPosition.x, float(position.y)/maxShort*bboxSize.y + minPosition.y, float(position.z)/maxShort*bboxSize.z + minPosition.z);\n\
+	}\n\
+	else\n\
+	{\n\
+		realPos = position;\n\
+	}\n\
+	rotatedPos = buildingRotMatrix * vec4(realPos.xyz, 1.0);\n\
+    vec3 objPosHigh = buildingPosHIGH;\n\
+    vec3 objPosLow = buildingPosLOW.xyz + rotatedPos.xyz;\n\
+    vec3 highDifference = objPosHigh.xyz - encodedCameraPositionMCHigh.xyz;\n\
+    vec3 lowDifference = objPosLow.xyz - encodedCameraPositionMCLow.xyz;\n\
+    vec4 pos = vec4(highDifference.xyz + lowDifference.xyz, 1.0);\n\
+	\n\
+    if(bUse1Color)\n\
+	{\n\
+		vColor=oneColor4;\n\
+	}\n\
+	else\n\
+		vColor=color4;\n\
+	\n\
+    gl_Position = ModelViewProjectionMatrixRelToEye * pos;\n\
+\n\
+	if(bUseLogarithmicDepth)\n\
+	{\n\
+		// logarithmic zBuffer:\n\
+		// https://www.gamasutra.com/blogs/BranoKemen/20090812/85207/Logarithmic_Depth_Buffer.php\n\
+		// z = log(C*z + 1) / log(C*Far + 1) * w\n\
+		float z = gl_Position.z;\n\
+		//float C = 1.0;\n\
+		float w = gl_Position.w;\n\
+		////gl_Position.z = log(C*z + 1.0) / log(C*far + 1.0) * w;\n\
+		gl_Position.z = log(z/near) / log(far/near)*w; // another way.\n\
+	}\n\
+\n\
+	if(bUseFixPointSize)\n\
+	{\n\
+		gl_PointSize = fixPointSize;\n\
+	}\n\
+	else{\n\
+		float z_b = gl_Position.z/gl_Position.w;\n\
+		float z_n = 2.0 * z_b - 1.0;\n\
+		float z_e = 2.0 * near * far / (far + near - z_n * (far - near));\n\
+		gl_PointSize = minPointSize + pendentPointSize/z_e; // Original.***\n\
+		if(gl_PointSize > maxPointSize)\n\
+			gl_PointSize = maxPointSize;\n\
+		if(gl_PointSize < 2.0)\n\
+			gl_PointSize = 2.0;\n\
+	}\n\
+	glPointSize = gl_PointSize;\n\
+}";
+ShaderSource.PointCloudVS_rainbow = "attribute vec3 position;\n\
+attribute vec3 normal;\n\
+attribute vec2 texCoord;\n\
+attribute vec4 color4;\n\
+uniform mat4 ModelViewProjectionMatrixRelToEye;\n\
+uniform vec3 buildingPosHIGH;\n\
+uniform vec3 buildingPosLOW;\n\
+uniform mat4 buildingRotMatrix;\n\
+uniform vec3 encodedCameraPositionMCHigh;\n\
+uniform vec3 encodedCameraPositionMCLow;\n\
+uniform float near;\n\
+uniform float far;\n\
+uniform bool bPositionCompressed;\n\
+uniform vec3 minPosition;\n\
+uniform vec3 bboxSize;\n\
+uniform bool bUse1Color;\n\
+uniform vec4 oneColor4;\n\
+uniform float fixPointSize;\n\
+uniform float maxPointSize;\n\
+uniform float minPointSize;\n\
+uniform float pendentPointSize;\n\
+uniform bool bUseFixPointSize;\n\
+varying vec4 vColor;\n\
+varying float glPointSize;\n\
+varying float realHeigh;\n\
+\n\
+void main()\n\
+{\n\
+	vec3 realPos;\n\
+	vec4 rotatedPos;\n\
+	if(bPositionCompressed)\n\
+	{\n\
+		float maxShort = 65535.0;\n\
+		realPos = vec3(float(position.x)/maxShort*bboxSize.x + minPosition.x, float(position.y)/maxShort*bboxSize.y + minPosition.y, float(position.z)/maxShort*bboxSize.z + minPosition.z);\n\
+	}\n\
+	else\n\
+	{\n\
+		realPos = position;\n\
+	}\n\
+	realHeigh = realPos.z;\n\
+	rotatedPos = buildingRotMatrix * vec4(realPos.xyz, 1.0);\n\
+    vec3 objPosHigh = buildingPosHIGH;\n\
+    vec3 objPosLow = buildingPosLOW.xyz + rotatedPos.xyz;\n\
+    vec3 highDifference = objPosHigh.xyz - encodedCameraPositionMCHigh.xyz;\n\
+    vec3 lowDifference = objPosLow.xyz - encodedCameraPositionMCLow.xyz;\n\
+    vec4 pos = vec4(highDifference.xyz + lowDifference.xyz, 1.0);\n\
+	\n\
+    if(bUse1Color)\n\
+	{\n\
+		vColor=oneColor4;\n\
+	}\n\
+	else\n\
+		vColor=color4;\n\
+	\n\
+    gl_Position = ModelViewProjectionMatrixRelToEye * pos;\n\
+	float z_b = gl_Position.z/gl_Position.w;\n\
+	float z_n = 2.0 * z_b - 1.0;\n\
+    float z_e = 2.0 * near * far / (far + near - z_n * (far - near));\n\
+    gl_PointSize = minPointSize + pendentPointSize/z_e; // Original.***\n\
+    if(gl_PointSize > maxPointSize)\n\
+        gl_PointSize = maxPointSize;\n\
+    if(gl_PointSize < 2.0)\n\
+        gl_PointSize = 2.0;\n\
+        \n\
+    glPointSize = gl_PointSize;\n\
+}\n\
+";
+ShaderSource.quad_vert = "precision mediump float;\n\
+\n\
+attribute vec2 a_pos;\n\
+\n\
+varying vec2 v_tex_pos;\n\
+\n\
+void main() {\n\
+    v_tex_pos = a_pos;\n\
+    gl_Position = vec4(1.0 - 2.0 * a_pos, 0, 1);\n\
+}\n\
+";
+ShaderSource.RenderShowDepthFS = "#ifdef GL_ES\n\
+precision highp float;\n\
+#endif\n\
+\n\
+#define %USE_LOGARITHMIC_DEPTH%\n\
+#ifdef USE_LOGARITHMIC_DEPTH\n\
+#extension GL_EXT_frag_depth : enable\n\
+#endif\n\
+\n\
+uniform float near;\n\
+uniform float far;\n\
+\n\
+// clipping planes.***\n\
+uniform bool bApplyClippingPlanes;\n\
+uniform int clippingPlanesCount;\n\
+uniform vec4 clippingPlanes[6];\n\
+uniform bool bUseLogarithmicDepth;\n\
+\n\
+varying float depth;  \n\
+varying vec3 vertexPos;\n\
+varying float flogz;\n\
+varying float Fcoef_half;\n\
+\n\
+vec4 packDepth(const in float depth)\n\
+{\n\
+    const vec4 bit_shift = vec4(16777216.0, 65536.0, 256.0, 1.0); // original.***\n\
+    const vec4 bit_mask  = vec4(0.0, 0.00390625, 0.00390625, 0.00390625);  // original.*** \n\
+	\n\
+    //vec4 res = fract(depth * bit_shift); // Is not precise.\n\
+	vec4 res = mod(depth * bit_shift * vec4(255), vec4(256) ) / vec4(255); // Is better.\n\
+    res -= res.xxyz * bit_mask;\n\
+    return res;  \n\
+}\n\
+\n\
+\n\
+//vec4 PackDepth32( in float depth )\n\
+//{\n\
+//    depth *= (16777216.0 - 1.0) / (16777216.0);\n\
+//    vec4 encode = fract( depth * vec4(1.0, 256.0, 256.0*256.0, 16777216.0) );// 256.0*256.0*256.0 = 16777216.0\n\
+//    return vec4( encode.xyz - encode.yzw / 256.0, encode.w ) + 1.0/512.0;\n\
+//}\n\
+\n\
+bool clipVertexByPlane(in vec4 plane, in vec3 point)\n\
+{\n\
+	float dist = plane.x * point.x + plane.y * point.y + plane.z * point.z + plane.w;\n\
+	\n\
+	if(dist < 0.0)\n\
+	return true;\n\
+	else return false;\n\
+}\n\
+\n\
+void main()\n\
+{     \n\
+	// 1rst, check if there are clipping planes.\n\
+	if(bApplyClippingPlanes)\n\
+	{\n\
+		bool discardFrag = true;\n\
+		for(int i=0; i<6; i++)\n\
+		{\n\
+			vec4 plane = clippingPlanes[i];\n\
+			if(!clipVertexByPlane(plane, vertexPos))\n\
+			{\n\
+				discardFrag = false;\n\
+				break;\n\
+			}\n\
+			if(i >= clippingPlanesCount)\n\
+			break;\n\
+		}\n\
+		\n\
+		if(discardFrag)\n\
+		discard;\n\
+	}\n\
+	\n\
+    gl_FragData[0] = packDepth(-depth);\n\
+	//gl_FragData[0] = PackDepth32(depth);\n\
+	#ifdef USE_LOGARITHMIC_DEPTH\n\
+	if(bUseLogarithmicDepth)\n\
+	{\n\
+		gl_FragDepthEXT = log2(flogz) * Fcoef_half;\n\
+	}\n\
+	#endif\n\
+}";
+ShaderSource.RenderShowDepthVS = "attribute vec3 position;\n\
+\n\
+uniform mat4 buildingRotMatrix; \n\
+uniform mat4 modelViewMatrix;\n\
+uniform mat4 modelViewMatrixRelToEye; \n\
+uniform mat4 RefTransfMatrix;\n\
+uniform mat4 ModelViewProjectionMatrixRelToEye;\n\
+uniform vec3 buildingPosHIGH;\n\
+uniform vec3 buildingPosLOW;\n\
+uniform vec3 scaleLC;\n\
+uniform vec3 encodedCameraPositionMCHigh;\n\
+uniform vec3 encodedCameraPositionMCLow;\n\
+uniform float near;\n\
+uniform float far;\n\
+uniform vec3 aditionalPosition;\n\
+uniform vec3 refTranslationVec;\n\
+uniform int refMatrixType; // 0= identity, 1= translate, 2= transform\n\
+uniform bool bUseLogarithmicDepth;\n\
+\n\
+varying float flogz;\n\
+varying float Fcoef_half;\n\
+\n\
+varying float depth;\n\
+varying vec3 vertexPos;\n\
+  \n\
+void main()\n\
+{	\n\
+	vec4 scaledPos = vec4(position.x * scaleLC.x, position.y * scaleLC.y, position.z * scaleLC.z, 1.0);\n\
+	vec4 rotatedPos;\n\
+\n\
+	if(refMatrixType == 0)\n\
+	{\n\
+		rotatedPos = buildingRotMatrix * vec4(scaledPos.xyz, 1.0) + vec4(aditionalPosition.xyz, 0.0);\n\
+	}\n\
+	else if(refMatrixType == 1)\n\
+	{\n\
+		rotatedPos = buildingRotMatrix * vec4(scaledPos.xyz + refTranslationVec.xyz, 1.0) + vec4(aditionalPosition.xyz, 0.0);\n\
+	}\n\
+	else if(refMatrixType == 2)\n\
+	{\n\
+		rotatedPos = RefTransfMatrix * vec4(scaledPos.xyz, 1.0) + vec4(aditionalPosition.xyz, 0.0);\n\
+	}\n\
+\n\
+    vec3 objPosHigh = buildingPosHIGH;\n\
+    vec3 objPosLow = buildingPosLOW.xyz + rotatedPos.xyz;\n\
+    vec3 highDifference = objPosHigh.xyz - encodedCameraPositionMCHigh.xyz;\n\
+    vec3 lowDifference = objPosLow.xyz - encodedCameraPositionMCLow.xyz;\n\
+    vec4 pos4 = vec4(highDifference.xyz + lowDifference.xyz, 1.0);\n\
+    \n\
+    //linear depth in camera space (0..far)\n\
+	vec4 orthoPos = modelViewMatrixRelToEye * pos4;\n\
+    depth = orthoPos.z/far; // original.***\n\
+\n\
+\n\
+    gl_Position = ModelViewProjectionMatrixRelToEye * pos4;\n\
+\n\
+	if(bUseLogarithmicDepth)\n\
+	{\n\
+		// logarithmic zBuffer:\n\
+		// https://outerra.blogspot.com/2013/07/logarithmic-depth-buffer-optimizations.html\n\
+		float Fcoef = 2.0 / log2(far + 1.0);\n\
+		gl_Position.z = log2(max(1e-6, 1.0 + gl_Position.w)) * Fcoef - 1.0;\n\
+\n\
+		flogz = 1.0 + gl_Position.w;\n\
+		Fcoef_half = 0.5 * Fcoef;\n\
+	}\n\
+\n\
+	vertexPos = orthoPos.xyz;\n\
+}";
+ShaderSource.ScreenQuadFS = "#ifdef GL_ES\n\
+    precision highp float;\n\
+#endif\n\
+\n\
+uniform sampler2D depthTex;\n\
+uniform sampler2D shadowMapTex;\n\
+uniform sampler2D shadowMapTex2;\n\
+uniform mat4 modelViewMatrix;\n\
+uniform mat4 modelViewMatrixRelToEye; \n\
+uniform mat4 modelViewMatrixInv;\n\
+uniform mat4 modelViewProjectionMatrixInv;\n\
+uniform mat4 modelViewMatrixRelToEyeInv;\n\
+uniform mat4 projectionMatrix;\n\
+uniform mat4 projectionMatrixInv;\n\
+uniform vec3 encodedCameraPositionMCHigh;\n\
+uniform vec3 encodedCameraPositionMCLow;\n\
+uniform bool bApplyShadow;\n\
+uniform bool bSilhouette;\n\
+uniform mat4 sunMatrix[2]; \n\
+uniform vec3 sunPosHIGH[2];\n\
+uniform vec3 sunPosLOW[2];\n\
+uniform int sunIdx;\n\
+uniform float screenWidth;    \n\
+uniform float screenHeight;   \n\
+uniform float near;\n\
+uniform float far;\n\
+uniform float fov;\n\
+uniform float tangentOfHalfFovy;\n\
+uniform float aspectRatio;\n\
+varying vec4 vColor; \n\
+\n\
+float unpackDepth(vec4 packedDepth)\n\
+{\n\
+	// See Aras Pranckevičius' post Encoding Floats to RGBA\n\
+	// http://aras-p.info/blog/2009/07/30/encoding-floats-to-rgba-the-final/\n\
+	return dot(packedDepth, vec4(1.0, 1.0 / 255.0, 1.0 / 65025.0, 1.0 / 16581375.0));\n\
+}\n\
+\n\
+float unpackDepthMago(const in vec4 rgba_depth)\n\
+{\n\
+    const vec4 bit_shift = vec4(0.000000059605, 0.000015258789, 0.00390625, 1.0);// original.***\n\
+    float depth = dot(rgba_depth, bit_shift);\n\
+    return depth;\n\
+} \n\
+\n\
+float UnpackDepth32( in vec4 pack )\n\
+{\n\
+	float depth = dot( pack, vec4(1.0, 0.00390625, 0.000015258789, 0.000000059605) );\n\
+    return depth * 1.000000059605;// 1.000000059605 = (16777216.0) / (16777216.0 - 1.0);\n\
+}  \n\
+\n\
+float getDepthShadowMap(vec2 coord)\n\
+{\n\
+	// currSunIdx\n\
+	if(sunIdx == 0)\n\
+	{\n\
+		return UnpackDepth32(texture2D(shadowMapTex, coord.xy));\n\
+	}\n\
+    else if(sunIdx ==1)\n\
+	{\n\
+		return UnpackDepth32(texture2D(shadowMapTex2, coord.xy));\n\
+	}\n\
+	else\n\
+		return -1.0;\n\
+}\n\
+\n\
+bool isInShadow(vec4 pointWC, int currSunIdx)\n\
+{\n\
+	bool inShadow = false;\n\
+	vec3 currSunPosLOW;\n\
+	vec3 currSunPosHIGH;\n\
+	mat4 currSunMatrix;\n\
+	if(currSunIdx == 0)\n\
+	{\n\
+		currSunPosLOW = sunPosLOW[0];\n\
+		currSunPosHIGH = sunPosHIGH[0];\n\
+		currSunMatrix = sunMatrix[0];\n\
+	}\n\
+	else if(currSunIdx == 1)\n\
+	{\n\
+		currSunPosLOW = sunPosLOW[1];\n\
+		currSunPosHIGH = sunPosHIGH[1];\n\
+		currSunMatrix = sunMatrix[1];\n\
+	}\n\
+	else\n\
+	return false;\n\
+	\n\
+		\n\
+	vec3 highDifferenceSun = pointWC.xyz -currSunPosHIGH.xyz;\n\
+	vec3 lowDifferenceSun = -currSunPosLOW.xyz;\n\
+	vec4 pos4Sun = vec4(highDifferenceSun.xyz + lowDifferenceSun.xyz, 1.0);\n\
+	vec4 vPosRelToLight = currSunMatrix * pos4Sun;\n\
+\n\
+	vec3 posRelToLight = vPosRelToLight.xyz / vPosRelToLight.w;\n\
+	float tolerance = 0.9963;\n\
+	posRelToLight = posRelToLight * 0.5 + 0.5; // transform to [0,1] range\n\
+	if(posRelToLight.x >= 0.0 && posRelToLight.x <= 1.0)\n\
+	{\n\
+		if(posRelToLight.y >= 0.0 && posRelToLight.y <= 1.0)\n\
+		{\n\
+			float depthRelToLight;\n\
+			if(currSunIdx == 0)\n\
+			{depthRelToLight = UnpackDepth32(texture2D(shadowMapTex, posRelToLight.xy));}\n\
+			else if(currSunIdx == 1)\n\
+			{depthRelToLight = UnpackDepth32(texture2D(shadowMapTex2, posRelToLight.xy));}\n\
+			if(posRelToLight.z > depthRelToLight*tolerance )\n\
+			{\n\
+				inShadow = true;\n\
+			}\n\
+		}\n\
+	}\n\
+	\n\
+	return inShadow;\n\
+}\n\
+\n\
+void main()\n\
+{\n\
+	// 1rst, check if this is silhouette rendering.\n\
+	if(bSilhouette)\n\
+	{\n\
+		// Check the adjacent pixels to decide if this is silhouette.\n\
+		// Analize a 5x5 rectangle of the depthTexture: if there are objectDepth & backgroundDepth => is silhouette.\n\
+		float pixelSizeW = 1.0/screenWidth;\n\
+		float pixelSizeH = 1.0/screenHeight;\n\
+		int objectDepthCount = 0;\n\
+		int backgroundDepthCount = 0;\n\
+		float tolerance = 0.9963;\n\
+		tolerance = 0.9963;\n\
+		\n\
+		vec2 screenPos = vec2(gl_FragCoord.x / screenWidth, gl_FragCoord.y / screenHeight); // centerPos.\n\
+		vec2 screenPos_LD = vec2(screenPos.x - pixelSizeW*1.5, screenPos.y - pixelSizeH*1.5); // left-down corner.\n\
+		\n\
+		for(int w = 0; w<3; w++)\n\
+		{\n\
+			for(int h=0; h<3; h++)\n\
+			{\n\
+				vec2 screenPosAux = vec2(screenPos_LD.x + pixelSizeW*float(w), screenPos_LD.y + pixelSizeH*float(h));\n\
+				float z_window  = unpackDepthMago(texture2D(depthTex, screenPosAux.xy)); // z_window  is [0.0, 1.0] range depth.\n\
+\n\
+				if(z_window > tolerance)\n\
+				{\n\
+					// is background.\n\
+					backgroundDepthCount += 1;\n\
+				}\n\
+				else\n\
+				{\n\
+					// is object.\n\
+					objectDepthCount += 1;\n\
+				}\n\
+\n\
+				if(backgroundDepthCount > 0 && objectDepthCount > 0)\n\
+				{\n\
+					// is silhouette.\n\
+					gl_FragColor = vec4(0.2, 1.0, 0.3, 1.0);\n\
+					return;\n\
+				}\n\
+				\n\
+			}\n\
+		}\n\
+		\n\
+		return;\n\
+	}\n\
+	\n\
+	float shadow_occlusion = 1.0;\n\
+	float alpha = 0.0;\n\
+	vec4 finalColor;\n\
+	finalColor = vec4(0.2, 0.2, 0.2, 0.8);\n\
+	if(bApplyShadow)\n\
+	{\n\
+		// the sun lights count are 2.\n\
+		// 1rst, calculate the pixelPosWC.\n\
+		vec2 screenPos = vec2(gl_FragCoord.x / screenWidth, gl_FragCoord.y / screenHeight);\n\
+		float z_window  = unpackDepth(texture2D(depthTex, screenPos.xy)); // z_window  is [0.0, 1.0] range depth.\n\
+		if(z_window < 0.001)\n\
+		discard;\n\
+		\n\
+		// https://stackoverflow.com/questions/11277501/how-to-recover-view-space-position-given-view-space-depth-value-and-ndc-xy\n\
+		float depthRange_near = 0.0;\n\
+		float depthRange_far = 1.0;\n\
+		float x_ndc = 2.0 * screenPos.x - 1.0;\n\
+		float y_ndc = 2.0 * screenPos.y - 1.0;\n\
+		float z_ndc = (2.0 * z_window - depthRange_near - depthRange_far) / (depthRange_far - depthRange_near);\n\
+		\n\
+		vec4 viewPosH = projectionMatrixInv * vec4(x_ndc, y_ndc, z_ndc, 1.0);\n\
+		vec3 posCC = viewPosH.xyz/viewPosH.w;\n\
+		vec4 posWC = modelViewMatrixRelToEyeInv * vec4(posCC.xyz, 1.0) + vec4((encodedCameraPositionMCHigh + encodedCameraPositionMCLow).xyz, 1.0);\n\
+		//----------------------------------------------------------------\n\
+	\n\
+		// 2nd, calculate the vertex relative to light.***\n\
+		// 1rst, try with the closest sun. sunIdx = 0.\n\
+		bool pointIsinShadow = isInShadow(posWC, 0);\n\
+		if(!pointIsinShadow)\n\
+		{\n\
+			pointIsinShadow = isInShadow(posWC, 1);\n\
+		}\n\
+\n\
+		if(pointIsinShadow)\n\
+		{\n\
+			shadow_occlusion = 0.5;\n\
+			alpha = 0.5;\n\
+		}\n\
+		\n\
+	}\n\
+    gl_FragColor = vec4(finalColor.rgb*shadow_occlusion, alpha);\n\
+}";
+ShaderSource.ScreenQuadVS = "precision mediump float;\n\
+\n\
+attribute vec2 position;\n\
+varying vec4 vColor; \n\
+\n\
+void main() {\n\
+	vColor = vec4(0.2, 0.2, 0.2, 0.5);\n\
+    gl_Position = vec4(1.0 - 2.0 * position, 0.0, 1.0);\n\
+}";
+ShaderSource.screen_frag = "precision mediump float;\n\
+\n\
+uniform sampler2D u_screen;\n\
+uniform float u_opacity;\n\
+\n\
+varying vec2 v_tex_pos;\n\
+\n\
+void main() {\n\
+    vec4 color = texture2D(u_screen, 1.0 - v_tex_pos);\n\
+    // a hack to guarantee opacity fade out even with a value close to 1.0\n\
+    gl_FragColor = vec4(floor(255.0 * color * u_opacity) / 255.0);\n\
+}\n\
+";
+ShaderSource.SilhouetteFS = "precision highp float;\n\
+uniform vec4 vColor4Aux;\n\
+\n\
+void main()\n\
+{          \n\
+    gl_FragColor = vColor4Aux;\n\
+}";
+ShaderSource.SilhouetteVS = "attribute vec3 position;\n\
+\n\
+uniform mat4 buildingRotMatrix; \n\
+uniform mat4 ModelViewProjectionMatrixRelToEye;\n\
+uniform mat4 ModelViewMatrixRelToEye;\n\
+uniform mat4 ProjectionMatrix;\n\
+uniform mat4 RefTransfMatrix;\n\
+uniform vec3 buildingPosHIGH;\n\
+uniform vec3 buildingPosLOW;\n\
+uniform vec3 encodedCameraPositionMCHigh;\n\
+uniform vec3 encodedCameraPositionMCLow;\n\
+uniform vec3 aditionalPosition;\n\
+uniform vec3 refTranslationVec;\n\
+uniform int refMatrixType; // 0= identity, 1= translate, 2= transform\n\
+uniform vec2 camSpacePixelTranslation;\n\
+uniform vec2 screenSize;   \n\
+varying vec2 camSpaceTranslation;\n\
+\n\
+void main()\n\
+{    \n\
+    vec4 rotatedPos;\n\
+	if(refMatrixType == 0)\n\
+	{\n\
+		rotatedPos = buildingRotMatrix * vec4(position.xyz, 1.0) + vec4(aditionalPosition.xyz, 0.0);\n\
+	}\n\
+	else if(refMatrixType == 1)\n\
+	{\n\
+		rotatedPos = buildingRotMatrix * vec4(position.xyz + refTranslationVec.xyz, 1.0) + vec4(aditionalPosition.xyz, 0.0);\n\
+	}\n\
+	else if(refMatrixType == 2)\n\
+	{\n\
+		rotatedPos = RefTransfMatrix * vec4(position.xyz, 1.0) + vec4(aditionalPosition.xyz, 0.0);\n\
+	}\n\
+\n\
+    vec3 objPosHigh = buildingPosHIGH;\n\
+    vec3 objPosLow = buildingPosLOW.xyz + rotatedPos.xyz;\n\
+    vec3 highDifference = objPosHigh.xyz - encodedCameraPositionMCHigh.xyz;\n\
+    vec3 lowDifference = objPosLow.xyz - encodedCameraPositionMCLow.xyz;\n\
+    vec4 pos4 = vec4(highDifference.xyz + lowDifference.xyz, 1.0);\n\
+    vec4 camSpacePos = ModelViewMatrixRelToEye * pos4;\n\
+    vec4 translationVec = ProjectionMatrix * vec4(camSpacePixelTranslation.x*(-camSpacePos.z), camSpacePixelTranslation.y*(-camSpacePos.z), 0.0, 1.0);\n\
+\n\
+    gl_Position = ModelViewProjectionMatrixRelToEye * pos4;\n\
+    gl_Position += translationVec;  \n\
+}";
+ShaderSource.StandardFS = "precision lowp float;\n\
+varying vec3 vColor;\n\
+\n\
+void main()\n\
+{\n\
+    gl_FragColor = vec4(vColor, 1.);\n\
+}";
+ShaderSource.StandardVS = "attribute vec3 position;\n\
+uniform mat4 ModelViewProjectionMatrixRelToEye;\n\
+uniform vec3 buildingPosHIGH;\n\
+uniform vec3 buildingPosLOW;\n\
+uniform vec3 encodedCameraPositionMCHigh;\n\
+uniform vec3 encodedCameraPositionMCLow;\n\
+uniform mat4 RefTransfMatrix;\n\
+attribute vec3 color;\n\
+varying vec3 vColor;\n\
+\n\
+void main()\n\
+{\n\
+    vec4 rotatedPos = RefTransfMatrix * vec4(position.xyz, 1.0);\n\
+    vec3 objPosHigh = buildingPosHIGH;\n\
+    vec3 objPosLow = buildingPosLOW.xyz + rotatedPos.xyz;\n\
+    vec3 highDifference = objPosHigh.xyz - encodedCameraPositionMCHigh.xyz;\n\
+    vec3 lowDifference = objPosLow.xyz - encodedCameraPositionMCLow.xyz;\n\
+    vec4 pos = vec4(highDifference.xyz + lowDifference.xyz, 1.0);\n\
+ \n\
+    vColor=color;\n\
+\n\
+    gl_Position = ModelViewProjectionMatrixRelToEye * pos;\n\
+}";
+ShaderSource.Test_QuadFS = "#ifdef GL_ES\n\
+    precision highp float;\n\
+#endif\n\
+ \n\
+uniform sampler2D diffuseTex;  \n\
+varying vec2 vTexCoord; \n\
+void main()\n\
+{          \n\
+    vec4 textureColor = texture2D(diffuseTex, vec2(vTexCoord.s, vTexCoord.t));\n\
+    gl_FragColor = textureColor; \n\
+}\n\
+";
+ShaderSource.Test_QuadVS = "attribute vec3 position;\n\
+attribute vec2 texCoord;\n\
+\n\
+uniform sampler2D diffuseTex;\n\
+uniform mat4 projectionMatrix;  \n\
+uniform mat4 modelViewMatrix;\n\
+uniform mat4 modelViewMatrixRelToEye; \n\
+uniform mat4 ModelViewProjectionMatrixRelToEye;\n\
+uniform mat4 normalMatrix4;\n\
+uniform mat4 buildingRotMatrix;  \n\
+uniform vec3 buildingPosHIGH;\n\
+uniform vec3 buildingPosLOW;\n\
+uniform vec3 encodedCameraPositionMCHigh;\n\
+uniform vec3 encodedCameraPositionMCLow;\n\
+\n\
+varying vec3 vNormal;\n\
+varying vec2 vTexCoord;   \n\
+\n\
+void main()\n\
+{	\n\
+    vec4 rotatedPos = buildingRotMatrix * vec4(position.xyz, 1.0);\n\
+    vec3 objPosHigh = buildingPosHIGH;\n\
+    vec3 objPosLow = buildingPosLOW.xyz + rotatedPos.xyz;\n\
+    vec3 highDifference = objPosHigh.xyz - encodedCameraPositionMCHigh.xyz;\n\
+    vec3 lowDifference = objPosLow.xyz - encodedCameraPositionMCLow.xyz;\n\
+    vec4 pos4 = vec4(highDifference.xyz + lowDifference.xyz, 1.0);\n\
+	\n\
+    vTexCoord = texCoord;\n\
+\n\
+    gl_Position = ModelViewProjectionMatrixRelToEye * pos4;\n\
+}\n\
+";
+ShaderSource.TextureA1FS = "precision mediump float;\n\
+varying vec4 vColor;\n\
+varying vec2 vTextureCoord;\n\
+uniform sampler2D uSampler;\n\
+\n\
+void main()\n\
+{\n\
+    gl_FragColor = texture2D(uSampler, vec2(vTextureCoord.s, vTextureCoord.t));\n\
+}\n\
+";
+ShaderSource.TextureA1VS = "attribute vec3 position;\n\
+attribute vec4 aVertexColor;\n\
+attribute vec2 aTextureCoord;\n\
+uniform mat4 ModelViewProjectionMatrixRelToEye;\n\
+uniform vec3 buildingPosHIGH;\n\
+uniform vec3 buildingPosLOW;\n\
+uniform vec3 encodedCameraPositionMCHigh;\n\
+uniform vec3 encodedCameraPositionMCLow;\n\
+varying vec4 vColor;\n\
+varying vec2 vTextureCoord;\n\
+\n\
+void main()\n\
+{\n\
+    vec3 objPosHigh = buildingPosHIGH;\n\
+    vec3 objPosLow = buildingPosLOW.xyz + position.xyz;\n\
+    vec3 highDifference = objPosHigh.xyz - encodedCameraPositionMCHigh.xyz;\n\
+    vec3 lowDifference = objPosLow.xyz - encodedCameraPositionMCLow.xyz;\n\
+    vec4 pos = vec4(highDifference.xyz + lowDifference.xyz, 1.0);\n\
+ \n\
+    vColor=aVertexColor;\n\
+    vTextureCoord = aTextureCoord;\n\
+\n\
+    gl_Position = ModelViewProjectionMatrixRelToEye * pos;\n\
+}";
+ShaderSource.TextureFS = "precision mediump float;\n\
+varying vec4 vColor;\n\
+varying vec2 vTextureCoord;\n\
+uniform sampler2D uSampler;\n\
+\n\
+void main()\n\
+{\n\
+    gl_FragColor = texture2D(uSampler, vec2(vTextureCoord.s, vTextureCoord.t));\n\
+}";
+ShaderSource.TextureNormalFS = "	precision mediump float;\n\
+	varying vec4 vColor;\n\
+	varying vec2 vTextureCoord;\n\
+	uniform sampler2D uSampler;\n\
+	varying vec3 vLightWeighting;\n\
+\n\
+	void main()\n\
+    {\n\
+		vec4 textureColor = texture2D(uSampler, vec2(vTextureCoord.s, vTextureCoord.t));\n\
+        \n\
+		gl_FragColor = vec4(textureColor.rgb * vLightWeighting, textureColor.a);\n\
+	}\n\
+";
+ShaderSource.TextureNormalVS = "attribute vec3 position;\n\
+attribute vec4 aVertexColor;\n\
+attribute vec2 aTextureCoord;\n\
+uniform mat4 ModelViewProjectionMatrixRelToEye;\n\
+uniform vec3 buildingPosHIGH;\n\
+uniform vec3 buildingPosLOW;\n\
+uniform vec3 encodedCameraPositionMCHigh;\n\
+uniform vec3 encodedCameraPositionMCLow;\n\
+varying vec4 vColor;\n\
+varying vec2 vTextureCoord;\n\
+attribute vec3 aVertexNormal;\n\
+varying vec3 uAmbientColor;\n\
+varying vec3 vLightWeighting;\n\
+uniform mat3 uNMatrix;\n\
+\n\
+void main()\n\
+{\n\
+    vec3 objPosHigh = buildingPosHIGH;\n\
+    vec3 objPosLow = buildingPosLOW.xyz + position.xyz;\n\
+    vec3 highDifference = objPosHigh.xyz - encodedCameraPositionMCHigh.xyz;\n\
+    vec3 lowDifference = objPosLow.xyz - encodedCameraPositionMCLow.xyz;\n\
+    vec4 pos = vec4(highDifference.xyz + lowDifference.xyz, 1.0);\n\
+    \n\
+    vColor = aVertexColor;\n\
+    vTextureCoord = aTextureCoord;\n\
+    \n\
+    vLightWeighting = vec3(1.0, 1.0, 1.0);\n\
+    uAmbientColor = vec3(0.7, 0.7, 0.7);\n\
+    vec3 uLightingDirection = vec3(0.8, 0.2, -0.9);\n\
+    vec3 directionalLightColor = vec3(0.4, 0.4, 0.4);\n\
+    vec3 transformedNormal = uNMatrix * aVertexNormal;\n\
+    float directionalLightWeighting = max(dot(transformedNormal, uLightingDirection), 0.0);\n\
+    vLightWeighting = uAmbientColor + directionalLightColor * directionalLightWeighting;\n\
+\n\
+    gl_Position = ModelViewProjectionMatrixRelToEye * pos;\n\
+}\n\
+";
+ShaderSource.texturesMergerFS = "#ifdef GL_ES\n\
+    precision highp float;\n\
+#endif\n\
+\n\
+uniform sampler2D texture_0;  \n\
+uniform sampler2D texture_1;\n\
+uniform sampler2D texture_2;\n\
+uniform sampler2D texture_3;\n\
+uniform sampler2D texture_4;\n\
+uniform sampler2D texture_5;\n\
+uniform sampler2D texture_6;\n\
+uniform sampler2D texture_7;\n\
+\n\
+uniform float externalAlphasArray[8];\n\
+uniform int uActiveTextures[8];\n\
+uniform vec4 uExternalTexCoordsArray[8]; // vec4 (minS, minT, maxS, maxT).\n\
+uniform vec2 uMinMaxAltitudes; // used for altitudes textures as bathymetry.\n\
+\n\
+varying vec2 v_tex_pos;\n\
+\n\
+//vec4 mixColor(sampler2D tex)\n\
+bool intersects(vec2 texCoord, vec4 extension)\n\
+{\n\
+    bool bIntersects = true;\n\
+    float minS = extension.x;\n\
+    float minT = extension.y;\n\
+    float maxS = extension.z;\n\
+    float maxT = extension.w;\n\
+\n\
+    if(texCoord.x < minS || texCoord.x > maxS)\n\
+    return false;\n\
+    else if(texCoord.y < minT || texCoord.y > maxT)\n\
+    return false;\n\
+\n\
+    return bIntersects;\n\
+}\n\
+\n\
+void getTextureColor(in int activeNumber, in vec4 currColor4, in vec2 texCoord,  inout bool victory, in float externalAlpha, in vec4 externalTexCoords, inout vec4 resultTextureColor)\n\
+{\n\
+    if(activeNumber == 1 || activeNumber == 2)\n\
+    {\n\
+        if(currColor4.w > 0.0 && externalAlpha > 0.0)\n\
+        {\n\
+            if(victory)\n\
+            {\n\
+                resultTextureColor = mix(resultTextureColor, currColor4, currColor4.w*externalAlpha);\n\
+            }\n\
+            else{\n\
+                currColor4.w *= externalAlpha;\n\
+                resultTextureColor = currColor4;\n\
+            }\n\
+            \n\
+            victory = true;\n\
+        }\n\
+    }\n\
+    else if(activeNumber == 10)\n\
+    {\n\
+        // Bathymetry texture.\n\
+        float altitude = 1000000.0;\n\
+        if(currColor4.w > 0.0)\n\
+        {\n\
+            // decode the grayScale.***\n\
+            altitude = uMinMaxAltitudes.x + currColor4.r * (uMinMaxAltitudes.y - uMinMaxAltitudes.x);\n\
+        \n\
+            if(altitude < 0.0)\n\
+            {\n\
+                float minHeight_rainbow = -100.0;\n\
+                float maxHeight_rainbow = 0.0;\n\
+                float gray = (altitude - minHeight_rainbow)/(maxHeight_rainbow - minHeight_rainbow);\n\
+                //vec3 rainbowColor = getRainbowColor_byHeight(altitude);\n\
+\n\
+                if(gray < 0.05)\n\
+                gray = 0.05;\n\
+                float red = gray + 0.1;//float red = gray + 0.2;\n\
+                float green = gray + 0.5;//float green = gray + 0.6;\n\
+                float blue = gray*2.0 + 2.0;\n\
+                vec4 fogColor = vec4(red, green, blue, 1.0);\n\
+                \n\
+                resultTextureColor = mix(resultTextureColor, fogColor, 0.7); \n\
+            }\n\
+        }\n\
+    }\n\
+}\n\
+\n\
+void main()\n\
+{           \n\
+    // Debug.\n\
+    /*\n\
+    if(v_tex_pos.x < 0.002 || v_tex_pos.x > 0.998)\n\
+    {\n\
+        gl_FragColor = vec4(1.0, 1.0, 1.0, 1.0);\n\
+        return;\n\
+    }\n\
+\n\
+    if(v_tex_pos.y < 0.002 || v_tex_pos.y > 0.998)\n\
+    {\n\
+        gl_FragColor = vec4(1.0, 1.0, 1.0, 1.0);\n\
+        return;\n\
+    }\n\
+    */\n\
+\n\
+    vec2 texCoord = vec2(1.0 - v_tex_pos.x, 1.0 - v_tex_pos.y);\n\
+\n\
+    // Take the base color.\n\
+    vec4 textureColor = vec4(0.0, 0.0, 0.0, 0.0);\n\
+    bool victory = false;\n\
+\n\
+    if(uActiveTextures[0] > 0)\n\
+    {\n\
+        if(uActiveTextures[0] == 2)\n\
+        {\n\
+            // CustomImage. Must recalculate texCoords.\n\
+            vec4 externalTexCoord = uExternalTexCoordsArray[0];\n\
+            \n\
+            // check if intersects.\n\
+            vec2 texCoordAux = vec2(texCoord.x, 1.0-texCoord.y);\n\
+            if(intersects(texCoordAux, externalTexCoord))\n\
+            {\n\
+                // convert myTexCoord to customImageTexCoord.\n\
+                vec2 minTexCoord = vec2(externalTexCoord.x, externalTexCoord.y);\n\
+                vec2 maxTexCoord = vec2(externalTexCoord.z, externalTexCoord.w);\n\
+\n\
+                texCoord.x = (texCoordAux.x - minTexCoord.x)/(maxTexCoord.x - minTexCoord.x);\n\
+                texCoord.y = (texCoordAux.y - minTexCoord.y)/(maxTexCoord.y - minTexCoord.y);\n\
+\n\
+                texCoord.y = 1.0 - texCoord.y;\n\
+                getTextureColor(uActiveTextures[0], texture2D(texture_0, texCoord), texCoord,  victory, externalAlphasArray[0], uExternalTexCoordsArray[0], textureColor);\n\
+            }\n\
+        }\n\
+        else\n\
+            getTextureColor(uActiveTextures[0], texture2D(texture_0, texCoord), texCoord,  victory, externalAlphasArray[0], uExternalTexCoordsArray[0], textureColor);\n\
+        \n\
+    }\n\
+    if(uActiveTextures[1] > 0)\n\
+    {\n\
+        if(uActiveTextures[1] == 2)\n\
+        {\n\
+            // CustomImage. Must recalculate texCoords.\n\
+            vec4 externalTexCoord = uExternalTexCoordsArray[1];\n\
+            \n\
+            // check if intersects.\n\
+            vec2 texCoordAux = vec2(texCoord.x, 1.0-texCoord.y);\n\
+            if(intersects(texCoordAux, externalTexCoord))\n\
+            {\n\
+                // convert myTexCoord to customImageTexCoord.\n\
+                vec2 minTexCoord = vec2(externalTexCoord.x, externalTexCoord.y);\n\
+                vec2 maxTexCoord = vec2(externalTexCoord.z, externalTexCoord.w);\n\
+\n\
+                texCoord.x = (texCoordAux.x - minTexCoord.x)/(maxTexCoord.x - minTexCoord.x);\n\
+                texCoord.y = (texCoordAux.y - minTexCoord.y)/(maxTexCoord.y - minTexCoord.y);\n\
+\n\
+                texCoord.y = 1.0 - texCoord.y;\n\
+                getTextureColor(uActiveTextures[1], texture2D(texture_1, texCoord), texCoord,  victory, externalAlphasArray[1], uExternalTexCoordsArray[1], textureColor);\n\
+            }\n\
+        }\n\
+        else\n\
+            getTextureColor(uActiveTextures[1], texture2D(texture_1, texCoord), texCoord,  victory, externalAlphasArray[1], uExternalTexCoordsArray[1], textureColor);\n\
+    }\n\
+    if(uActiveTextures[2] > 0)\n\
+    {\n\
+        if(uActiveTextures[2] == 2)\n\
+        {\n\
+            // CustomImage. Must recalculate texCoords.\n\
+            vec4 externalTexCoord = uExternalTexCoordsArray[2];\n\
+            \n\
+            // check if intersects.\n\
+            vec2 texCoordAux = vec2(texCoord.x, 1.0-texCoord.y);\n\
+            if(intersects(texCoordAux, externalTexCoord))\n\
+            {\n\
+                // convert myTexCoord to customImageTexCoord.\n\
+                vec2 minTexCoord = vec2(externalTexCoord.x, externalTexCoord.y);\n\
+                vec2 maxTexCoord = vec2(externalTexCoord.z, externalTexCoord.w);\n\
+\n\
+                texCoord.x = (texCoordAux.x - minTexCoord.x)/(maxTexCoord.x - minTexCoord.x);\n\
+                texCoord.y = (texCoordAux.y - minTexCoord.y)/(maxTexCoord.y - minTexCoord.y);\n\
+\n\
+                texCoord.y = 1.0 - texCoord.y;\n\
+                getTextureColor(uActiveTextures[2], texture2D(texture_2, texCoord), texCoord,  victory, externalAlphasArray[2], uExternalTexCoordsArray[2], textureColor);\n\
+            }\n\
+        }\n\
+        else\n\
+            getTextureColor(uActiveTextures[2], texture2D(texture_2, texCoord), texCoord,  victory, externalAlphasArray[2], uExternalTexCoordsArray[2], textureColor);\n\
+    }\n\
+    if(uActiveTextures[3] > 0)\n\
+    {\n\
+        if(uActiveTextures[3] == 2)\n\
+        {\n\
+            // CustomImage. Must recalculate texCoords.\n\
+            vec4 externalTexCoord = uExternalTexCoordsArray[3];\n\
+            \n\
+            // check if intersects.\n\
+            vec2 texCoordAux = vec2(texCoord.x, 1.0-texCoord.y);\n\
+            if(intersects(texCoordAux, externalTexCoord))\n\
+            {\n\
+                // convert myTexCoord to customImageTexCoord.\n\
+                vec2 minTexCoord = vec2(externalTexCoord.x, externalTexCoord.y);\n\
+                vec2 maxTexCoord = vec2(externalTexCoord.z, externalTexCoord.w);\n\
+\n\
+                texCoord.x = (texCoordAux.x - minTexCoord.x)/(maxTexCoord.x - minTexCoord.x);\n\
+                texCoord.y = (texCoordAux.y - minTexCoord.y)/(maxTexCoord.y - minTexCoord.y);\n\
+\n\
+                texCoord.y = 1.0 - texCoord.y;\n\
+                getTextureColor(uActiveTextures[3], texture2D(texture_3, texCoord), texCoord,  victory, externalAlphasArray[3], uExternalTexCoordsArray[3], textureColor);\n\
+            }\n\
+        }\n\
+        else\n\
+            getTextureColor(uActiveTextures[3], texture2D(texture_3, texCoord), texCoord,  victory, externalAlphasArray[3], uExternalTexCoordsArray[3], textureColor);\n\
+    }\n\
+    if(uActiveTextures[4] > 0)\n\
+    {\n\
+        if(uActiveTextures[4] == 2)\n\
+        {\n\
+            // CustomImage. Must recalculate texCoords.\n\
+            vec4 externalTexCoord = uExternalTexCoordsArray[4];\n\
+            \n\
+            // check if intersects.\n\
+            vec2 texCoordAux = vec2(texCoord.x, 1.0-texCoord.y);\n\
+            if(intersects(texCoordAux, externalTexCoord))\n\
+            {\n\
+                // convert myTexCoord to customImageTexCoord.\n\
+                vec2 minTexCoord = vec2(externalTexCoord.x, externalTexCoord.y);\n\
+                vec2 maxTexCoord = vec2(externalTexCoord.z, externalTexCoord.w);\n\
+\n\
+                texCoord.x = (texCoordAux.x - minTexCoord.x)/(maxTexCoord.x - minTexCoord.x);\n\
+                texCoord.y = (texCoordAux.y - minTexCoord.y)/(maxTexCoord.y - minTexCoord.y);\n\
+\n\
+                texCoord.y = 1.0 - texCoord.y;\n\
+                getTextureColor(uActiveTextures[4], texture2D(texture_4, texCoord), texCoord,  victory, externalAlphasArray[4], uExternalTexCoordsArray[4], textureColor);\n\
+            }\n\
+        }\n\
+        else\n\
+            getTextureColor(uActiveTextures[4], texture2D(texture_4, texCoord), texCoord,  victory, externalAlphasArray[4], uExternalTexCoordsArray[4], textureColor);\n\
+    }\n\
+    if(uActiveTextures[5] > 0)\n\
+    {\n\
+        if(uActiveTextures[5] == 2)\n\
+        {\n\
+            // CustomImage. Must recalculate texCoords.\n\
+            vec4 externalTexCoord = uExternalTexCoordsArray[5];\n\
+            \n\
+            // check if intersects.\n\
+            vec2 texCoordAux = vec2(texCoord.x, 1.0-texCoord.y);\n\
+            if(intersects(texCoordAux, externalTexCoord))\n\
+            {\n\
+                // convert myTexCoord to customImageTexCoord.\n\
+                vec2 minTexCoord = vec2(externalTexCoord.x, externalTexCoord.y);\n\
+                vec2 maxTexCoord = vec2(externalTexCoord.z, externalTexCoord.w);\n\
+\n\
+                texCoord.x = (texCoordAux.x - minTexCoord.x)/(maxTexCoord.x - minTexCoord.x);\n\
+                texCoord.y = (texCoordAux.y - minTexCoord.y)/(maxTexCoord.y - minTexCoord.y);\n\
+\n\
+                texCoord.y = 1.0 - texCoord.y;\n\
+                getTextureColor(uActiveTextures[5], texture2D(texture_5, texCoord), texCoord,  victory, externalAlphasArray[5], uExternalTexCoordsArray[5], textureColor);\n\
+            }\n\
+        }\n\
+        else\n\
+            getTextureColor(uActiveTextures[5], texture2D(texture_5, texCoord), texCoord,  victory, externalAlphasArray[5], uExternalTexCoordsArray[5], textureColor);\n\
+    }\n\
+    if(uActiveTextures[6] > 0)\n\
+    {\n\
+        if(uActiveTextures[6] == 2)\n\
+        {\n\
+            // CustomImage. Must recalculate texCoords.\n\
+            vec4 externalTexCoord = uExternalTexCoordsArray[6];\n\
+            \n\
+            // check if intersects.\n\
+            vec2 texCoordAux = vec2(texCoord.x, 1.0-texCoord.y);\n\
+            if(intersects(texCoordAux, externalTexCoord))\n\
+            {\n\
+                // convert myTexCoord to customImageTexCoord.\n\
+                vec2 minTexCoord = vec2(externalTexCoord.x, externalTexCoord.y);\n\
+                vec2 maxTexCoord = vec2(externalTexCoord.z, externalTexCoord.w);\n\
+\n\
+                texCoord.x = (texCoordAux.x - minTexCoord.x)/(maxTexCoord.x - minTexCoord.x);\n\
+                texCoord.y = (texCoordAux.y - minTexCoord.y)/(maxTexCoord.y - minTexCoord.y);\n\
+\n\
+                texCoord.y = 1.0 - texCoord.y;\n\
+                getTextureColor(uActiveTextures[6], texture2D(texture_2, texCoord), texCoord,  victory, externalAlphasArray[6], uExternalTexCoordsArray[6], textureColor);\n\
+            }\n\
+        }\n\
+        else\n\
+            getTextureColor(uActiveTextures[6], texture2D(texture_2, texCoord), texCoord,  victory, externalAlphasArray[6], uExternalTexCoordsArray[6], textureColor);\n\
+    }\n\
+    if(uActiveTextures[7] > 0)\n\
+    {\n\
+        if(uActiveTextures[7] == 2)\n\
+        {\n\
+            // CustomImage. Must recalculate texCoords.\n\
+            vec4 externalTexCoord = uExternalTexCoordsArray[7];\n\
+            \n\
+            // check if intersects.\n\
+            vec2 texCoordAux = vec2(texCoord.x, 1.0-texCoord.y);\n\
+            if(intersects(texCoordAux, externalTexCoord))\n\
+            {\n\
+                // convert myTexCoord to customImageTexCoord.\n\
+                vec2 minTexCoord = vec2(externalTexCoord.x, externalTexCoord.y);\n\
+                vec2 maxTexCoord = vec2(externalTexCoord.z, externalTexCoord.w);\n\
+\n\
+                texCoord.x = (texCoordAux.x - minTexCoord.x)/(maxTexCoord.x - minTexCoord.x);\n\
+                texCoord.y = (texCoordAux.y - minTexCoord.y)/(maxTexCoord.y - minTexCoord.y);\n\
+\n\
+                texCoord.y = 1.0 - texCoord.y;\n\
+                getTextureColor(uActiveTextures[7], texture2D(texture_7, texCoord), texCoord,  victory, externalAlphasArray[7], uExternalTexCoordsArray[7], textureColor);\n\
+            }\n\
+        }\n\
+        else\n\
+            getTextureColor(uActiveTextures[7], texture2D(texture_7, texCoord), texCoord,  victory, externalAlphasArray[7], uExternalTexCoordsArray[7], textureColor);\n\
+    }\n\
+    \n\
+    if(!victory)\n\
+    discard;\n\
+    \n\
+    gl_FragColor = textureColor;\n\
+	\n\
+}";
+ShaderSource.texturesMergerVS = "precision mediump float;\n\
+\n\
+attribute vec2 a_pos;\n\
+\n\
+varying vec2 v_tex_pos;\n\
+\n\
+void main() {\n\
+    v_tex_pos = a_pos;\n\
+    //vec2 pos = a_pos*0.5;\n\
+    gl_Position = vec4(1.0 - 2.0 * a_pos, 0, 1);\n\
+}";
+ShaderSource.TextureVS = "attribute vec3 position;\n\
+attribute vec4 aVertexColor;\n\
+attribute vec2 aTextureCoord;\n\
+uniform mat4 Mmatrix;\n\
+uniform mat4 ModelViewProjectionMatrixRelToEye;\n\
+uniform vec3 buildingPosHIGH;\n\
+uniform vec3 buildingPosLOW;\n\
+uniform vec3 encodedCameraPositionMCHigh;\n\
+uniform vec3 encodedCameraPositionMCLow;\n\
+varying vec4 vColor;\n\
+varying vec2 vTextureCoord;\n\
+\n\
+void main()\n\
+{\n\
+    vec4 rotatedPos = Mmatrix * vec4(position.xyz, 1.0);\n\
+    vec3 objPosHigh = buildingPosHIGH;\n\
+    vec3 objPosLow = buildingPosLOW.xyz + rotatedPos.xyz;\n\
+    vec3 highDifference = objPosHigh.xyz - encodedCameraPositionMCHigh.xyz;\n\
+    vec3 lowDifference = objPosLow.xyz - encodedCameraPositionMCLow.xyz;\n\
+    vec4 pos = vec4(highDifference.xyz + lowDifference.xyz, 1.0);\n\
+\n\
+    vColor=aVertexColor;\n\
+    vTextureCoord = aTextureCoord;\n\
+\n\
+    gl_Position = ModelViewProjectionMatrixRelToEye * pos;\n\
+    \n\
+}";
+ShaderSource.thickLineDepthVS = "\n\
+attribute vec4 prev;\n\
+attribute vec4 current;\n\
+attribute vec4 next;\n\
+attribute vec4 color4;\n\
+\n\
+uniform float thickness;\n\
+uniform mat4 buildingRotMatrix;\n\
+uniform mat4 projectionMatrix;\n\
+uniform mat4 modelViewMatrix;\n\
+uniform mat4 modelViewMatrixRelToEye; \n\
+uniform mat4 ModelViewProjectionMatrixRelToEye;\n\
+uniform vec2 viewport;\n\
+uniform vec3 buildingPosHIGH;\n\
+uniform vec3 buildingPosLOW;\n\
+uniform vec3 encodedCameraPositionMCHigh;\n\
+uniform vec3 encodedCameraPositionMCLow;\n\
+uniform vec4 oneColor4;\n\
+uniform highp int colorType; // 0= oneColor, 1= attribColor, 2= texture.\n\
+\n\
+uniform float near;\n\
+uniform float far;\n\
+uniform bool bUseLogarithmicDepth;\n\
+\n\
+varying vec4 vColor;\n\
+varying float depth;\n\
+varying float flogz;\n\
+varying float Fcoef_half;\n\
+\n\
+const float error = 0.001;\n\
+\n\
+// see https://weekly-geekly.github.io/articles/331164/index.html\n\
+// see too https://github.com/ridiculousfish/wavefiz/blob/master/ts/polyline.ts#L306\n\
+\n\
+vec2 project(vec4 p){\n\
+	return (0.5 * p.xyz / p.w + 0.5).xy * viewport;\n\
+}\n\
+\n\
+bool isEqual(float value, float valueToCompare)\n\
+{\n\
+	if(value + error > valueToCompare && value - error < valueToCompare)\n\
+	return true;\n\
+	\n\
+	return false;\n\
+}\n\
+\n\
+vec4 getPointRelToEye(in vec4 point)\n\
+{\n\
+	vec4 rotatedCurrent = buildingRotMatrix * vec4(point.xyz, 1.0);\n\
+	vec3 objPosHigh = buildingPosHIGH;\n\
+	vec3 objPosLow = buildingPosLOW.xyz + rotatedCurrent.xyz;\n\
+	vec3 highDifference = objPosHigh.xyz - encodedCameraPositionMCHigh.xyz;\n\
+	vec3 lowDifference = objPosLow.xyz - encodedCameraPositionMCLow.xyz;\n\
+	return vec4(highDifference.xyz + lowDifference.xyz, 1.0);\n\
+}\n\
+\n\
+void main(){\n\
+	// current, prev & next.***\n\
+	vec4 vCurrent = getPointRelToEye(vec4(current.xyz, 1.0));\n\
+	vec4 vPrev = getPointRelToEye(vec4(prev.xyz, 1.0));\n\
+	vec4 vNext = getPointRelToEye(vec4(next.xyz, 1.0));\n\
+	\n\
+	float order_w = current.w;\n\
+	//float order_w = float(order);\n\
+	float sense = 1.0;\n\
+	int orderInt = 0;\n\
+	if(order_w > 0.0)\n\
+	{\n\
+		sense = -1.0;\n\
+		if(order_w < 1.5)\n\
+		{\n\
+			orderInt = 1;\n\
+		}\n\
+		else{\n\
+			orderInt = 2;\n\
+		}\n\
+	}\n\
+	else\n\
+	{\n\
+		sense = 1.0;\n\
+		if(order_w > -1.5)\n\
+		{\n\
+			orderInt = -1;\n\
+		}\n\
+		else{\n\
+			orderInt = -2;\n\
+		}\n\
+	}\n\
+	\n\
+	float aspect = viewport.x / viewport.y;\n\
+	vec2 aspectVec = vec2(aspect, 1.0);\n\
+	\n\
+	vec4 previousProjected = ModelViewProjectionMatrixRelToEye * vPrev;\n\
+	vec4 currentProjected = ModelViewProjectionMatrixRelToEye * vCurrent;\n\
+	vec4 nextProjected = ModelViewProjectionMatrixRelToEye * vNext;\n\
+	\n\
+	float projectedDepth = currentProjected.w;                \n\
+	// Get 2D screen space with W divide and aspect correction\n\
+	vec2 currentScreen = currentProjected.xy / currentProjected.w * aspectVec;\n\
+	vec2 previousScreen = previousProjected.xy / previousProjected.w * aspectVec;\n\
+	vec2 nextScreen = nextProjected.xy / nextProjected.w * aspectVec;\n\
+					\n\
+	// This helps us handle 90 degree turns correctly\n\
+	vec2 tangentNext = normalize(nextScreen - currentScreen);\n\
+	vec2 tangentPrev = normalize(currentScreen - previousScreen);\n\
+	vec2 normal; \n\
+	if(orderInt == 1 || orderInt == -1)\n\
+	{\n\
+		normal = vec2(-tangentPrev.y, tangentPrev.x);\n\
+	}\n\
+	else{\n\
+		normal = vec2(-tangentNext.y, tangentNext.x);\n\
+	}\n\
+	normal *= thickness/2.0;\n\
+	normal.x /= aspect;\n\
+	float direction = (thickness*sense*projectedDepth)/1000.0;\n\
+	// Offset our position along the normal\n\
+	vec4 offset = vec4(normal * direction, 0.0, 1.0);\n\
+	gl_Position = currentProjected + offset; \n\
+	if(bUseLogarithmicDepth)\n\
+	{\n\
+		// logarithmic zBuffer:\n\
+			// https://outerra.blogspot.com/2013/07/logarithmic-depth-buffer-optimizations.html\n\
+			float Fcoef = 2.0 / log2(far + 1.0);\n\
+			gl_Position.z = log2(max(1e-6, 1.0 + gl_Position.w)) * Fcoef - 1.0;\n\
+\n\
+			flogz = 1.0 + gl_Position.w;\n\
+			Fcoef_half = 0.5 * Fcoef;\n\
+	}\n\
+\n\
+    depth = (modelViewMatrixRelToEye * current).z/far; // original.***\n\
+\n\
+	\n\
+	if(colorType == 0)\n\
+		vColor = oneColor4;\n\
+	else if(colorType == 1)\n\
+		vColor = color4; //vec4(color4.r+0.8, color4.g+0.8, color4.b+0.8, color4.a+0.8);\n\
+	else\n\
+		vColor = oneColor4;\n\
+}\n\
+\n\
+\n\
+\n\
+\n\
+\n\
+\n\
+\n\
+\n\
+\n\
+\n\
+\n\
+\n\
+";
+ShaderSource.thickLineFS = "precision highp float;\n\
+\n\
+#define %USE_LOGARITHMIC_DEPTH%\n\
+#ifdef USE_LOGARITHMIC_DEPTH\n\
+#extension GL_EXT_frag_depth : enable\n\
+#endif\n\
+\n\
+uniform bool bUseLogarithmicDepth;\n\
+varying vec4 vColor;\n\
+varying float flogz;\n\
+varying float Fcoef_half;\n\
+\n\
+void main() {\n\
+	gl_FragColor = vColor;\n\
+	#ifdef USE_LOGARITHMIC_DEPTH\n\
+	if(bUseLogarithmicDepth)\n\
+	{\n\
+		gl_FragDepthEXT = log2(flogz) * Fcoef_half;\n\
+	}\n\
+	#endif\n\
+}";
+ShaderSource.thickLineVS = "\n\
+attribute vec4 prev;\n\
+attribute vec4 current;\n\
+attribute vec4 next;\n\
+attribute vec4 color4;\n\
+\n\
+uniform float thickness;\n\
+uniform mat4 buildingRotMatrix;\n\
+uniform mat4 projectionMatrix;\n\
+uniform mat4 modelViewMatrix;\n\
+uniform mat4 modelViewMatrixRelToEye; \n\
+uniform mat4 ModelViewProjectionMatrixRelToEye;\n\
+uniform vec2 viewport;\n\
+uniform vec3 buildingPosHIGH;\n\
+uniform vec3 buildingPosLOW;\n\
+uniform vec3 encodedCameraPositionMCHigh;\n\
+uniform vec3 encodedCameraPositionMCLow;\n\
+uniform vec4 oneColor4;\n\
+uniform highp int colorType; // 0= oneColor, 1= attribColor, 2= texture.\n\
+uniform float near;\n\
+uniform float far;\n\
+uniform bool bUseLogarithmicDepth;\n\
+\n\
+varying vec4 vColor;\n\
+varying float flogz;\n\
+varying float Fcoef_half;\n\
+\n\
+const float error = 0.001;\n\
+\n\
+// see https://weekly-geekly.github.io/articles/331164/index.html\n\
+// see too https://github.com/ridiculousfish/wavefiz/blob/master/ts/polyline.ts#L306\n\
+\n\
+vec2 project(vec4 p){\n\
+	return (0.5 * p.xyz / p.w + 0.5).xy * viewport;\n\
+}\n\
+\n\
+bool isEqual(float value, float valueToCompare)\n\
+{\n\
+	if(value + error > valueToCompare && value - error < valueToCompare)\n\
+	return true;\n\
+	\n\
+	return false;\n\
+}\n\
+\n\
+vec4 getPointRelToEye(in vec4 point)\n\
+{\n\
+	vec4 rotatedCurrent = buildingRotMatrix * vec4(point.xyz, 1.0);\n\
+	vec3 objPosHigh = buildingPosHIGH;\n\
+	vec3 objPosLow = buildingPosLOW.xyz + rotatedCurrent.xyz;\n\
+	vec3 highDifference = objPosHigh.xyz - encodedCameraPositionMCHigh.xyz;\n\
+	vec3 lowDifference = objPosLow.xyz - encodedCameraPositionMCLow.xyz;\n\
+	return vec4(highDifference.xyz + lowDifference.xyz, 1.0);\n\
+}\n\
+\n\
+void main(){\n\
+	// current, prev & next.***\n\
+	vec4 vCurrent = getPointRelToEye(vec4(current.xyz, 1.0));\n\
+	vec4 vPrev = getPointRelToEye(vec4(prev.xyz, 1.0));\n\
+	vec4 vNext = getPointRelToEye(vec4(next.xyz, 1.0));\n\
+	\n\
+	float order_w = current.w;\n\
+	//float order_w = float(order);\n\
+	float sense = 1.0;\n\
+	int orderInt = 0;\n\
+	if(order_w > 0.0)\n\
+	{\n\
+		sense = -1.0;\n\
+		if(order_w < 1.5)\n\
+		{\n\
+			orderInt = 1;\n\
+		}\n\
+		else{\n\
+			orderInt = 2;\n\
+		}\n\
+	}\n\
+	else\n\
+	{\n\
+		sense = 1.0;\n\
+		if(order_w > -1.5)\n\
+		{\n\
+			orderInt = -1;\n\
+		}\n\
+		else{\n\
+			orderInt = -2;\n\
+		}\n\
+	}\n\
+	\n\
+	float aspect = viewport.x / viewport.y;\n\
+	vec2 aspectVec = vec2(aspect, 1.0);\n\
+	\n\
+	vec4 previousProjected = ModelViewProjectionMatrixRelToEye * vPrev;\n\
+	vec4 currentProjected = ModelViewProjectionMatrixRelToEye * vCurrent;\n\
+	vec4 nextProjected = ModelViewProjectionMatrixRelToEye * vNext;\n\
+	\n\
+	float projectedDepth = currentProjected.w;                \n\
+	// Get 2D screen space with W divide and aspect correction\n\
+	vec2 currentScreen = currentProjected.xy / currentProjected.w * aspectVec;\n\
+	vec2 previousScreen = previousProjected.xy / previousProjected.w * aspectVec;\n\
+	vec2 nextScreen = nextProjected.xy / nextProjected.w * aspectVec;\n\
+					\n\
+	// This helps us handle 90 degree turns correctly\n\
+	vec2 tangentNext = normalize(nextScreen - currentScreen);\n\
+	vec2 tangentPrev = normalize(currentScreen - previousScreen);\n\
+	vec2 normal; \n\
+	if(orderInt == 1 || orderInt == -1)\n\
+	{\n\
+		normal = vec2(-tangentPrev.y, tangentPrev.x);\n\
+	}\n\
+	else{\n\
+		normal = vec2(-tangentNext.y, tangentNext.x);\n\
+	}\n\
+	normal *= thickness/2.0;\n\
+	normal.x /= aspect;\n\
+	float direction = (thickness*sense*projectedDepth)/1000.0;\n\
+	// Offset our position along the normal\n\
+	vec4 offset = vec4(normal * direction, 0.0, 1.0);\n\
+	gl_Position = currentProjected + offset; \n\
+\n\
+	if(bUseLogarithmicDepth)\n\
+	{\n\
+		// logarithmic zBuffer:\n\
+			// https://outerra.blogspot.com/2013/07/logarithmic-depth-buffer-optimizations.html\n\
+			float Fcoef = 2.0 / log2(far + 1.0);\n\
+			gl_Position.z = log2(max(1e-6, 1.0 + gl_Position.w)) * Fcoef - 1.0;\n\
+\n\
+			flogz = 1.0 + gl_Position.w;\n\
+			Fcoef_half = 0.5 * Fcoef;\n\
+	}\n\
+	\n\
+	if(colorType == 0)\n\
+		vColor = oneColor4;\n\
+	else if(colorType == 1)\n\
+		vColor = color4; //vec4(color4.r+0.8, color4.g+0.8, color4.b+0.8, color4.a+0.8);\n\
+	else\n\
+		vColor = oneColor4;\n\
+}\n\
+\n\
+\n\
+\n\
+\n\
+\n\
+\n\
+\n\
+\n\
+\n\
+\n\
+\n\
+\n\
+";
+ShaderSource.TinTerrainAltitudesFS = "#ifdef GL_ES\n\
+precision highp float;\n\
+#endif\n\
+\n\
+varying float vAltitude;  \n\
+\n\
+vec4 packDepth(const in float depth)\n\
+{\n\
+    const vec4 bit_shift = vec4(16777216.0, 65536.0, 256.0, 1.0);\n\
+    const vec4 bit_mask  = vec4(0.0, 0.00390625, 0.00390625, 0.00390625); \n\
+    //vec4 res = fract(depth * bit_shift); // Is not precise.\n\
+	vec4 res = mod(depth * bit_shift * vec4(255), vec4(256) ) / vec4(255); // Is better.\n\
+    res -= res.xxyz * bit_mask;\n\
+    return res;  \n\
+}\n\
+\n\
+vec4 PackDepth32( in float depth )\n\
+{\n\
+    depth *= (16777216.0 - 1.0) / (16777216.0);\n\
+    vec4 encode = fract( depth * vec4(1.0, 256.0, 256.0*256.0, 16777216.0) );// 256.0*256.0*256.0 = 16777216.0\n\
+    return vec4( encode.xyz - encode.yzw / 256.0, encode.w ) + 1.0/512.0;\n\
+}\n\
+\n\
+void main()\n\
+{     \n\
+    gl_FragData[0] = PackDepth32(vAltitude);\n\
+	//gl_FragData[0] = packDepth(-depth);\n\
+}";
+ShaderSource.TinTerrainAltitudesVS = "attribute vec3 position;\n\
+uniform mat4 ModelViewProjectionMatrix;\n\
+\n\
+varying float vAltitude;\n\
+  \n\
+void main()\n\
+{	\n\
+    vec4 pos4 = vec4(position.xyz, 1.0);\n\
+	gl_Position = ModelViewProjectionMatrix * pos4;\n\
+	vAltitude = position.z;\n\
+}\n\
+";
+ShaderSource.TinTerrainFS = "#ifdef GL_ES\n\
+    precision highp float;\n\
+#endif\n\
+\n\
+#define %USE_LOGARITHMIC_DEPTH%\n\
+#ifdef USE_LOGARITHMIC_DEPTH\n\
+#extension GL_EXT_frag_depth : enable\n\
+#endif\n\
+  \n\
+uniform sampler2D shadowMapTex;// 0\n\
+uniform sampler2D shadowMapTex2;// 1\n\
+//uniform sampler2D depthTex;//2\n\
+//uniform sampler2D noiseTex;//3\n\
+uniform sampler2D diffuseTex;  // 4\n\
+uniform sampler2D diffuseTex_1;// 5\n\
+uniform sampler2D diffuseTex_2;// 6\n\
+uniform sampler2D diffuseTex_3;// 7\n\
+uniform sampler2D diffuseTex_4;// 8\n\
+uniform sampler2D diffuseTex_5;// 9\n\
+uniform bool textureFlipYAxis;\n\
+uniform bool bIsMakingDepth;\n\
+uniform bool bExistAltitudes;\n\
+uniform mat4 projectionMatrix;\n\
+uniform vec2 noiseScale;\n\
+uniform float near;\n\
+uniform float far;            \n\
+uniform float fov;\n\
+uniform float aspectRatio;    \n\
+uniform float screenWidth;    \n\
+uniform float screenHeight;    \n\
+uniform float shininessValue;\n\
+uniform vec3 kernel[16];   \n\
+uniform int uActiveTextures[8];\n\
+uniform float externalAlphasArray[8];\n\
+uniform vec2 uMinMaxAltitudes;\n\
+uniform int uTileDepth;\n\
+uniform int uSeaOrTerrainType;\n\
+uniform int uRenderType;\n\
+\n\
+uniform vec4 oneColor4;\n\
+uniform highp int colorType; // 0= oneColor, 1= attribColor, 2= texture.\n\
+\n\
+varying vec2 vTexCoord;   \n\
+varying vec3 vLightWeighting;\n\
+\n\
+varying vec3 diffuseColor;\n\
+uniform vec3 specularColor;\n\
+varying float depthValue;\n\
+\n\
+const int kernelSize = 16;  \n\
+uniform float radius;      \n\
+uniform float uTime;  \n\
+\n\
+uniform float ambientReflectionCoef;\n\
+uniform float diffuseReflectionCoef;  \n\
+uniform float specularReflectionCoef; \n\
+uniform float externalAlpha;\n\
+uniform bool bApplyShadow;\n\
+uniform bool bApplySsao;\n\
+uniform float shadowMapWidth;    \n\
+uniform float shadowMapHeight;\n\
+uniform bool bUseLogarithmicDepth;\n\
+\n\
+varying vec3 v3Pos;\n\
+varying float vFogAmount;\n\
+\n\
+varying float applySpecLighting;\n\
+varying vec4 vPosRelToLight; \n\
+varying vec3 vLightDir; \n\
+varying vec3 vNormal;\n\
+varying vec3 vNormalWC;\n\
+varying float currSunIdx;\n\
+varying float vAltitude;\n\
+\n\
+varying float flogz;\n\
+varying float Fcoef_half;\n\
+\n\
+const float equatorialRadius = 6378137.0;\n\
+const float polarRadius = 6356752.3142;\n\
+\n\
+// water caustics: https://catlikecoding.com/unity/tutorials/flow/texture-distortion/\n\
+\n\
+float unpackDepth(const in vec4 rgba_depth)\n\
+{\n\
+    const vec4 bit_shift = vec4(0.000000059605, 0.000015258789, 0.00390625, 1.0);\n\
+    float depth = dot(rgba_depth, bit_shift);\n\
+    return depth;\n\
+} \n\
+\n\
+float unpackDepthOcean(const in vec4 rgba_depth)\n\
+{\n\
+    const vec4 bit_shift = vec4(1.0, 0.00390625, 0.000015258789, 0.000000059605);\n\
+    float depth = dot(rgba_depth, bit_shift);\n\
+    return depth;\n\
+} \n\
+\n\
+float UnpackDepth32( in vec4 pack )\n\
+{\n\
+    float depth = dot( pack, 1.0 / vec4(1.0, 256.0, 256.0*256.0, 16777216.0) );// 256.0*256.0*256.0 = 16777216.0\n\
+    return depth * (16777216.0) / (16777216.0 - 1.0);\n\
+}\n\
+\n\
+vec4 packDepth(const in float depth)\n\
+{\n\
+    const vec4 bit_shift = vec4(16777216.0, 65536.0, 256.0, 1.0);\n\
+    const vec4 bit_mask  = vec4(0.0, 0.00390625, 0.00390625, 0.00390625); \n\
+    //vec4 res = fract(depth * bit_shift); // Is not precise.\n\
+	vec4 res = mod(depth * bit_shift * vec4(255), vec4(256) ) / vec4(255); // Is better.\n\
+    res -= res.xxyz * bit_mask;\n\
+    return res;  \n\
+}               \n\
+\n\
+vec3 getViewRay(vec2 tc)\n\
+{\n\
+    float hfar = 2.0 * tan(fov/2.0) * far;\n\
+    float wfar = hfar * aspectRatio;    \n\
+    vec3 ray = vec3(wfar * (tc.x - 0.5), hfar * (tc.y - 0.5), -far);    \n\
+    return ray;                      \n\
+}\n\
+\n\
+//linear view space depth\n\
+float getDepth(vec2 coord)\n\
+{\n\
+	// in this shader the depthTex is \"diffuseTex\"\n\
+	return unpackDepth(texture2D(diffuseTex, coord.xy));\n\
+}\n\
+\n\
+//linear view space depth\n\
+//float getDepth(vec2 coord)\n\
+//{\n\
+//    return unpackDepth(texture2D(depthTex, coord.xy));\n\
+//}  \n\
+\n\
+vec3 getRainbowColor_byHeight(float height)\n\
+{\n\
+	float minHeight_rainbow = -200.0;\n\
+	float maxHeight_rainbow = 0.0;\n\
+	\n\
+	float gray = (height - minHeight_rainbow)/(maxHeight_rainbow - minHeight_rainbow);\n\
+	if (gray > 1.0){ gray = 1.0; }\n\
+	else if (gray<0.0){ gray = 0.0; }\n\
+	\n\
+	float r, g, b;\n\
+	\n\
+	if(gray < 0.16666)\n\
+	{\n\
+		b = 0.0;\n\
+		g = gray*6.0;\n\
+		r = 1.0;\n\
+	}\n\
+	else if(gray >= 0.16666 && gray < 0.33333)\n\
+	{\n\
+		b = 0.0;\n\
+		g = 1.0;\n\
+		r = 2.0 - gray*6.0;\n\
+	}\n\
+	else if(gray >= 0.33333 && gray < 0.5)\n\
+	{\n\
+		b = -2.0 + gray*6.0;\n\
+		g = 1.0;\n\
+		r = 0.0;\n\
+	}\n\
+	else if(gray >= 0.5 && gray < 0.66666)\n\
+	{\n\
+		b = 1.0;\n\
+		g = 4.0 - gray*6.0;\n\
+		r = 0.0;\n\
+	}\n\
+	else if(gray >= 0.66666 && gray < 0.83333)\n\
+	{\n\
+		b = 1.0;\n\
+		g = 0.0;\n\
+		r = -4.0 + gray*6.0;\n\
+	}\n\
+	else if(gray >= 0.83333)\n\
+	{\n\
+		b = 6.0 - gray*6.0;\n\
+		g = 0.0;\n\
+		r = 1.0;\n\
+	}\n\
+	\n\
+	float aux = r;\n\
+	r = b;\n\
+	b = aux;\n\
+	\n\
+	//b = -gray + 1.0;\n\
+	//if (gray > 0.5)\n\
+	//{\n\
+	//	g = -gray*2.0 + 2.0; \n\
+	//}\n\
+	//else \n\
+	//{\n\
+	//	g = gray*2.0;\n\
+	//}\n\
+	//r = gray;\n\
+	vec3 resultColor = vec3(r, g, b);\n\
+    return resultColor;\n\
+} \n\
+\n\
+float getDepthShadowMap(vec2 coord)\n\
+{\n\
+	// currSunIdx\n\
+	if(currSunIdx > 0.0 && currSunIdx < 1.0)\n\
+	{\n\
+		return UnpackDepth32(texture2D(shadowMapTex, coord.xy));\n\
+	}\n\
+    else if(currSunIdx > 1.0 && currSunIdx < 2.0)\n\
+	{\n\
+		return UnpackDepth32(texture2D(shadowMapTex2, coord.xy));\n\
+	}\n\
+	else\n\
+		return 1000.0;\n\
+} \n\
+\n\
+float getGridLineWidth(int depth)\n\
+{\n\
+	float gridLineWidth = 0.025;\n\
+	\n\
+	if(depth == 17)\n\
+	{\n\
+		gridLineWidth = 0.025;\n\
+	}\n\
+	else{\n\
+		int dif = 18 - depth;\n\
+		if(dif < 1)\n\
+		dif = 1;\n\
+		gridLineWidth = (0.04/17.0) * float(depth/dif);\n\
+	}\n\
+	\n\
+	return gridLineWidth;\n\
+}\n\
+\n\
+//#define SHOW_TILING\n\
+#define TAU 6.28318530718 // https://www.shadertoy.com/view/4sXfDj\n\
+#define MAX_ITER 5 // https://www.shadertoy.com/view/4sXfDj\n\
+\n\
+// Water Caustics with BCC-Noise :https://www.shadertoy.com/view/wlc3zr\n\
+\n\
+vec3 causticColor(vec2 texCoord)\n\
+{\n\
+	// To avoid mosaic repetitions.******************\n\
+	float uPlus = texCoord.x - 1.0;\n\
+	float vPlus = texCoord.y - 1.0;\n\
+	//float timePlus = max(uPlus, vPlus);\n\
+	float timePlus = uPlus + vPlus;\n\
+	if(timePlus < 0.0)\n\
+	timePlus = 0.0;\n\
+	// End avoid mosaic repetitions.-------------------------\n\
+	\n\
+	// Water turbulence effect by joltz0r 2013-07-04, improved 2013-07-07\n\
+	float time = (uTime+timePlus) * .5+23.0;\n\
+    // uv should be the 0-1 uv of texture...\n\
+\n\
+	\n\
+\n\
+	vec2 uv = texCoord;\n\
+    \n\
+#ifdef SHOW_TILING\n\
+	vec2 p = mod(uv*TAU*2.0, TAU)-250.0;\n\
+#else\n\
+    vec2 p = mod(uv*TAU, TAU)-250.0;\n\
+#endif\n\
+	vec2 i = vec2(p);\n\
+	float c = 1.0;\n\
+	float inten = .005;\n\
+\n\
+	for (int n = 0; n < MAX_ITER; n++) \n\
+	{\n\
+		float t = time * (1.0 - (3.5 / float(n+1)));\n\
+		i = p + vec2(cos(t - i.x) + sin(t + i.y), sin(t - i.y) + cos(t + i.x));\n\
+		c += 1.0/length(vec2(p.x / (sin(i.x+t)/inten),p.y / (cos(i.y+t)/inten)));\n\
+	}\n\
+	c /= float(MAX_ITER);\n\
+	c = 1.17-pow(c, 1.4);\n\
+	vec3 colour = vec3(pow(abs(c), 8.0));\n\
+    colour = clamp(colour + vec3(0.0, 0.35, 0.5), 0.0, 1.0);\n\
+\n\
+	#ifdef SHOW_TILING\n\
+	// Flash tile borders...\n\
+	vec2 pixel = 2.0 / vec2(screenWidth, screenHeight);//iResolution.xy;\n\
+	uv *= 2.0;\n\
+\n\
+	float f = floor(mod(time*.5, 2.0)); 	// Flash value.\n\
+	vec2 first = step(pixel, uv) * f;		   	// Rule out first screen pixels and flash.\n\
+	uv  = step(fract(uv), pixel);				// Add one line of pixels per tile.\n\
+	colour = mix(colour, vec3(1.0, 1.0, 0.0), (uv.x + uv.y) * first.x * first.y); // Yellow line\n\
+	\n\
+	#endif\n\
+\n\
+	return colour;\n\
+}\n\
+\n\
+void getTextureColor(in int activeNumber, in vec4 currColor4, in vec2 texCoord,  inout bool victory, in float externalAlpha, inout vec4 resultTextureColor)\n\
+{\n\
+    if(activeNumber == 1)\n\
+    {\n\
+        if(currColor4.w > 0.0 && externalAlpha > 0.0)\n\
+        {\n\
+            if(victory)\n\
+            {\n\
+                resultTextureColor = mix(resultTextureColor, currColor4, currColor4.w*externalAlpha);\n\
+            }\n\
+            else{\n\
+                currColor4.w *= externalAlpha;\n\
+                resultTextureColor = currColor4;\n\
+            }\n\
+            \n\
+            victory = true;\n\
+        }\n\
+    }\n\
+    else if(activeNumber == 2)\n\
+    {\n\
+        // custom image.\n\
+        // Check uExternalTexCoordsArray.\n\
+        \n\
+    }\n\
+}\n\
+\n\
+void main()\n\
+{    \n\
+	#ifdef USE_LOGARITHMIC_DEPTH\n\
+	if(bUseLogarithmicDepth)\n\
+	{\n\
+		gl_FragDepthEXT = log2(flogz) * Fcoef_half;\n\
+	}\n\
+	#endif\n\
+\n\
+	if(bIsMakingDepth)\n\
+	{\n\
+		gl_FragColor = packDepth(-depthValue);\n\
+	}\n\
+	else\n\
+	{\n\
+		if(uRenderType == 2)\n\
+		{\n\
+			gl_FragColor = oneColor4; \n\
+			return;\n\
+		}\n\
+\n\
+		if(uSeaOrTerrainType == 1)\n\
+		{\n\
+			//gl_FragColor = vec4(oneColor4.xyz * shadow_occlusion * lambertian, 0.5); // original.***\n\
+			// Render a dot matrix in the sea surface.***\n\
+			\n\
+\n\
+			return;\n\
+		}\n\
+\n\
+		\n\
+\n\
+		float shadow_occlusion = 1.0;\n\
+		if(bApplyShadow)\n\
+		{\n\
+			if(currSunIdx > 0.0)\n\
+			{\n\
+				vec3 fragCoord = gl_FragCoord.xyz;\n\
+				vec3 fragWC;\n\
+				\n\
+				//float ligthAngle = dot(vLightDir, vNormalWC);\n\
+				//if(ligthAngle > 0.0)\n\
+				//{\n\
+				//	// The angle between the light direction & face normal is less than 90 degree, so, the face is in shadow.***\n\
+				//	shadow_occlusion = 0.5;\n\
+				//}\n\
+				//else\n\
+				{\n\
+\n\
+					vec3 posRelToLight = vPosRelToLight.xyz / vPosRelToLight.w;\n\
+					float tolerance = 0.9963;\n\
+					//tolerance = 0.9962;\n\
+					//tolerance = 1.0;\n\
+					posRelToLight = posRelToLight * 0.5 + 0.5; // transform to [0,1] range\n\
+					if(posRelToLight.x >= 0.0 && posRelToLight.x <= 1.0)\n\
+					{\n\
+						if(posRelToLight.y >= 0.0 && posRelToLight.y <= 1.0)\n\
+						{\n\
+							float depthRelToLight = getDepthShadowMap(posRelToLight.xy);\n\
+							if(posRelToLight.z > depthRelToLight*tolerance )\n\
+							{\n\
+								shadow_occlusion = 0.5;\n\
+							}\n\
+						}\n\
+					}\n\
+				}\n\
+			}\n\
+		}\n\
+		\n\
+		// Do specular lighting.***\n\
+		vec3 normal2 = vNormal;	\n\
+		float lambertian = 1.0;\n\
+		float specular;\n\
+		vec2 texCoord;\n\
+		if(applySpecLighting> 0.0)\n\
+		{\n\
+			vec3 L;\n\
+			if(bApplyShadow)\n\
+			{\n\
+				L = vLightDir;// test.***\n\
+				lambertian = max(dot(normal2, L), 0.0); // original.***\n\
+			}\n\
+			else\n\
+			{\n\
+				vec3 lightPos = vec3(0.0, 0.0, 0.0);\n\
+				L = normalize(lightPos - v3Pos);\n\
+				lambertian = max(dot(normal2, L), 0.0);\n\
+			}\n\
+			/*\n\
+			specular = 0.0;\n\
+			if(lambertian > 0.0)\n\
+			{\n\
+				vec3 R = reflect(-L, normal2);      // Reflected light vector\n\
+				vec3 V = normalize(-v3Pos); // Vector to viewer\n\
+				\n\
+				// Compute the specular term\n\
+				float specAngle = max(dot(R, V), 0.0);\n\
+				specular = pow(specAngle, shininessValue);\n\
+				\n\
+				if(specular > 1.0)\n\
+				{\n\
+					specular = 1.0;\n\
+				}\n\
+			}\n\
+			*/\n\
+			// test.\n\
+			lambertian += 0.3;\n\
+\n\
+			if(lambertian < 0.8)\n\
+			{\n\
+				lambertian = 0.8;\n\
+			}\n\
+			else if(lambertian > 1.0)\n\
+			{\n\
+				lambertian = 1.0;\n\
+			}\n\
+		}\n\
+		\n\
+		// check if apply ssao.\n\
+		float occlusion = 1.0;\n\
+		//vec3 normal2 = vNormal;	\n\
+		\n\
+	\n\
+		vec4 textureColor = vec4(0.0);\n\
+		if(colorType == 0) // one color.\n\
+		{\n\
+			textureColor = oneColor4;\n\
+			\n\
+			if(textureColor.w == 0.0)\n\
+			{\n\
+				discard;\n\
+			}\n\
+		}\n\
+		else if(colorType == 2) // texture color.\n\
+		{\n\
+			\n\
+			if(textureFlipYAxis)\n\
+			{\n\
+				texCoord = vec2(vTexCoord.s, 1.0 - vTexCoord.t);\n\
+			}\n\
+			else{\n\
+				texCoord = vec2(vTexCoord.s, vTexCoord.t);\n\
+			}\n\
+			\n\
+			bool firstColorSetted = false;\n\
+			float externalAlpha = 0.0;\n\
+\n\
+			if(uActiveTextures[2] > 0 && uActiveTextures[2] != 10)\n\
+				getTextureColor(uActiveTextures[2], texture2D(diffuseTex, texCoord), texCoord,  firstColorSetted, externalAlphasArray[2], textureColor);\n\
+			if(uActiveTextures[3] > 0 && uActiveTextures[3] != 10)\n\
+				getTextureColor(uActiveTextures[3], texture2D(diffuseTex_1, texCoord), texCoord,  firstColorSetted, externalAlphasArray[3], textureColor);\n\
+			if(uActiveTextures[4] > 0 && uActiveTextures[4] != 10)\n\
+				getTextureColor(uActiveTextures[4], texture2D(diffuseTex_2, texCoord), texCoord,  firstColorSetted, externalAlphasArray[4], textureColor);\n\
+			if(uActiveTextures[5] > 0 && uActiveTextures[5] != 10)\n\
+				getTextureColor(uActiveTextures[5], texture2D(diffuseTex_3, texCoord), texCoord,  firstColorSetted, externalAlphasArray[5], textureColor);\n\
+			if(uActiveTextures[6] > 0 && uActiveTextures[6] != 10)\n\
+				getTextureColor(uActiveTextures[6], texture2D(diffuseTex_4, texCoord), texCoord,  firstColorSetted, externalAlphasArray[6], textureColor);\n\
+			if(uActiveTextures[7] > 0 && uActiveTextures[7] != 10)\n\
+				getTextureColor(uActiveTextures[7], texture2D(diffuseTex_5, texCoord), texCoord,  firstColorSetted, externalAlphasArray[7], textureColor);\n\
+\n\
+			if(textureColor.w == 0.0)\n\
+			{\n\
+				discard;\n\
+			}\n\
+		}\n\
+		else{\n\
+			textureColor = oneColor4;\n\
+		}\n\
+\n\
+		textureColor.w = externalAlpha;\n\
+		vec4 fogColor = vec4(0.9, 0.9, 0.9, 1.0);\n\
+		\n\
+		\n\
+		// Dem image.***************************************************************************************************************\n\
+		float altitude = 1000000.0;\n\
+		if(uActiveTextures[5] == 10)\n\
+		{\n\
+			vec4 layersTextureColor = texture2D(diffuseTex_3, texCoord);\n\
+			if(layersTextureColor.w > 0.0)\n\
+			{\n\
+				// decode the grayScale.***\n\
+				altitude = uMinMaxAltitudes.x + layersTextureColor.r * (uMinMaxAltitudes.y - uMinMaxAltitudes.x);\n\
+			}\n\
+		}\n\
+		// End Dem image.------------------------------------------------------------------------------------------------------------\n\
+		if(bApplySsao && altitude<0.0)\n\
+		{\n\
+			// must find depthTex & noiseTex.***\n\
+			////float farForDepth = 30000.0;\n\
+			vec2 screenPos = vec2(gl_FragCoord.x / screenWidth, gl_FragCoord.y / screenHeight);\n\
+			float linearDepth = getDepth(screenPos);  \n\
+			vec3 ray = getViewRay(screenPos); // The \"far\" for depthTextures if fixed in \"RenderShowDepthVS\" shader.\n\
+			vec3 origin = ray * linearDepth;  \n\
+			float ssaoRadius = radius*20.0;\n\
+			float tolerance = ssaoRadius/far; // original.***\n\
+			////float tolerance = radius/(far-near);// test.***\n\
+			////float tolerance = radius/farForDepth;\n\
+\n\
+			// in this shader noiseTex is \"diffusse_1\".\n\
+			vec3 rvec = texture2D(diffuseTex_1, screenPos.xy * noiseScale).xyz * 2.0 - 1.0;\n\
+			vec3 tangent = normalize(rvec - normal2 * dot(rvec, normal2));\n\
+			vec3 bitangent = cross(normal2, tangent);\n\
+			mat3 tbn = mat3(tangent, bitangent, normal2);   \n\
+			//float minDepthBuffer;\n\
+			//float maxDepthBuffer;\n\
+			for(int i = 0; i < kernelSize; ++i)\n\
+			{    	 \n\
+				vec3 sample = origin + (tbn * vec3(kernel[i].x*3.0, kernel[i].y*3.0, kernel[i].z)) * ssaoRadius*2.0; // original.***\n\
+				vec4 offset = projectionMatrix * vec4(sample, 1.0);					\n\
+				offset.xy /= offset.w;\n\
+				offset.xy = offset.xy * 0.5 + 0.5;  				\n\
+				float sampleDepth = -sample.z/far;// original.***\n\
+\n\
+				float depthBufferValue = getDepth(offset.xy);\n\
+				/*\n\
+				if(depthBufferValue > 0.00391 && depthBufferValue < 0.00393)\n\
+				{\n\
+					if (depthBufferValue < sampleDepth-tolerance*1000.0)\n\
+					{\n\
+						occlusion +=  0.5;\n\
+					}\n\
+					\n\
+					continue;\n\
+				}			\n\
+				*/\n\
+				if (depthBufferValue < sampleDepth)//-tolerance)\n\
+				{\n\
+					occlusion +=  1.0;\n\
+				}\n\
+			} \n\
+\n\
+			occlusion = 1.0 - occlusion / float(kernelSize);\n\
+			\n\
+			shadow_occlusion *= occlusion;\n\
+		}\n\
+		\n\
+		if(altitude < 0.0)\n\
+		{\n\
+			float minHeight_rainbow = -100.0;\n\
+			float maxHeight_rainbow = 0.0;\n\
+			float gray = (altitude - minHeight_rainbow)/(maxHeight_rainbow - minHeight_rainbow);\n\
+			//float gray = (vAltitude - minHeight_rainbow)/(maxHeight_rainbow - minHeight_rainbow);\n\
+			//vec3 rainbowColor = getRainbowColor_byHeight(altitude);\n\
+\n\
+			// caustics.*********************\n\
+			if(uTime > 0.0 && uTileDepth > 6 && gray > 0.0)//&& altitude > -120.0)\n\
+			{\n\
+				// Active this code if want same size caustic effects for different tileDepths.***\n\
+				// Take tileDepth 14 as the unitary tile depth.\n\
+				//float tileDethDiff = float(16 - uTileDepth);\n\
+				//vec2 cauticsTexCoord = texCoord*pow(2.0, tileDethDiff);\n\
+				//-----------------------------------------------------------------------\n\
+				vec2 cauticsTexCoord = texCoord;\n\
+				vec3 causticColor = causticColor(cauticsTexCoord)*gray*0.4;\n\
+				textureColor = vec4(textureColor.r+ causticColor.x, textureColor.g+ causticColor.y, textureColor.b+ causticColor.z, 1.0);\n\
+			}\n\
+			// End caustics.--------------------------\n\
+\n\
+			\n\
+			if(gray < 0.05)\n\
+			gray = 0.05;\n\
+			float red = gray + 0.2;\n\
+			float green = gray + 0.6;\n\
+			float blue = gray*2.0 + 2.0;\n\
+			fogColor = vec4(red, green, blue, 1.0);\n\
+			\n\
+			// Test drawing grid.***\n\
+			//if(uTileDepth > 7)\n\
+			//{\n\
+			//	float numSegs = 5.0;\n\
+			//	float fX = fract(texCoord.x * numSegs);\n\
+			//\n\
+			//	float gridLineWidth = getGridLineWidth(uTileDepth);\n\
+			//	if( fX < gridLineWidth || fX > 1.0-gridLineWidth)\n\
+			//	{\n\
+			//		vec3 color = vec3(0.99, 0.5, 0.5);\n\
+			//		gl_FragColor = vec4(color.rgb* shadow_occlusion * lambertian, 1.0);\n\
+			//		return;\n\
+			//	}\n\
+			//	\n\
+			//	float fY = fract(texCoord.y * numSegs);\n\
+			//	if( fY < gridLineWidth|| fY > 1.0-gridLineWidth)\n\
+			//	{\n\
+			//		vec3 color = vec3(0.3, 0.5, 0.99);\n\
+			//		gl_FragColor = vec4(color.rgb* shadow_occlusion * lambertian, 1.0);\n\
+			//		return;\n\
+			//	}\n\
+			//}\n\
+			\n\
+			// End test drawing grid.---\n\
+			float specularReflectionCoef = 0.6;\n\
+			vec3 specularColor = vec3(0.8, 0.8, 0.8);\n\
+			textureColor = mix(textureColor, fogColor, 0.2); \n\
+			//gl_FragColor = vec4(finalColor.xyz * shadow_occlusion * lambertian + specularReflectionCoef * specular * specularColor * shadow_occlusion, 1.0); // with specular.***\n\
+			gl_FragColor = vec4(textureColor.xyz * shadow_occlusion * lambertian, 1.0); // original.***\n\
+\n\
+			return;\n\
+		}\n\
+		else{\n\
+			if(uSeaOrTerrainType == 1)\n\
+			discard;\n\
+		\n\
+		}\n\
+		\n\
+		\n\
+		vec4 finalColor = mix(textureColor, fogColor, vFogAmount); \n\
+		gl_FragColor = vec4(finalColor.xyz * shadow_occlusion * lambertian, 1.0); // original.***\n\
+		//gl_FragColor = textureColor; // test.***\n\
+		//gl_FragColor = vec4(vNormal.xyz, 1.0); // test.***\n\
+		\n\
+		//if(currSunIdx > 0.0 && currSunIdx < 1.0 && shadow_occlusion<0.9)gl_FragColor = vec4(1.0, 0.0, 0.0, 1.0);\n\
+		\n\
+	}\n\
+}";
+ShaderSource.TinTerrainVS = "\n\
+attribute vec3 position;\n\
+attribute vec3 normal;\n\
+attribute vec4 color4;\n\
+attribute vec2 texCoord;\n\
+attribute float altitude;\n\
+\n\
+uniform mat4 projectionMatrix;  \n\
+uniform mat4 modelViewMatrix;\n\
+uniform mat4 modelViewMatrixInv;\n\
+uniform mat4 modelViewMatrixRelToEye; \n\
+uniform mat4 ModelViewProjectionMatrixRelToEye;\n\
+uniform mat4 ModelViewProjectionMatrix;\n\
+uniform mat4 normalMatrix4;\n\
+uniform mat4 sunMatrix[2]; \n\
+uniform mat4 buildingRotMatrix;  \n\
+uniform vec3 buildingPosHIGH;\n\
+uniform vec3 buildingPosLOW;\n\
+uniform vec3 sunPosHIGH[2];\n\
+uniform vec3 sunPosLOW[2];\n\
+uniform vec3 sunDirWC;\n\
+uniform vec3 encodedCameraPositionMCHigh;\n\
+uniform vec3 encodedCameraPositionMCLow;\n\
+uniform vec3 aditionalPosition;\n\
+uniform vec4 oneColor4;\n\
+uniform bool bUse1Color;\n\
+uniform bool hasTexture;\n\
+uniform bool bIsMakingDepth;\n\
+uniform bool bExistAltitudes;\n\
+uniform float near;\n\
+uniform float far;\n\
+uniform bool bApplyShadow;\n\
+uniform int sunIdx;\n\
+uniform bool bApplySpecularLighting;\n\
+uniform bool bUseLogarithmicDepth;\n\
+\n\
+varying float applySpecLighting;\n\
+varying vec3 vNormal;\n\
+varying vec2 vTexCoord;   \n\
+varying vec3 uAmbientColor;\n\
+varying vec3 vLightWeighting;\n\
+varying vec4 vcolor4;\n\
+varying vec3 v3Pos;\n\
+varying float depthValue;\n\
+varying float vFogAmount;\n\
+\n\
+varying vec4 vPosRelToLight; \n\
+varying vec3 vLightDir; \n\
+varying vec3 vNormalWC;\n\
+varying float currSunIdx;\n\
+varying float vAltitude;\n\
+varying float flogz;\n\
+varying float Fcoef_half;\n\
+\n\
+void main()\n\
+{	\n\
+    vec3 objPosHigh = buildingPosHIGH;\n\
+    vec3 objPosLow = buildingPosLOW.xyz + position.xyz;\n\
+    vec3 highDifference = objPosHigh.xyz - encodedCameraPositionMCHigh.xyz;\n\
+    vec3 lowDifference = objPosLow.xyz - encodedCameraPositionMCLow.xyz;\n\
+    vec4 pos4 = vec4(highDifference.xyz + lowDifference.xyz, 1.0);\n\
+	\n\
+	vNormal = normalize((normalMatrix4 * vec4(normal.x, normal.y, normal.z, 1.0)).xyz); // original.***\n\
+	vLightDir = vec3(normalMatrix4*vec4(sunDirWC.xyz, 1.0)).xyz;\n\
+	vAltitude = altitude;\n\
+	\n\
+	currSunIdx = -1.0; // initially no apply shadow.\n\
+	if(bApplyShadow && !bIsMakingDepth)\n\
+	{\n\
+		vec3 rotatedNormal = vec3(0.0, 0.0, 1.0); // provisional.***\n\
+		vNormalWC = rotatedNormal;\n\
+					\n\
+		// the sun lights count are 2.\n\
+		vec3 currSunPosLOW;\n\
+		vec3 currSunPosHIGH;\n\
+		mat4 currSunMatrix;\n\
+		if(sunIdx == 0)\n\
+		{\n\
+			currSunPosLOW = sunPosLOW[0];\n\
+			currSunPosHIGH = sunPosHIGH[0];\n\
+			currSunMatrix = sunMatrix[0];\n\
+			currSunIdx = 0.5;\n\
+		}\n\
+		else if(sunIdx == 1)\n\
+		{\n\
+			currSunPosLOW = sunPosLOW[1];\n\
+			currSunPosHIGH = sunPosHIGH[1];\n\
+			currSunMatrix = sunMatrix[1];\n\
+			currSunIdx = 1.5;\n\
+		}\n\
+		\n\
+		// Calculate the vertex relative to light.***\n\
+		vec3 highDifferenceSun = objPosHigh.xyz - currSunPosHIGH.xyz;\n\
+		vec3 lowDifferenceSun = objPosLow.xyz - currSunPosLOW.xyz;\n\
+		vec4 pos4Sun = vec4(highDifferenceSun.xyz + lowDifferenceSun.xyz, 1.0);\n\
+		vec4 posRelToLightAux = currSunMatrix * pos4Sun;\n\
+		\n\
+		// now, check if \"posRelToLightAux\" is inside of the lightVolume (inside of the depthTexture of the light).\n\
+		vec3 posRelToLightNDC = posRelToLightAux.xyz / posRelToLightAux.w;\n\
+		vPosRelToLight = posRelToLightAux;\n\
+	}\n\
+	\n\
+	if(bApplySpecularLighting)\n\
+	{\n\
+		applySpecLighting = 1.0;\n\
+	}\n\
+	else{\n\
+		applySpecLighting = -1.0;\n\
+	}\n\
+	\n\
+	if(bIsMakingDepth)\n\
+	{\n\
+		\n\
+		depthValue = (modelViewMatrixRelToEye * pos4).z/far;\n\
+	}\n\
+	else\n\
+	{\n\
+		\n\
+		vTexCoord = texCoord;\n\
+	}\n\
+    gl_Position = ModelViewProjectionMatrixRelToEye * pos4;\n\
+	v3Pos = (modelViewMatrixRelToEye * pos4).xyz;\n\
+\n\
+	if(bUseLogarithmicDepth)\n\
+	{\n\
+		// logarithmic zBuffer:\n\
+		// https://www.gamasutra.com/blogs/BranoKemen/20090812/85207/Logarithmic_Depth_Buffer.php\n\
+		// z = log(C*z + 1) / log(C*Far + 1) * w\n\
+		// https://android.developreference.com/article/21119961/Logarithmic+Depth+Buffer+OpenGL\n\
+		//if(v3Pos.z < 0.0)\n\
+		{\n\
+			// logarithmic zBuffer:\n\
+			// https://outerra.blogspot.com/2013/07/logarithmic-depth-buffer-optimizations.html\n\
+			float Fcoef = 2.0 / log2(far + 1.0);\n\
+			gl_Position.z = log2(max(1e-6, 1.0 + gl_Position.w)) * Fcoef - 1.0;\n\
+\n\
+			flogz = 1.0 + gl_Position.w;\n\
+			Fcoef_half = 0.5 * Fcoef;\n\
+		}\n\
+	}\n\
+\n\
+	// calculate fog amount.\n\
+	float fogParam = 1.15 * v3Pos.z/(far - 10000.0);\n\
+	float fogParam2 = fogParam*fogParam;\n\
+	vFogAmount = fogParam2*fogParam2;\n\
+	if(vFogAmount < 0.0)\n\
+	vFogAmount = 0.0;\n\
+	else if(vFogAmount > 1.0)\n\
+	vFogAmount = 1.0;\n\
+	//vFogAmount = ((-v3Pos.z))/(far);\n\
+}";
+ShaderSource.update_frag = "precision highp float;\n\
+\n\
+uniform sampler2D u_particles;\n\
+uniform sampler2D u_wind;\n\
+uniform vec2 u_wind_res;\n\
+uniform vec2 u_wind_min;\n\
+uniform vec2 u_wind_max;\n\
+uniform vec3 u_geoCoordRadiansMax;\n\
+uniform vec3 u_geoCoordRadiansMin;\n\
+uniform float u_rand_seed;\n\
+uniform float u_speed_factor;\n\
+uniform float u_interpolation;\n\
+uniform float u_drop_rate;\n\
+uniform float u_drop_rate_bump;\n\
+uniform bool u_flipTexCoordY_windMap;\n\
+uniform vec4 u_visibleTilesRanges[16];\n\
+uniform int u_visibleTilesRangesCount;\n\
+\n\
+varying vec2 v_tex_pos;\n\
+\n\
+// pseudo-random generator\n\
+const vec3 rand_constants = vec3(12.9898, 78.233, 4375.85453);\n\
+// https://community.khronos.org/t/random-values/75728\n\
+float rand(const vec2 co) {\n\
+    float t = dot(rand_constants.xy, co);\n\
+    return fract(sin(t) * (rand_constants.z + t));\n\
+}\n\
+\n\
+// wind speed lookup; use manual bilinear filtering based on 4 adjacent pixels for smooth interpolation\n\
+vec2 lookup_wind(const vec2 uv) {\n\
+    //return texture2D(u_wind, uv).rg; // lower-res hardware filtering\n\
+	\n\
+    vec2 px = 1.0 / u_wind_res;\n\
+    vec2 vc = (floor(uv * u_wind_res)) * px;\n\
+    vec2 f = fract(uv * u_wind_res);\n\
+    vec2 tl = texture2D(u_wind, vc).rg;\n\
+    vec2 tr = texture2D(u_wind, vc + vec2(px.x, 0)).rg;\n\
+    vec2 bl = texture2D(u_wind, vc + vec2(0, px.y)).rg;\n\
+    vec2 br = texture2D(u_wind, vc + px).rg;\n\
+    return mix(mix(tl, tr, f.x), mix(bl, br, f.x), f.y);\n\
+	\n\
+}\n\
+\n\
+bool checkFrustumCulling(vec2 pos)\n\
+{\n\
+	for(int i=0; i<16; i++)\n\
+	{\n\
+		if(i >= u_visibleTilesRangesCount)\n\
+		return false;\n\
+		\n\
+		vec4 range = u_visibleTilesRanges[i]; // range = minX(x), minY(y), maxX(z), maxY(w)\n\
+\n\
+		float minX = range.x;\n\
+		float minY = range.y;\n\
+		float maxX = range.z;\n\
+		float maxY = range.w;\n\
+		\n\
+		if(pos.x > minX && pos.x < maxX)\n\
+		{\n\
+			if(pos.y > minY && pos.y < maxY)\n\
+			{\n\
+				return true;\n\
+			}\n\
+		}\n\
+	}\n\
+	return false;\n\
+}\n\
+\n\
+void main() {\n\
+    vec4 color = texture2D(u_particles, v_tex_pos);\n\
+    vec2 pos = vec2(\n\
+        color.r / 255.0 + color.b,\n\
+        color.g / 255.0 + color.a); // decode particle position from pixel RGBA\n\
+	vec2 windMapTexCoord = pos;\n\
+	if(u_flipTexCoordY_windMap)\n\
+	{\n\
+		windMapTexCoord.y = 1.0 - windMapTexCoord.y;\n\
+	}\n\
+    vec2 velocity = mix(u_wind_min, u_wind_max, lookup_wind(windMapTexCoord));\n\
+    float speed_t = length(velocity) / length(u_wind_max);\n\
+\n\
+    // take EPSG:4236 distortion into account for calculating where the particle moved\n\
+	float minLat = u_geoCoordRadiansMin.y;\n\
+	float maxLat = u_geoCoordRadiansMax.y;\n\
+	float latRange = maxLat - minLat;\n\
+	float distortion = cos((minLat + pos.y * latRange ));\n\
+    vec2 offset = vec2(velocity.x / distortion, -velocity.y) * 0.0001 * u_speed_factor * u_interpolation;\n\
+\n\
+    // update particle position, wrapping around the date line\n\
+    pos = fract(1.0 + pos + offset);\n\
+\n\
+\n\
+    // drop rate is a chance a particle will restart at random position, to avoid degeneration\n\
+	float drop = 0.0;\n\
+\n\
+	if(u_interpolation < 0.99) // 0.9\n\
+	{\n\
+		drop = 0.0;\n\
+	}\n\
+	else\n\
+	{\n\
+		// a random seed to use for the particle drop\n\
+		vec2 seed = (pos + v_tex_pos) * u_rand_seed;\n\
+		float drop_rate = u_drop_rate + speed_t * u_drop_rate_bump;\n\
+		drop = step(1.0 - drop_rate, rand(seed));\n\
+	}\n\
+	/*\n\
+	if(drop > 0.5) // 0.01\n\
+	{\n\
+		vec2 random_pos = vec2( rand(pos), rand(v_tex_pos) );\n\
+		float randomValue = (u_rand_seed);\n\
+		int index = int(floor(float(u_visibleTilesRangesCount+1)*(randomValue)));\n\
+		for(int i=0; i<32; i++)\n\
+		{\n\
+			if(i >= u_visibleTilesRangesCount)\n\
+			break;\n\
+		\n\
+			if(i == index)\n\
+			{\n\
+				vec4 posAux4 = u_visibleTilesRanges[i];\n\
+				float width = (posAux4.z-posAux4.x);\n\
+				float height = (posAux4.w-posAux4.y);\n\
+				float scaledX = posAux4.x + random_pos.x*width;\n\
+				float scaledY = posAux4.y + random_pos.y*height;\n\
+				random_pos = vec2(scaledX, 1.0-scaledY);\n\
+				pos = random_pos;\n\
+				break;\n\
+			}\n\
+		}\n\
+	}\n\
+	*/\n\
+	\n\
+	\n\
+	if(drop > 0.01)\n\
+	{\n\
+		vec2 random_pos = vec2( rand(pos), rand(v_tex_pos) );\n\
+		pos = random_pos;\n\
+	}\n\
+	\n\
+\n\
+    // encode the new particle position back into RGBA\n\
+    gl_FragColor = vec4(\n\
+        fract(pos * 255.0),\n\
+        floor(pos * 255.0) / 255.0);\n\
+}";
+ShaderSource.vol_fs = "#ifdef GL_ES\n\
+precision highp float;\n\
+#endif\n\
+\n\
+//---------------------------------------------------------\n\
+// MACROS\n\
+//---------------------------------------------------------\n\
+\n\
+#define EPS       0.0001\n\
+#define PI        3.14159265\n\
+#define HALFPI    1.57079633\n\
+#define ROOTTHREE 1.73205081\n\
+\n\
+#define EQUALS(A,B) ( abs((A)-(B)) < EPS )\n\
+#define EQUALSZERO(A) ( ((A)<EPS) && ((A)>-EPS) )\n\
+\n\
+\n\
+//---------------------------------------------------------\n\
+// CONSTANTS\n\
+//---------------------------------------------------------\n\
+\n\
+// 32 48 64 96 128\n\
+#define MAX_STEPS 64\n\
+\n\
+#define LIGHT_NUM 2\n\
+//#define uTMK 20.0\n\
+#define TM_MIN 0.05\n\
+\n\
+\n\
+//---------------------------------------------------------\n\
+// SHADER VARS\n\
+//---------------------------------------------------------\n\
+\n\
+varying vec2 vUv;\n\
+varying vec3 vPos0; // position in world coords\n\
+varying vec3 vPos1; // position in object coords\n\
+varying vec3 vPos1n; // normalized 0 to 1, for texture lookup\n\
+\n\
+uniform vec3 uOffset; // TESTDEBUG\n\
+\n\
+uniform vec3 uCamPos;\n\
+\n\
+uniform vec3 uLightP[LIGHT_NUM];  // point lights\n\
+uniform vec3 uLightC[LIGHT_NUM];\n\
+\n\
+uniform vec3 uColor;      // color of volume\n\
+uniform sampler2D uTex;   // 3D(2D) volume texture\n\
+uniform vec3 uTexDim;     // dimensions of texture\n\
+\n\
+uniform float uTMK;\n\
+\n\
+float gStepSize;\n\
+float gStepFactor;\n\
+\n\
+\n\
+//---------------------------------------------------------\n\
+// PROGRAM\n\
+//---------------------------------------------------------\n\
+\n\
+// TODO: convert world to local volume space\n\
+vec3 toLocal(vec3 p) {\n\
+  return p + vec3(0.5);\n\
+}\n\
+\n\
+float sampleVolTex(vec3 pos) {\n\
+  pos = pos + uOffset; // TESTDEBUG\n\
+  \n\
+  // note: z is up in 3D tex coords, pos.z is tex.y, pos.y is zSlice\n\
+  float zSlice = (1.0-pos.y)*(uTexDim.z-1.0);   // float value of slice number, slice 0th to 63rd\n\
+  \n\
+  // calc pixels from top of texture\n\
+  float fromTopPixels =\n\
+    floor(zSlice)*uTexDim.y +   // offset pix from top of tex, from upper slice  \n\
+    pos.z*(uTexDim.y-1.0) +     // y pos in pixels, range 0th to 63rd pix\n\
+    0.5;  // offset to center of cell\n\
+    \n\
+  // calc y tex coords of two slices\n\
+  float y0 = min( (fromTopPixels)/(uTexDim.y*uTexDim.z), 1.0);\n\
+  float y1 = min( (fromTopPixels+uTexDim.y)/(uTexDim.y*uTexDim.z), 1.0);\n\
+    \n\
+  // get (bi)linear interped texture reads at two slices\n\
+  float z0 = texture2D(uTex, vec2(pos.x, y0)).g;\n\
+  float z1 = texture2D(uTex, vec2(pos.x, y1)).g;\n\
+  \n\
+  // lerp them again (thus trilinear), using remaining fraction of zSlice\n\
+  return mix(z0, z1, fract(zSlice));\n\
+}\n\
+\n\
+// accumulate density by ray marching\n\
+float getDensity(vec3 ro, vec3 rd) {\n\
+  vec3 step = rd*gStepSize;\n\
+  vec3 pos = ro;\n\
+  \n\
+  float density = 0.0;\n\
+  \n\
+  for (int i=0; i<MAX_STEPS; ++i) {\n\
+    density += (1.0-density) * sampleVolTex(pos) * gStepFactor;\n\
+    //density += sampleVolTex(pos);\n\
+    \n\
+    pos += step;\n\
+    \n\
+    if (density > 0.95 ||\n\
+      pos.x > 1.0 || pos.x < 0.0 ||\n\
+      pos.y > 1.0 || pos.y < 0.0 ||\n\
+      pos.z > 1.0 || pos.z < 0.0)\n\
+      break;\n\
+  }\n\
+  \n\
+  return density;\n\
+}\n\
+\n\
+// calc transmittance\n\
+float getTransmittance(vec3 ro, vec3 rd) {\n\
+  vec3 step = rd*gStepSize;\n\
+  vec3 pos = ro;\n\
+  \n\
+  float tm = 1.0;\n\
+  \n\
+  for (int i=0; i<MAX_STEPS; ++i) {\n\
+    tm *= exp( -uTMK*gStepSize*sampleVolTex(pos) );\n\
+    \n\
+    pos += step;\n\
+    \n\
+    if (tm < TM_MIN ||\n\
+      pos.x > 1.0 || pos.x < 0.0 ||\n\
+      pos.y > 1.0 || pos.y < 0.0 ||\n\
+      pos.z > 1.0 || pos.z < 0.0)\n\
+      break;\n\
+  }\n\
+  \n\
+  return tm;\n\
+}\n\
+\n\
+vec4 raymarchNoLight(vec3 ro, vec3 rd) {\n\
+  vec3 step = rd*gStepSize;\n\
+  vec3 pos = ro;\n\
+  \n\
+  vec3 col = vec3(0.0);\n\
+  float tm = 1.0;\n\
+  \n\
+  for (int i=0; i<MAX_STEPS; ++i) {\n\
+    float dtm = exp( -uTMK*gStepSize*sampleVolTex(pos) );\n\
+    tm *= dtm;\n\
+    \n\
+    col += (1.0-dtm) * uColor * tm;\n\
+    \n\
+    pos += step;\n\
+    \n\
+    if (tm < TM_MIN ||\n\
+      pos.x > 1.0 || pos.x < 0.0 ||\n\
+      pos.y > 1.0 || pos.y < 0.0 ||\n\
+      pos.z > 1.0 || pos.z < 0.0)\n\
+      break;\n\
+  }\n\
+  \n\
+  float alpha = 1.0-tm;\n\
+  return vec4(col/alpha, alpha);\n\
+}\n\
+\n\
+vec4 raymarchLight(vec3 ro, vec3 rd) {\n\
+  vec3 step = rd*gStepSize;\n\
+  vec3 pos = ro;\n\
+  \n\
+  \n\
+  vec3 col = vec3(0.0);   // accumulated color\n\
+  float tm = 1.0;         // accumulated transmittance\n\
+  \n\
+  for (int i=0; i<MAX_STEPS; ++i) {\n\
+    // delta transmittance \n\
+    float dtm = exp( -uTMK*gStepSize*sampleVolTex(pos) );\n\
+    tm *= dtm;\n\
+    \n\
+    // get contribution per light\n\
+    for (int k=0; k<LIGHT_NUM; ++k) {\n\
+      vec3 ld = normalize( toLocal(uLightP[k])-pos );\n\
+      float ltm = getTransmittance(pos,ld);\n\
+      \n\
+      col += (1.0-dtm) * uColor*uLightC[k] * tm * ltm;\n\
+    }\n\
+    \n\
+    pos += step;\n\
+    \n\
+    if (tm < TM_MIN ||\n\
+      pos.x > 1.0 || pos.x < 0.0 ||\n\
+      pos.y > 1.0 || pos.y < 0.0 ||\n\
+      pos.z > 1.0 || pos.z < 0.0)\n\
+      break;\n\
+  }\n\
+  \n\
+  float alpha = 1.0-tm;\n\
+  return vec4(col/alpha, alpha);\n\
+}\n\
+\n\
+void main() {\n\
+  // in world coords, just for now\n\
+  vec3 ro = vPos1n;\n\
+  vec3 rd = normalize( ro - toLocal(uCamPos) );\n\
+  //vec3 rd = normalize(ro-uCamPos);\n\
+  \n\
+  // step_size = root_three / max_steps ; to get through diagonal  \n\
+  gStepSize = ROOTTHREE / float(MAX_STEPS);\n\
+  gStepFactor = 32.0 * gStepSize;\n\
+  \n\
+  gl_FragColor = raymarchLight(ro, rd);\n\
+  //gl_FragColor = vec4(uColor, getDensity(ro,rd));\n\
+  //gl_FragColor = vec4(vec3(sampleVolTex(pos)), 1.0);\n\
+  //gl_FragColor = vec4(vPos1n, 1.0);\n\
+  //gl_FragColor = vec4(uLightP[0], 1.0);\n\
+}";
+ShaderSource.vol_vs = "attribute vec3 aPosition;\n\
+\n\
+uniform sampler2D diffuseTex;\n\
+uniform mat4 projectionMatrix;  \n\
+uniform mat4 modelViewMatrix;\n\
+uniform mat4 modelViewMatrixRelToEye; \n\
+uniform mat4 ModelViewProjectionMatrixRelToEye;\n\
+uniform vec3 encodedCameraPositionMCHigh;\n\
+uniform vec3 encodedCameraPositionMCLow;\n\
+\n\
+varying vec3 vNormal;\n\
+varying vec3 vPosObjectCoord;\n\
+varying vec3 vPosCameraCoord;\n\
+varying vec3 vPosWorldCoord;\n\
+\n\
+// Render a fullScreen quad (2 triangles).***\n\
+void main()\n\
+{\n\
+	vec4 rotatedPos = buildingRotMatrix * vec4(position.xyz + aditionalPosition.xyz, 1.0);\n\
+    vec3 objPosHigh = buildingPosHIGH;\n\
+    vec3 objPosLow = buildingPosLOW.xyz + rotatedPos.xyz;\n\
+    vec3 highDifference = objPosHigh.xyz - encodedCameraPositionMCHigh.xyz;\n\
+    vec3 lowDifference = objPosLow.xyz - encodedCameraPositionMCLow.xyz;\n\
+    vec4 pos4 = vec4(highDifference.xyz + lowDifference.xyz, 1.0);\n\
+	\n\
+    gl_Position = ModelViewProjectionMatrixRelToEye * pos4;\n\
+}";
+ShaderSource.wgs84_volumFS = "precision mediump float;\n\
+\n\
+#define M_PI 3.1415926535897932384626433832795\n\
+\n\
+uniform sampler2D volumeTex;\n\
+uniform mat4 projectionMatrix;  \n\
+uniform mat4 modelViewMatrix;\n\
+uniform mat4 modelViewMatrixInv;\n\
+uniform mat4 modelViewMatrixRelToEye; \n\
+uniform mat4 ModelViewProjectionMatrixRelToEye;\n\
+uniform vec3 encodedCameraPositionMCHigh;\n\
+uniform vec3 encodedCameraPositionMCLow;\n\
+\n\
+uniform float screenWidth;    \n\
+uniform float screenHeight;\n\
+uniform float aspectRatio;\n\
+uniform float far;\n\
+uniform float fovyRad;\n\
+uniform float tanHalfFovy;\n\
+\n\
+// volume tex definition.***\n\
+uniform int texNumCols;\n\
+uniform int texNumRows;\n\
+uniform int texNumSlices;\n\
+uniform int numSlicesPerStacks;\n\
+uniform int slicesNumCols;\n\
+uniform int slicesNumRows;\n\
+uniform float maxLon;\n\
+uniform float minLon;\n\
+uniform float maxLat;\n\
+uniform float minLat;\n\
+uniform float maxAlt;\n\
+uniform float minAlt;\n\
+uniform vec4 cuttingPlanes[6];   \n\
+uniform int cuttingPlanesCount;\n\
+\n\
+uniform float maxValue;\n\
+uniform float minValue;\n\
+\n\
+vec3 getViewRay(vec2 tc)\n\
+{\n\
+	float hfar = 2.0 * tanHalfFovy * far;\n\
+    float wfar = hfar * aspectRatio;    \n\
+    vec3 ray = vec3(wfar * (tc.x - 0.5), hfar * (tc.y - 0.5), -far);    \n\
+    return ray;                      \n\
+} \n\
+\n\
+float squaredLength(vec3 point1, vec3 point2)\n\
+{\n\
+	float a = point1.x - point2.x;\n\
+	float b = point1.y - point2.y;\n\
+	float c = point1.z - point2.z;\n\
+	\n\
+	float sqDist = a*a + b*b + c*c;\n\
+	return sqDist;\n\
+}\n\
+\n\
+void intersectionLineSphere(float radius, vec3 rayPos, vec3 rayDir, out int intersectType, out vec3 nearIntersectPos, out vec3 farIntersectPos)\n\
+{\n\
+	// line: (x, y, z) = x1 + t(x2 - x1), y1 + t(y2 - y1), z1 + t(z2 - z1)\n\
+	// sphere: (x - x3)^2 + (y - y3)^2 + (z - z3)^2 = r^2, where x3, y3, z3 is the center of the sphere.\n\
+	\n\
+	// line:\n\
+	vec3 p1 = rayPos;\n\
+	vec3 lineDir = rayDir;\n\
+	float dist = 1000.0;// any value is ok.***\n\
+	vec3 p2 = vec3(p1.x + lineDir.x * dist, p1.y + lineDir.y * dist, p1.z + lineDir.z * dist);\n\
+	float x1 = p1.x;\n\
+	float y1 = p1.y;\n\
+	float z1 = p1.z;\n\
+	float x2 = p2.x;\n\
+	float y2 = p2.y;\n\
+	float z2 = p2.z;\n\
+\n\
+	// sphere:\n\
+	float x3 = 0.0;\n\
+	float y3 = 0.0;\n\
+	float z3 = 0.0;\n\
+	float r = radius;\n\
+	\n\
+	// resolve:\n\
+	float x21 = (x2-x1);\n\
+	float y21 = (y2-y1);\n\
+	float z21 = (z2-z1);\n\
+	\n\
+	float a = x21*x21 + y21*y21 + z21*z21;\n\
+	\n\
+	float x13 = (x1-x3);\n\
+	float y13 = (y1-y3);\n\
+	float z13 = (z1-z3);\n\
+	\n\
+	float b = 2.0*(x21 * x13 + y21 * y13 + z21 * z13);\n\
+	\n\
+	float c = x3*x3 + y3*y3 + z3*z3 + x1*x1 + y1*y1 + z1*z1 - 2.0*(x3*x1 + y3*y1+ z3*z1) - r*r;\n\
+	\n\
+	float discriminant = b*b - 4.0*a*c;\n\
+	\n\
+	if (discriminant < 0.0)\n\
+	{\n\
+		// no intersection.***\n\
+		intersectType = 0;\n\
+	}\n\
+	else if (discriminant == 0.0)\n\
+	{\n\
+		// this is tangent.***\n\
+		intersectType = 1;\n\
+		\n\
+		float t1 = (-b)/(2.0*a);\n\
+		nearIntersectPos = vec3(x1 + (x2 - x1)*t1, y1 + (y2 - y1)*t1, z1 + (z2 - z1)*t1);\n\
+	}\n\
+	else\n\
+	{\n\
+		intersectType = 2;\n\
+		\n\
+		// find the nearest to p1.***\n\
+		float sqrtDiscriminant = sqrt(discriminant);\n\
+		float t1 = (-b + sqrtDiscriminant)/(2.0*a);\n\
+		float t2 = (-b - sqrtDiscriminant)/(2.0*a);\n\
+		\n\
+		// solution 1.***\n\
+		vec3 intersectPoint1 = vec3(x1 + (x2 - x1)*t1, y1 + (y2 - y1)*t1, z1 + (z2 - z1)*t1);\n\
+		vec3 intersectPoint2 = vec3(x1 + (x2 - x1)*t2, y1 + (y2 - y1)*t2, z1 + (z2 - z1)*t2);\n\
+		\n\
+		float dist1 = squaredLength(p1,intersectPoint1);\n\
+		float dist2 = squaredLength(p1,intersectPoint2);\n\
+		\n\
+		// nearIntersectPos, out vec3 farIntersectPos\n\
+		if (dist1 < dist2)\n\
+		{\n\
+			nearIntersectPos = intersectPoint1;\n\
+			farIntersectPos = intersectPoint2;\n\
+		}\n\
+		else\n\
+		{\n\
+			nearIntersectPos = intersectPoint2;\n\
+			farIntersectPos = intersectPoint1;\n\
+		}\n\
+	}\n\
+}\n\
+\n\
+float atan2(float y, float x) \n\
+{\n\
+	if(x > 0.0)\n\
+	{\n\
+		return atan(y/x);\n\
+	}\n\
+	else if(x < 0.0)\n\
+	{\n\
+		if(y >= 0.0)\n\
+		{\n\
+			return atan(y/x) + M_PI;\n\
+		}\n\
+		else{\n\
+			return atan(y/x) - M_PI;\n\
+		}\n\
+	}\n\
+	else if(x == 0.0)\n\
+	{\n\
+		if(y>0.0)\n\
+		{\n\
+			return M_PI/2.0;\n\
+		}\n\
+		else if(y<0.0)\n\
+		{\n\
+			return -M_PI/2.0;\n\
+		}\n\
+		else{\n\
+			return 0.0; // return undefined.***\n\
+		}\n\
+	}\n\
+}\n\
+\n\
+void cartesianToGeographicWgs84(vec3 point, out vec3 result) \n\
+{\n\
+	// From WebWorldWind.***\n\
+	// According to H. Vermeille, An analytical method to transform geocentric into geodetic coordinates\n\
+	// http://www.springerlink.com/content/3t6837t27t351227/fulltext.pdf\n\
+	\n\
+	float firstEccentricitySquared = 6.69437999014E-3;\n\
+	float equatorialRadius = 6378137.0;\n\
+\n\
+	// wwwind coord type.***\n\
+	// X = point.z;\n\
+	// Y = point.x;\n\
+	// Z = point.y;\n\
+\n\
+	// magoWorld coord type.***\n\
+	float X = point.x;\n\
+	float Y = point.y;\n\
+	float Z = point.z;\n\
+	float XXpYY = X * X + Y * Y;\n\
+	float sqrtXXpYY = sqrt(XXpYY);\n\
+	float a = equatorialRadius;\n\
+	float ra2 = 1.0 / (a * a);\n\
+	float e2 = firstEccentricitySquared;\n\
+	float e4 = e2 * e2;\n\
+	float p = XXpYY * ra2;\n\
+	float q = Z * Z * (1.0 - e2) * ra2;\n\
+	float r = (p + q - e4) / 6.0;\n\
+	float h;\n\
+	float phi;\n\
+	float u;\n\
+	float evoluteBorderTest = 8.0 * r * r * r + e4 * p * q;\n\
+	float rad1;\n\
+	float rad2;\n\
+	float rad3;\n\
+	float atanAux;\n\
+	float v;\n\
+	float w;\n\
+	float k;\n\
+	float D;\n\
+	float sqrtDDpZZ;\n\
+	float e;\n\
+	float lambda;\n\
+	float s2;\n\
+	float cbrtFac = 1.0/3.0;\n\
+\n\
+	if (evoluteBorderTest > 0.0 || q != 0.0) \n\
+	{\n\
+		if (evoluteBorderTest > 0.0) \n\
+		{\n\
+			// Step 2: general case\n\
+			rad1 = sqrt(evoluteBorderTest);\n\
+			rad2 = sqrt(e4 * p * q);\n\
+\n\
+			// 10*e2 is my arbitrary decision of what Vermeille means by near... the cusps of the evolute.\n\
+			if (evoluteBorderTest > 10.0 * e2) \n\
+			{\n\
+				rad3 = pow((rad1 + rad2) * (rad1 + rad2), cbrtFac);\n\
+				u = r + 0.5 * rad3 + 2.0 * r * r / rad3;\n\
+			}\n\
+			else \n\
+			{\n\
+				u = r + 0.5 * pow((rad1 + rad2) * (rad1 + rad2), cbrtFac)\n\
+					+ 0.5 * pow((rad1 - rad2) * (rad1 - rad2), cbrtFac);\n\
+			}\n\
+		}\n\
+		else \n\
+		{\n\
+			// Step 3: near evolute\n\
+			rad1 = sqrt(-evoluteBorderTest);\n\
+			rad2 = sqrt(-8.0 * r * r * r);\n\
+			rad3 = sqrt(e4 * p * q);\n\
+			atanAux = 2.0 * atan2(rad3, rad1 + rad2) / 3.0;\n\
+\n\
+			u = -4.0 * r * sin(atanAux) * cos(M_PI / 6.0 + atanAux);\n\
+		}\n\
+\n\
+		v = sqrt(u * u + e4 * q);\n\
+		w = e2 * (u + v - q) / (2.0 * v);\n\
+		k = (u + v) / (sqrt(w * w + u + v) + w);\n\
+		D = k * sqrtXXpYY / (k + e2);\n\
+		sqrtDDpZZ = sqrt(D * D + Z * Z);\n\
+\n\
+		h = (k + e2 - 1.0) * sqrtDDpZZ / k;\n\
+		phi = 2.0 * atan2(Z, sqrtDDpZZ + D);\n\
+	}\n\
+	else \n\
+	{\n\
+		// Step 4: singular disk\n\
+		rad1 = sqrt(1.0 - e2);\n\
+		rad2 = sqrt(e2 - p);\n\
+		e = sqrt(e2);\n\
+\n\
+		h = -a * rad1 * rad2 / e;\n\
+		phi = rad2 / (e * rad2 + rad1 * sqrt(p));\n\
+	}\n\
+\n\
+	// Compute lambda\n\
+	s2 = sqrt(2.0);\n\
+	if ((s2 - 1.0) * Y < sqrtXXpYY + X) \n\
+	{\n\
+		// case 1 - -135deg < lambda < 135deg\n\
+		lambda = 2.0 * atan2(Y, sqrtXXpYY + X);\n\
+	}\n\
+	else if (sqrtXXpYY + Y < (s2 + 1.0) * X) \n\
+	{\n\
+		// case 2 - -225deg < lambda < 45deg\n\
+		lambda = -M_PI * 0.5 + 2.0 * atan2(X, sqrtXXpYY - Y);\n\
+	}\n\
+	else \n\
+	{\n\
+		// if (sqrtXXpYY-Y<(s2=1)*X) {  // is the test, if needed, but it's not\n\
+		// case 3: - -45deg < lambda < 225deg\n\
+		lambda = M_PI * 0.5 - 2.0 * atan2(X, sqrtXXpYY + Y);\n\
+	}\n\
+\n\
+	float factor = 180.0 / M_PI;\n\
+	result = vec3(factor * lambda, factor * phi, h); // (longitude, latitude, altitude).***\n\
+}\n\
+\n\
+bool isPointRearCamera(vec3 point, vec3 camPos, vec3 camDir)\n\
+{\n\
+	bool isRear = false;\n\
+	float lambdaX = 10.0;\n\
+	float lambdaY = 10.0;\n\
+	float lambdaZ = 10.0;\n\
+	if(abs(camDir.x) > 0.0000001)\n\
+	{\n\
+		float lambdaX = (point.x - camPos.x)/camDir.x;\n\
+	}\n\
+	else if(abs(camDir.y) > 0.0000001)\n\
+	{\n\
+		float lambdaY = (point.y - camPos.y)/camDir.y;\n\
+	}\n\
+	else if(abs(camDir.z) > 0.0000001)\n\
+	{\n\
+		float lambdaZ = (point.z - camPos.z)/camDir.z;\n\
+	}\n\
+	\n\
+	if(lambdaZ < 0.0 || lambdaY < 0.0 || lambdaX < 0.0)\n\
+			isRear = true;\n\
+		else\n\
+			isRear = false;\n\
+	return isRear;\n\
+}\n\
+\n\
+float distPointToPlane(vec3 point, vec4 plane)\n\
+{\n\
+	return (point.x*plane.x + point.y*plane.y + point.z*plane.z + plane.w);\n\
+}\n\
+\n\
+bool getValue(vec3 geoLoc, out vec4 value)\n\
+{\n\
+	// geoLoc = (longitude, latitude, altitude).***\n\
+	float lon = geoLoc.x;\n\
+	float lat = geoLoc.y;\n\
+	float alt = geoLoc.z;\n\
+	\n\
+	// 1rst, check if geoLoc intersects the volume.***\n\
+	// Note: minLon, maxLon, minLat, maxLat, minAlt & maxAlt are uniforms.***\n\
+	if(lon < minLon || lon > maxLon)\n\
+		return false;\n\
+	else if(lat < minLat || lat > maxLat)\n\
+		return false;\n\
+	else if(alt < minAlt || alt > maxAlt)\n\
+		return false;\n\
+		\n\
+	float lonRange = maxLon - minLon;\n\
+	float latRange = maxLat - minLat;\n\
+	float altRange = maxAlt - minAlt;\n\
+	float col = (lon - minLon)/lonRange * float(slicesNumCols); \n\
+	float row = (lat - minLat)/latRange * float(slicesNumRows); \n\
+	float slice = (alt - minAlt)/altRange * float(texNumSlices); // slice if texture has only one stack.***\n\
+	float sliceDown = floor(slice);\n\
+	float sliceUp = ceil(slice);\n\
+	float sliceDownDist = slice - sliceDown;\n\
+	//slice = 18.0; // test. force slice to nearest to ground.***\n\
+	\n\
+	float stackDown = floor(sliceDown/float(numSlicesPerStacks));\n\
+	float realSliceDown = sliceDown - stackDown * float(numSlicesPerStacks);\n\
+	float tx = stackDown * float(slicesNumCols) + col;\n\
+	float ty = realSliceDown * float(slicesNumRows) + row;\n\
+	vec2 texCoord = vec2(tx/float(texNumCols), ty/float(texNumRows));\n\
+	vec4 valueDown = texture2D(volumeTex, texCoord);\n\
+	\n\
+	if(sliceDown < float(texNumSlices-1))\n\
+	{\n\
+		float stackUp = floor(sliceUp/float(numSlicesPerStacks));\n\
+		float realSliceUp = sliceUp - stackUp * float(numSlicesPerStacks);\n\
+		float tx2 = stackUp * float(slicesNumCols) + col;\n\
+		float ty2 = realSliceUp * float(slicesNumRows) + row;\n\
+		vec2 texCoord2 = vec2(tx2/float(texNumCols), ty2/float(texNumRows));\n\
+		vec4 valueUp = texture2D(volumeTex, texCoord2);\n\
+		value = valueDown*(1.0-sliceDownDist)+valueUp*(sliceDownDist);\n\
+	}\n\
+	else{\n\
+		value = valueDown;\n\
+	}\n\
+	//if((value.r * (maxValue - minValue)) > maxValue * 0.3)\n\
+	//	return true;\n\
+	//else return false;\n\
+	return true;\n\
+}\n\
+\n\
+void main() {\n\
+	vec2 screenPos = vec2(gl_FragCoord.x / screenWidth, gl_FragCoord.y / screenHeight);\n\
+	float linearDepth = 1.0; // the quad is 1m of dist of the camera.***          \n\
+    vec3 rayCamCoord = getViewRay(screenPos) * linearDepth;  \n\
+	rayCamCoord = normalize(rayCamCoord);\n\
+	\n\
+	vec3 camTarget = rayCamCoord * 10000.0;\n\
+	vec4 camPosWorld = vec4(encodedCameraPositionMCHigh + encodedCameraPositionMCLow, 1.0);\n\
+	vec4 camTargetWorld = modelViewMatrixInv * vec4(camTarget.xyz, 1.0);\n\
+	vec3 camDirWorld = camTargetWorld.xyz - camPosWorld.xyz;\n\
+	camDirWorld = normalize(camDirWorld);\n\
+\n\
+	// now, must find sampling points.***\n\
+	int intersectType = 0;\n\
+	vec3 nearP;\n\
+	vec3 farP;\n\
+	float radius = 6378137.0 + maxAlt; // equatorial radius.***\n\
+	//radius = 6250000.0 + maxAlt; // test radius.***\n\
+	\n\
+	intersectionLineSphere(radius, camPosWorld.xyz, camDirWorld, intersectType, nearP, farP);\n\
+	\n\
+	if(intersectType == 0)\n\
+	{\n\
+		discard;\n\
+	}\n\
+		\n\
+	if(intersectType == 1)\n\
+	{\n\
+		// provisionally discard.***\n\
+		discard;	\n\
+	}\n\
+	\n\
+	// check if nearP is rear of the camera.***\n\
+	if(isPointRearCamera(nearP, camPosWorld.xyz, camDirWorld.xyz))\n\
+	{\n\
+		nearP = vec3(camPosWorld.xyz);\n\
+	}\n\
+	float dist = distance(nearP, farP);\n\
+	float testDist = dist;\n\
+	if(dist > 1500000.0)\n\
+		testDist = 1500000.0;\n\
+	\n\
+	// now calculate the geographicCoords of 2 points.***\n\
+	// now, depending the dist(nearP, endPoint), determine numSmples.***\n\
+	// provisionally take 16 samples.***\n\
+	float numSamples = 512.0;\n\
+	vec4 color = vec4(0.0, 0.0, 0.0, 0.0);\n\
+	float alpha = 0.8/numSamples;\n\
+	float tempRange = maxValue - minValue;\n\
+	vec4 value;\n\
+	float totalValue = 0.0;\n\
+	int sampledsCount = 0;\n\
+	int intAux = 0;\n\
+	float increDist = testDist / numSamples;\n\
+	int c = 0;\n\
+	bool isPointRearPlane = true;\n\
+	for(int i=0; i<512; i++)\n\
+	{\n\
+		vec3 currGeoLoc;\n\
+		vec3 currPosWorld = vec3(nearP.x + camDirWorld.x * increDist*float(c), nearP.y + camDirWorld.y * increDist*float(c), nearP.z + camDirWorld.z * increDist*float(c));\n\
+		// Check if the currPosWorld is in front or rear of planes (if exist planes).***\n\
+		int planesCounter = 0;\n\
+		for(int j=0; j<6; j++)\n\
+		{\n\
+			if(planesCounter == cuttingPlanesCount)\n\
+				break;\n\
+			\n\
+			vec4 plane = cuttingPlanes[j];\n\
+			float dist = distPointToPlane(currPosWorld, plane);\n\
+			if(dist > 0.0)\n\
+			{\n\
+				isPointRearPlane = false;\n\
+				break;\n\
+			}\n\
+			else{\n\
+				isPointRearPlane = true;\n\
+			}\n\
+			planesCounter++;\n\
+		}\n\
+		\n\
+		\n\
+		if(isPointRearPlane)\n\
+		{\n\
+			cartesianToGeographicWgs84(currPosWorld, currGeoLoc);\n\
+			if(getValue(currGeoLoc, value))\n\
+			{\n\
+				float realValue = value.r * tempRange + minValue*255.0;\n\
+				totalValue += (value.r);\n\
+				sampledsCount += 1;\n\
+			}\n\
+		}\n\
+		if(sampledsCount >= 1)\n\
+		{\n\
+			break;\n\
+		}\n\
+		c++;\n\
+	}\n\
+	if(sampledsCount == 0)\n\
+	{\n\
+		discard;\n\
+	}\n\
+	float fValue = totalValue/numSamples;\n\
+	fValue = totalValue;\n\
+	if(fValue > 1.0)\n\
+	{\n\
+		gl_FragColor = vec4(1.0, 0.0, 0.0, 1.0);\n\
+		return;\n\
+	}\n\
+	float b = 1.0 - fValue;\n\
+	float g;\n\
+	if(fValue > 0.5)\n\
+	{\n\
+		g = 2.0-2.0*fValue;\n\
+	}\n\
+	else{\n\
+		g = 2.0*fValue;\n\
+	}\n\
+	float r = fValue;\n\
+	color += vec4(r,g,b,0.8);\n\
+	gl_FragColor = color;\n\
+}";
+ShaderSource.wgs84_volumVS = "precision mediump float;\n\
+\n\
+attribute vec3 position;\n\
+uniform mat4 projectionMatrix;\n\
+\n\
+void main()\n\
+{	\n\
+	vec4 pos = projectionMatrix * vec4(position.xyz, 1.0);\n\
+    gl_Position = pos;\n\
+}";
+
+'use strict';
+
+/**
+ * 어떤 일을 하고 있습니까?
+ * @class Uniform1fDataPair
+ * @param gl 변수
+ */
+var Uniform1fDataPair = function(gl, uniformName) 
+{
+	if (!(this instanceof Uniform1fDataPair)) 
+	{
+		throw new Error(Messages.CONSTRUCT_ERROR);
+	}
+	this.gl = gl;
+	this.name = uniformName;
+	this.uniformLocation;
+	this.floatValue; 
+};
+
+/**
+ * 어떤 일을 하고 있습니까?
+ * @param gl 변수
+ */
+Uniform1fDataPair.prototype.bindUniform = function() 
+{
+	this.gl.uniform1f(this.uniformLocation, this.floatValue[0]);
+};
+'use strict';
+
+/**
+ * 어떤 일을 하고 있습니까?
+ * @class Uniform1iDataPair
+ * @param gl 변수
+ */
+var Uniform1iDataPair = function(gl, uniformName) 
+{
+	if (!(this instanceof Uniform1iDataPair)) 
+	{
+		throw new Error(Messages.CONSTRUCT_ERROR);
+	}
+	this.gl = gl;
+	this.name = uniformName;
+	this.uniformLocation;
+	this.intValue; 
+};
+
+/**
+ * 어떤 일을 하고 있습니까?
+ * @param gl 변수
+ */
+Uniform1iDataPair.prototype.bindUniform = function() 
+{
+	this.gl.uniform1i(this.uniformLocation, this.intValue);
+};
+'use strict';
+
+
+/**
+ * 어떤 일을 하고 있습니까?
+ * @class UniformMatrix4fvDataPair
+ * @param gl 변수
+ */
+var UniformMatrix4fvDataPair = function(gl, uniformName) 
+{
+	if (!(this instanceof UniformMatrix4fvDataPair)) 
+	{
+		throw new Error(Messages.CONSTRUCT_ERROR);
+	}
+	this.gl = gl;
+	this.name = uniformName;
+	this.uniformLocation;
+	this.matrix4fv; 
+};
+
+/**
+ * 어떤 일을 하고 있습니까?
+ * @param gl 변수
+ */
+UniformMatrix4fvDataPair.prototype.bindUniform = function() 
+{
+	this.gl.uniformMatrix4fv(this.uniformLocation, false, this.matrix4fv);
+};
+'use strict';
+
+/**
+ * 어떤 일을 하고 있습니까?
+ * @class UniformVec2fvDataPair
+ * @param gl 변수
+ */
+var UniformVec2fvDataPair = function(gl, uniformName) 
+{
+	if (!(this instanceof UniformVec2fvDataPair)) 
+	{
+		throw new Error(Messages.CONSTRUCT_ERROR);
+	}
+	this.gl = gl;
+	this.name = uniformName;
+	this.uniformLocation;
+	this.vec2fv; 
+};
+
+/**
+ * 어떤 일을 하고 있습니까?
+ * @param gl 변수
+ */
+UniformVec2fvDataPair.prototype.bindUniform = function() 
+{
+	this.gl.uniform2fv(this.uniformLocation, this.vec2fv);
+};
+'use strict';
+
+/**
+ * 어떤 일을 하고 있습니까?
+ * @class UniformVec3fvDataPair
+ * @param gl 변수
+ */
+var UniformVec3fvDataPair = function(gl, uniformName) 
+{
+	if (!(this instanceof UniformVec3fvDataPair)) 
+	{
+		throw new Error(Messages.CONSTRUCT_ERROR);
+	}
+	this.gl = gl;
+	this.name = uniformName;
+	this.uniformLocation;
+	this.vec3fv; 
+};
+
+/**
+ * 어떤 일을 하고 있습니까?
+ * @param gl 변수
+ */
+UniformVec3fvDataPair.prototype.bindUniform = function() 
+{
+	this.gl.uniform3fv(this.uniformLocation, this.vec3fv);
+};
+'use strict';
+
+/**
+ * 어떤 일을 하고 있습니까?
+ * @class UniformVec4fvDataPair
+ * @param gl 변수
+ */
+var UniformVec4fvDataPair = function(gl, uniformName) 
+{
+	if (!(this instanceof UniformVec4fvDataPair)) 
+	{
+		throw new Error(Messages.CONSTRUCT_ERROR);
+	}
+	this.gl = gl;
+	this.name = uniformName;
+	this.uniformLocation;
+	this.vec4fv; 
+};
+
+/**
+ * 어떤 일을 하고 있습니까?
+ * @param gl 변수
+ */
+UniformVec4fvDataPair.prototype.bindUniform = function() 
+{
+	this.gl.uniform4fv(this.uniformLocation, this.vec4fv);
+};
 
 'use strict';
 
@@ -87607,7501 +95219,6 @@ Wheel.prototype.renderAsChild = function(magoManager, shader, renderType, glPrim
 'use strict';
 
 /**
- * 어떤 일을 하고 있습니까?
- * @class AttribLocationState
- */
-var AttribLocationState = function() 
-{
-	if (!(this instanceof AttribLocationState)) 
-	{
-		throw new Error(Messages.CONSTRUCT_ERROR);
-	}
-	
-	this.attribLocationEnabled = false;
-};
-'use strict';
-
-/**
- * 어떤 일을 하고 있습니까?
- * @class PostFxShader
- * @param gl 변수
- */
-var PostFxShader = function(gl) 
-{
-	if (!(this instanceof PostFxShader)) 
-	{
-		throw new Error(Messages.CONSTRUCT_ERROR);
-	}
-	this.gl = gl;
-	this.name;
-	this.attribLocationCacheObj = {}; // old.
-	this.uniformsArrayGeneral = []; // this array has the same uniforms that "uniformsCacheObj".
-	this.uniformsMapGeneral = {}; // this object has the same uniforms that "uniformsArray".
-	
-	this.uniformsArrayLocal = []; // this array has the same uniforms that "uniformsCacheObj".
-	this.uniformsMapLocal = {}; // this object has the same uniforms that "uniformsArray".
-	
-	// No general objects.
-	this.camera;
-	
-	// shader program.
-	this.program;
-	this.shader_vertex;
-	this.shader_fragment;
-	
-	// current buffers binded.
-	this.last_tex_id;
-	this.last_isAditionalMovedZero = false;
-	
-	this.lastVboKeyBindedMap = {};
-	
-	
-	// attribLocations state management.
-	this.attribLocationStateArray = [];
-	
-	this.shaderManager; 
-};
-
-PostFxShader.createShader = function(gl, type, source) 
-{
-	var shader = gl.createShader(type);
-	gl.shaderSource(shader, source);
-
-	gl.compileShader(shader);
-	if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) 
-	{
-		throw new Error(gl.getShaderInfoLog(shader));
-	}
-
-	return shader;
-};
-
-PostFxShader.createProgram = function(gl, vertexSource, fragmentSource) 
-{
-	// static function.***
-	var program = gl.createProgram();
-
-	var vertexShader = PostFxShader.createShader(gl, gl.VERTEX_SHADER, vertexSource);
-	var fragmentShader = PostFxShader.createShader(gl, gl.FRAGMENT_SHADER, fragmentSource);
-
-	gl.attachShader(program, vertexShader);
-	gl.attachShader(program, fragmentShader);
-
-	gl.linkProgram(program);
-	if (!gl.getProgramParameter(program, gl.LINK_STATUS)) 
-	{
-		throw new Error(gl.getProgramInfoLog(program));
-	}
-
-	var wrapper = {program: program};
-
-	var numAttributes = gl.getProgramParameter(program, gl.ACTIVE_ATTRIBUTES);
-	for (var i = 0; i < numAttributes; i++) 
-	{
-		var attribute = gl.getActiveAttrib(program, i);
-		wrapper[attribute.name] = gl.getAttribLocation(program, attribute.name);
-	}
-	var numUniforms = gl.getProgramParameter(program, gl.ACTIVE_UNIFORMS);
-	for (var i = 0; i < numUniforms; i++) 
-	{
-		var uniform = gl.getActiveUniform(program, i);
-		wrapper[uniform.name] = gl.getUniformLocation(program, uniform.name);
-	}
-
-	return wrapper;
-};
-
-/**
- * 어떤 일을 하고 있습니까?
- * @param shaderName 변수
- * @returns shader
- */
-PostFxShader.prototype.resetLastBuffersBinded = function()
-{
-	this.last_tex_id = undefined; // todo: must distinguish by channel.
-	this.last_isAditionalMovedZero = false;
-	
-	this.lastVboKeyBindedMap = {};
-	
-	this.disableVertexAttribArrayAll();
-	
-	if (this.attribLocationStateArray)
-	{
-		var attribLocsCount = this.attribLocationStateArray.length;
-		for (var i=0; i<attribLocsCount; i++)
-		{
-			var attribLocationState = this.attribLocationStateArray[i];
-			if (attribLocationState !== undefined)
-			{
-				attribLocationState.attribLocationEnabled = undefined;
-				this.attribLocationStateArray[i] = undefined;
-			}
-		}
-		this.attribLocationStateArray.length = 0;
-	}
-};
-
-/**
- * 어떤 일을 하고 있습니까?
- * @param shaderName 변수
- * @returns shader
- */
-PostFxShader.prototype.enableVertexAttribArray = function(attribLocation)
-{
-	if (attribLocation === undefined || attribLocation < 0)
-	{ return false; }
-	
-	var attribLocationState = this.attribLocationStateArray[attribLocation];
-	if (attribLocationState === undefined)
-	{
-		attribLocationState = new AttribLocationState();
-		this.attribLocationStateArray[attribLocation] = attribLocationState;
-		attribLocationState.attribLocationEnabled = false;
-	}
-
-	if (!attribLocationState.attribLocationEnabled)
-	{
-		this.gl.enableVertexAttribArray(attribLocation);
-		attribLocationState.attribLocationEnabled = true;
-	}
-	
-	return true;
-};
-
-/**
- * 어떤 일을 하고 있습니까?
- * @param shaderName 변수
- * @returns shader
- */
-PostFxShader.prototype.disableTextureImagesUnitsAll = function()
-{
-	var gl = this.gl;
-	var textureImagesUnitsCount = gl.getParameter(gl.MAX_TEXTURE_IMAGE_UNITS);
-	for (var i = 0; i<textureImagesUnitsCount; i++)
-	{ 
-		gl.activeTexture(gl.TEXTURE0 + i);
-		gl.bindTexture(gl.TEXTURE_2D, null);
-	}
-};
-
-/**
- * 어떤 일을 하고 있습니까?
- * @param shaderName 변수
- * @returns shader
- */
-PostFxShader.prototype.disableVertexAttribArrayAll = function()
-{
-	var gl = this.gl;
-	var vertexAttribsCount = gl.getParameter(gl.MAX_VERTEX_ATTRIBS);
-	for (var i = 0; i<vertexAttribsCount; i++)
-	{ gl.disableVertexAttribArray(i); }
-};
-
-/**
- * 어떤 일을 하고 있습니까?
- * @param shaderName 변수
- * @returns shader
- */
-PostFxShader.prototype.disableVertexAttribArray = function(attribLocation)
-{
-	if (attribLocation === undefined || attribLocation < 0)
-	{ return; }
-	
-	var attribLocationState = this.attribLocationStateArray[attribLocation];
-	if (attribLocationState === undefined)
-	{
-		attribLocationState = new AttribLocationState();
-		this.attribLocationStateArray[attribLocation] = attribLocationState;
-		attribLocationState.attribLocationEnabled = true;
-	}
-
-	if (attribLocationState.attribLocationEnabled)
-	{
-		this.gl.disableVertexAttribArray(attribLocation);
-		attribLocationState.attribLocationEnabled = false;
-	}
-};
-
-/**
- * 어떤 일을 하고 있습니까?
- * @param shaderName 변수
- * @returns shader
- */
-PostFxShader.prototype.useProgram = function()
-{
-	var gl = this.gl;
-	var currProgram = gl.getParameter(gl.CURRENT_PROGRAM);
-	if (currProgram !== this.program)
-	{
-		gl.useProgram(this.program);
-		this.shaderManager.currentShaderUsing = this;
-	}
-	this.resetLastBuffersBinded();
-};
-
-/**
- * 어떤 일을 하고 있습니까?
- * @param shaderName 변수
- * @returns shader
- */
-PostFxShader.prototype.bindUniformGenerals = function()
-{
-	if (this.uniformsArrayGeneral === undefined)
-	{ return; }
-	
-	var uniformsDataPairsCount = this.uniformsArrayGeneral.length;
-	for (var i=0; i<uniformsDataPairsCount; i++)
-	{
-		this.uniformsArrayGeneral[i].bindUniform();
-	}
-	
-	// Bind camera uniforms.
-	if (this.camera)
-	{ this.camera.bindUniforms(this.gl, this); }
-};
-
-/**
- * 어떤 일을 하고 있습니까?
- * @param shaderName 변수
- * @returns shader
- */
-PostFxShader.prototype.getUniformDataPair = function(uniformName)
-{
-	return this.uniformsMapGeneral[uniformName];
-};
-
-/**
- * 어떤 일을 하고 있습니까?
- * @param shaderName 변수
- * @returns shader
- */
-PostFxShader.prototype.newUniformDataPair = function(uniformType, uniformName)
-{
-	var uniformDataPair;//
-	if (uniformType === "Matrix4fv")
-	{
-		uniformDataPair = new UniformMatrix4fvDataPair(this.gl, uniformName);
-		this.uniformsArrayGeneral.push(uniformDataPair);
-		this.uniformsMapGeneral[uniformName] = uniformDataPair;
-	}
-	else if (uniformType === "Vec4fv")
-	{
-		uniformDataPair = new UniformVec4fvDataPair(this.gl, uniformName);
-		this.uniformsArrayGeneral.push(uniformDataPair);
-		this.uniformsMapGeneral[uniformName] = uniformDataPair;
-	}
-	else if (uniformType === "Vec3fv")
-	{
-		uniformDataPair = new UniformVec3fvDataPair(this.gl, uniformName);
-		this.uniformsArrayGeneral.push(uniformDataPair);
-		this.uniformsMapGeneral[uniformName] = uniformDataPair;
-	}
-	else if (uniformType === "Vec2fv")
-	{
-		uniformDataPair = new UniformVec2fvDataPair(this.gl, uniformName);
-		this.uniformsArrayGeneral.push(uniformDataPair);
-		this.uniformsMapGeneral[uniformName] = uniformDataPair;
-	}
-	else if (uniformType === "1f")
-	{
-		uniformDataPair = new Uniform1fDataPair(this.gl, uniformName);
-		this.uniformsArrayGeneral.push(uniformDataPair);
-		this.uniformsMapGeneral[uniformName] = uniformDataPair;
-	}
-	else if (uniformType === "1i")
-	{
-		uniformDataPair = new Uniform1iDataPair(this.gl, uniformName);
-		this.uniformsArrayGeneral.push(uniformDataPair);
-		this.uniformsMapGeneral[uniformName] = uniformDataPair;
-	}
-	
-	return uniformDataPair;
-};
-
-/**
- * 어떤 일을 하고 있습니까?
- * @param shaderName 변수
- * @returns shader
- */
-PostFxShader.prototype.newUniformDataPairLocal = function(uniformType, uniformName)
-{
-	var uniformDataPair;//
-	if (uniformType === "Matrix4fv")
-	{
-		uniformDataPair = new UniformMatrix4fvDataPair(this.gl, uniformName);
-		this.uniformsArrayLocal.push(uniformDataPair);
-		this.uniformsMapLocal[uniformName] = uniformDataPair;
-	}
-	else if (uniformType === "Vec4fv")
-	{
-		uniformDataPair = new UniformVec4fvDataPair(this.gl, uniformName);
-		this.uniformsArrayLocal.push(uniformDataPair);
-		this.uniformsMapLocal[uniformName] = uniformDataPair;
-	}
-	else if (uniformType === "Vec3fv")
-	{
-		uniformDataPair = new UniformVec3fvDataPair(this.gl, uniformName);
-		this.uniformsArrayLocal.push(uniformDataPair);
-		this.uniformsMapLocal[uniformName] = uniformDataPair;
-	}
-	else if (uniformType === "Vec2fv")
-	{
-		uniformDataPair = new UniformVec2fvDataPair(this.gl, uniformName);
-		this.uniformsArrayLocal.push(uniformDataPair);
-		this.uniformsMapLocal[uniformName] = uniformDataPair;
-	}
-	else if (uniformType === "1f")
-	{
-		uniformDataPair = new Uniform1fDataPair(this.gl, uniformName);
-		this.uniformsArrayLocal.push(uniformDataPair);
-		this.uniformsMapLocal[uniformName] = uniformDataPair;
-	}
-	else if (uniformType === "1i")
-	{
-		uniformDataPair = new Uniform1iDataPair(this.gl, uniformName);
-		this.uniformsArrayLocal.push(uniformDataPair);
-		this.uniformsMapLocal[uniformName] = uniformDataPair;
-	}
-	
-	return uniformDataPair;
-};
-
-/**
- * 어떤 일을 하고 있습니까?
- * @param shaderName 변수
- */
-PostFxShader.prototype.createUniformGenerals = function(gl, shader, sceneState)
-{
-	// Here create all generals uniforms, if exist, of the shader.
-	var uniformDataPair;
-	var uniformLocation;
-
-	// 1. ModelViewProjectionMatrixRelToEye.              
-	uniformLocation = gl.getUniformLocation(shader.program, "ModelViewProjectionMatrixRelToEye");
-	if (uniformLocation !== null && uniformLocation !== undefined)
-	{
-		uniformDataPair = shader.newUniformDataPair("Matrix4fv", "mvpMat4RelToEye");
-		uniformDataPair.uniformLocation = uniformLocation;
-		uniformDataPair.matrix4fv = sceneState.modelViewProjRelToEyeMatrix._floatArrays;
-	}
-	
-	// 1. ModelViewProjectionMatrix.
-	uniformLocation = gl.getUniformLocation(shader.program, "ModelViewProjectionMatrix");
-	if (uniformLocation !== null && uniformLocation !== undefined)
-	{
-		uniformDataPair = shader.newUniformDataPair("Matrix4fv", "mvpMat4");
-		uniformDataPair.uniformLocation = uniformLocation;
-		uniformDataPair.matrix4fv = sceneState.modelViewProjMatrix._floatArrays;
-	}
-	
-	// 2. modelViewMatrixRelToEye.
-	uniformLocation = gl.getUniformLocation(shader.program, "modelViewMatrixRelToEye");
-	if (uniformLocation !== null && uniformLocation !== undefined)
-	{
-		uniformDataPair = shader.newUniformDataPair("Matrix4fv", "mvMat4RelToEye");
-		uniformDataPair.uniformLocation = uniformLocation;
-		uniformDataPair.matrix4fv = sceneState.modelViewRelToEyeMatrix._floatArrays;
-	}
-	
-	// 3. modelViewMatrix.
-	uniformLocation = gl.getUniformLocation(shader.program, "modelViewMatrix");
-	if (uniformLocation !== null && uniformLocation !== undefined)
-	{
-		uniformDataPair = shader.newUniformDataPair("Matrix4fv", "modelViewMatrix");
-		uniformDataPair.uniformLocation = uniformLocation;
-		uniformDataPair.matrix4fv = sceneState.modelViewMatrix._floatArrays;
-	}
-	
-	// 3.1. modelViewMatrixInv.
-	uniformLocation = gl.getUniformLocation(shader.program, "modelViewMatrixInv");
-	if (uniformLocation !== null && uniformLocation !== undefined)
-	{
-		uniformDataPair = shader.newUniformDataPair("Matrix4fv", "modelViewMatrixInv");
-		uniformDataPair.uniformLocation = uniformLocation;
-		var mvMatInv = sceneState.getModelViewMatrixInv();
-		uniformDataPair.matrix4fv = mvMatInv._floatArrays;
-	}
-	
-	// 4. projectionMatrix.
-	uniformLocation = gl.getUniformLocation(shader.program, "projectionMatrix");
-	if (uniformLocation !== null && uniformLocation !== undefined)
-	{
-		uniformDataPair = shader.newUniformDataPair("Matrix4fv", "pMat4");
-		uniformDataPair.uniformLocation = uniformLocation;
-		uniformDataPair.matrix4fv = sceneState.projectionMatrix._floatArrays;
-	}
-	
-	// 5. normalMatrix4.
-	uniformLocation = gl.getUniformLocation(shader.program, "normalMatrix4");
-	if (uniformLocation !== null && uniformLocation !== undefined)
-	{
-		uniformDataPair = shader.newUniformDataPair("Matrix4fv", "normalMat4");
-		uniformDataPair.uniformLocation = uniformLocation;
-		uniformDataPair.matrix4fv = sceneState.normalMatrix4._floatArrays;
-	}
-	
-	// 6. encodedCameraPositionMCHigh.
-	uniformLocation = gl.getUniformLocation(shader.program, "encodedCameraPositionMCHigh");
-	if (uniformLocation !== null && uniformLocation !== undefined)
-	{
-		uniformDataPair = shader.newUniformDataPair("Vec3fv", "encodedCamPosHigh");
-		uniformDataPair.uniformLocation = uniformLocation;
-		uniformDataPair.vec3fv = sceneState.encodedCamPosHigh;
-	}
-	
-	// 7. encodedCameraPositionMCLow.
-	uniformLocation = gl.getUniformLocation(shader.program, "encodedCameraPositionMCLow");
-	if (uniformLocation !== null && uniformLocation !== undefined)
-	{
-		uniformDataPair = shader.newUniformDataPair("Vec3fv", "encodedCamPosLow");
-		uniformDataPair.uniformLocation = uniformLocation;
-		uniformDataPair.vec3fv = sceneState.encodedCamPosLow;
-	}
-	
-	// 10. fovy.
-	uniformLocation = gl.getUniformLocation(shader.program, "fov");
-	if (uniformLocation !== null && uniformLocation !== undefined)
-	{
-		uniformDataPair = shader.newUniformDataPair("1f", "fovyRad");
-		uniformDataPair.uniformLocation = uniformLocation;
-		uniformDataPair.floatValue = sceneState.camera.frustum.fovyRad;
-	}
-	
-	// 10.1 tangentOfHalfFovy.
-	uniformLocation = gl.getUniformLocation(shader.program, "tangentOfHalfFovy");
-	if (uniformLocation !== null && uniformLocation !== undefined)
-	{
-		uniformDataPair = shader.newUniformDataPair("1f", "tangentOfHalfFovy");
-		uniformDataPair.uniformLocation = uniformLocation;
-		uniformDataPair.floatValue = sceneState.camera.frustum.tangentOfHalfFovy;
-	}
-	
-	// 11. aspectRatio.
-	uniformLocation = gl.getUniformLocation(shader.program, "aspectRatio");
-	if (uniformLocation !== null && uniformLocation !== undefined)
-	{
-		uniformDataPair = shader.newUniformDataPair("1f", "aspectRatio");
-		uniformDataPair.uniformLocation = uniformLocation;
-		uniformDataPair.floatValue = sceneState.camera.frustum.aspectRatio;
-	}
-	
-	// 12. drawBuffWidht.
-	uniformLocation = gl.getUniformLocation(shader.program, "screenWidth");
-	if (uniformLocation !== null && uniformLocation !== undefined)
-	{
-		uniformDataPair = shader.newUniformDataPair("1f", "drawBuffWidht");
-		uniformDataPair.uniformLocation = uniformLocation;
-		uniformDataPair.floatValue = sceneState.drawingBufferWidth;
-	}
-	
-	// 13. drawBuffHeight.
-	uniformLocation = gl.getUniformLocation(shader.program, "screenHeight");
-	if (uniformLocation !== null && uniformLocation !== undefined)
-	{
-		uniformDataPair = shader.newUniformDataPair("1f", "drawBuffHeight");
-		uniformDataPair.uniformLocation = uniformLocation;
-		uniformDataPair.floatValue = sceneState.drawingBufferHeight;
-	}
-	
-	// 14. depthTex.
-	uniformLocation = gl.getUniformLocation(shader.program, "depthTex");
-	if (uniformLocation !== null && uniformLocation !== undefined)
-	{
-		uniformDataPair = shader.newUniformDataPair("1i", "depthTex");
-		uniformDataPair.uniformLocation = uniformLocation;
-		uniformDataPair.intValue = 0;
-	}
-	
-	// 15. noiseTex.
-	uniformLocation = gl.getUniformLocation(shader.program, "noiseTex");
-	if (uniformLocation !== null && uniformLocation !== undefined)
-	{
-		uniformDataPair = shader.newUniformDataPair("1i", "noiseTex");
-		uniformDataPair.uniformLocation = uniformLocation;
-		uniformDataPair.intValue = 1;
-	}
-	
-	// 16. diffuseTex.
-	uniformLocation = gl.getUniformLocation(shader.program, "diffuseTex");
-	if (uniformLocation !== null && uniformLocation !== undefined)
-	{
-		uniformDataPair = shader.newUniformDataPair("1i", "diffuseTex");
-		uniformDataPair.uniformLocation = uniformLocation;
-		uniformDataPair.intValue = 2;
-	}
-	
-	// 16.1 shadowMapTex.
-	uniformLocation = gl.getUniformLocation(shader.program, "shadowMapTex");
-	if (uniformLocation !== null && uniformLocation !== undefined)
-	{
-		uniformDataPair = shader.newUniformDataPair("1i", "shadowMapTex");
-		uniformDataPair.uniformLocation = uniformLocation;
-		uniformDataPair.intValue = 3;
-	}
-	
-	// 16.2 shadowMapTex2.
-	uniformLocation = gl.getUniformLocation(shader.program, "shadowMapTex2");
-	if (uniformLocation !== null && uniformLocation !== undefined)
-	{
-		uniformDataPair = shader.newUniformDataPair("1i", "shadowMapTex2");
-		uniformDataPair.uniformLocation = uniformLocation;
-		uniformDataPair.intValue = 4;
-	}
-	
-	// 17. specularColor.
-	uniformLocation = gl.getUniformLocation(shader.program, "specularColor");
-	if (uniformLocation !== null && uniformLocation !== undefined)
-	{
-		uniformDataPair = shader.newUniformDataPair("Vec3fv", "specularColor");
-		uniformDataPair.uniformLocation = uniformLocation;
-		uniformDataPair.vec3fv = sceneState.specularColor;
-	}
-	
-	// 17. ambientColor.
-	uniformLocation = gl.getUniformLocation(shader.program, "ambientColor");
-	if (uniformLocation !== null && uniformLocation !== undefined)
-	{
-		uniformDataPair = shader.newUniformDataPair("Vec3fv", "ambientColor");
-		uniformDataPair.uniformLocation = uniformLocation;
-		uniformDataPair.vec3fv = sceneState.ambientColor;
-	}
-	
-	// 18. ssaoRadius.
-	uniformLocation = gl.getUniformLocation(shader.program, "radius");
-	if (uniformLocation !== null && uniformLocation !== undefined)
-	{
-		uniformDataPair = shader.newUniformDataPair("1f", "radius");
-		uniformDataPair.uniformLocation = uniformLocation;
-		uniformDataPair.floatValue = sceneState.ssaoRadius;
-	}
-	
-	// 19. ambientReflectionCoef.
-	uniformLocation = gl.getUniformLocation(shader.program, "ambientReflectionCoef");
-	if (uniformLocation !== null && uniformLocation !== undefined)
-	{
-		uniformDataPair = shader.newUniformDataPair("1f", "ambientReflectionCoef");
-		uniformDataPair.uniformLocation = uniformLocation;
-		uniformDataPair.floatValue = sceneState.ambientReflectionCoef;
-	}
-	
-	// 20. diffuseReflectionCoef.
-	uniformLocation = gl.getUniformLocation(shader.program, "diffuseReflectionCoef");
-	if (uniformLocation !== null && uniformLocation !== undefined)
-	{
-		uniformDataPair = shader.newUniformDataPair("1f", "diffuseReflectionCoef");
-		uniformDataPair.uniformLocation = uniformLocation;
-		uniformDataPair.floatValue = sceneState.diffuseReflectionCoef;
-	}
-	
-	// 21. specularReflectionCoef.
-	uniformLocation = gl.getUniformLocation(shader.program, "specularReflectionCoef");
-	if (uniformLocation !== null && uniformLocation !== undefined)
-	{
-		uniformDataPair = shader.newUniformDataPair("1f", "specularReflectionCoef");
-		uniformDataPair.uniformLocation = uniformLocation;
-		uniformDataPair.floatValue = sceneState.specularReflectionCoef;
-	}
-	
-	// 22. shininessValue.
-	uniformLocation = gl.getUniformLocation(shader.program, "shininessValue");
-	if (uniformLocation !== null && uniformLocation !== undefined)
-	{
-		uniformDataPair = shader.newUniformDataPair("1f", "shininessValue");
-		uniformDataPair.uniformLocation = uniformLocation;
-		uniformDataPair.floatValue = sceneState.shininessValue;
-	}
-	
-	// 23. ssaoNoiseScale2.
-	uniformLocation = gl.getUniformLocation(shader.program, "noiseScale");
-	if (uniformLocation !== null && uniformLocation !== undefined)
-	{
-		uniformDataPair = shader.newUniformDataPair("Vec2fv", "ssaoNoiseScale2");
-		uniformDataPair.uniformLocation = uniformLocation;
-		uniformDataPair.vec2fv = sceneState.ssaoNoiseScale2;
-	}
-	
-	// 24. ssaoKernel16.
-	uniformLocation = gl.getUniformLocation(shader.program, "kernel");
-	if (uniformLocation !== null && uniformLocation !== undefined)
-	{
-		uniformDataPair = shader.newUniformDataPair("Vec3fv", "ssaoKernel16");
-		uniformDataPair.uniformLocation = uniformLocation;
-		uniformDataPair.vec3fv = sceneState.ssaoKernel16;
-	}
-	
-	// Set the camera.
-	this.camera = sceneState.camera;
-};
-
-/**
- * 어떤 일을 하고 있습니까?
- * @param shaderName 변수
- */
-PostFxShader.prototype.bindAttribLocations = function(gl, shader)
-{
-	gl.bindAttribLocation(shader.program, 0, "position");
-	gl.bindAttribLocation(shader.program, 1, "normal");
-	gl.bindAttribLocation(shader.program, 2, "texCoord");
-	gl.bindAttribLocation(shader.program, 3, "color4");
-};
-
-/**
- * 어떤 일을 하고 있습니까?
- * @param shaderName 변수
- */
-PostFxShader.prototype.createUniformLocals = function(gl, shader, sceneState)
-{
-	// Here create all local uniforms, if exist, of the shader.
-	var uniformDataPair;
-	var uniformLocation;
-	
-	shader.buildingRotMatrix_loc = gl.getUniformLocation(shader.program, "buildingRotMatrix");
-	shader.buildingPosHIGH_loc = gl.getUniformLocation(shader.program, "buildingPosHIGH");
-	shader.buildingPosLOW_loc = gl.getUniformLocation(shader.program, "buildingPosLOW");
-	shader.sunMatrix_loc = gl.getUniformLocation(shader.program, "sunMatrix");
-	
-	shader.refMatrixType_loc = gl.getUniformLocation(shader.program, "refMatrixType");
-	shader.refMatrix_loc = gl.getUniformLocation(shader.program, "RefTransfMatrix");
-	shader.refTranslationVec_loc = gl.getUniformLocation(shader.program, "refTranslationVec");
-	shader.aditionalMov_loc = gl.getUniformLocation(shader.program, "aditionalPosition");
-	
-	shader.hasTexture_loc = gl.getUniformLocation(shader.program, "hasTexture");
-	shader.textureFlipYAxis_loc = gl.getUniformLocation(shader.program, "textureFlipYAxis");
-	shader.kernel16_loc = gl.getUniformLocation(shader.program, "kernel");
-	//shader.kernel32_loc = gl.getUniformLocation(shader.program, "kernel32");
-	shader.noiseScale2_loc = gl.getUniformLocation(shader.program, "noiseScale");
-	
-	shader.sunPosHigh_loc = gl.getUniformLocation(shader.program, "sunPosHIGH");
-	shader.sunPosLow_loc = gl.getUniformLocation(shader.program, "sunPosLOW");
-	
-	shader.shadowMapWidth_loc = gl.getUniformLocation(shader.program, "shadowMapWidth");
-	shader.shadowMapHeight_loc = gl.getUniformLocation(shader.program, "shadowMapHeight");
-	
-	shader.sunDirWC_loc = gl.getUniformLocation(shader.program, "sunDirWC");
-	shader.sunIdx_loc = gl.getUniformLocation(shader.program, "sunIdx");
-	
-	// Attributtes.*
-	shader.position3_loc = gl.getAttribLocation(shader.program, "position");
-	shader.texCoord2_loc = gl.getAttribLocation(shader.program, "texCoord");
-	shader.normal3_loc = gl.getAttribLocation(shader.program, "normal");
-	shader.color4_loc = gl.getAttribLocation(shader.program, "color4");
-	
-	
-	shader.bUse1Color_loc = gl.getUniformLocation(shader.program, "bUse1Color");
-	shader.oneColor4_loc = gl.getUniformLocation(shader.program, "oneColor4");
-	shader.bApplySsao_loc = gl.getUniformLocation(shader.program, "bApplySsao");
-	shader.bApplyShadow_loc = gl.getUniformLocation(shader.program, "bApplyShadow");
-	shader.bSilhouette_loc = gl.getUniformLocation(shader.program, "bSilhouette");
-	
-	// clippingPlanes.
-	shader.bApplyClippingPlanes_loc = gl.getUniformLocation(shader.program, "bApplyClippingPlanes");
-	shader.clippingPlanesCount_loc = gl.getUniformLocation(shader.program, "clippingPlanesCount");
-	shader.clippingPlanes_loc = gl.getUniformLocation(shader.program, "clippingPlanes");
-	
-	// compression data, for shaders with data compressed.
-	// compressionMaxPoint & compressionMinPoint: for refObjects, this is the octree's size.
-	shader.posDataByteSize_loc = gl.getUniformLocation(shader.program, "posDataByteSize");
-	shader.texCoordByteSize_loc = gl.getUniformLocation(shader.program, "texCoordByteSize");
-	shader.compressionMaxPoint_loc = gl.getUniformLocation(shader.program, "compressionMaxPoint");
-	shader.compressionMinPoint_loc = gl.getUniformLocation(shader.program, "compressionMinPoint");
-	
-	shader.bApplySpecularLighting_loc = gl.getUniformLocation(shader.program, "bApplySpecularLighting");
-	shader.colorType_loc = gl.getUniformLocation(shader.program, "colorType");
-	shader.externalAlpha_loc = gl.getUniformLocation(shader.program, "externalAlpha");
-	
-	//uniform float fixPointSize;
-	//uniform bool bUseFixPointSize;
-	shader.fixPointSize_loc = gl.getUniformLocation(shader.program, "fixPointSize");
-	shader.bUseFixPointSize_loc = gl.getUniformLocation(shader.program, "bUseFixPointSize");
-	
-	// Camera frustum near & far.
-	// frustumNear.
-	shader.frustumNear_loc = gl.getUniformLocation(shader.program, "near");
-
-	// frustumFar.
-	shader.frustumFar_loc = gl.getUniformLocation(shader.program, "far");
-	
-	shader.scaleLC_loc = gl.getUniformLocation(shader.program, "scaleLC");
-	shader.colorMultiplier_loc = gl.getUniformLocation(shader.program, "colorMultiplier");
-	shader.modelViewProjectionMatrixInv_loc = gl.getUniformLocation(shader.program, "modelViewProjectionMatrixInv");
-	shader.projectionMatrixInv_loc = gl.getUniformLocation(shader.program, "projectionMatrixInv");
-	shader.modelViewMatrixRelToEyeInv_loc = gl.getUniformLocation(shader.program, "modelViewMatrixRelToEyeInv");
-
-	shader.uRenderType_loc = gl.getUniformLocation(shader.program, "uRenderType");
-	shader.uTime_loc = gl.getUniformLocation(shader.program, "uTime");
-};
-
-'use strict';
-
-/**
- * 어떤 일을 하고 있습니까?
- * @class PostFxShadersManager
- */
-var PostFxShadersManager = function(options) 
-{
-	if (!(this instanceof PostFxShadersManager)) 
-	{
-		throw new Error(Messages.CONSTRUCT_ERROR);
-	}
-	this.gl;
-	this.pFx_shaders_array = []; // old.
-	this.shadersMap = {};
-	
-	// preCreated shaders.
-	this.modelRefShader;
-	this.modelRefSilhouetteShader;
-	this.lodBuildingShader;
-	
-	this.currentShaderUsing = undefined; // current active shader.
-
-	this.bUseLogarithmicDepth = false;
-
-	if (options)
-	{
-		if (options.useLogarithmicDepth)
-		{ this.bUseLogarithmicDepth = options.useLogarithmicDepth; }
-	}
-};
-
-/**
- * 어떤 일을 하고 있습니까?
- * @param shaderName 변수
- * @returns shader
- */
-PostFxShadersManager.prototype.newShader = function(shaderName)
-{
-	var shader = new PostFxShader(this.gl);
-	shader.name = shaderName;
-	shader.shaderManager = this;
-	this.shadersMap[shaderName] = shader;
-	return shader;
-};
-
-/**
- * Returns true if the shader is the this.currentShaderUsing.
- * @returns shader
- */
-PostFxShadersManager.prototype.getCurrentShader = function() 
-{
-	return this.currentShaderUsing;
-};
-
-
-/**
- * Returns the current active shader.
- * @param {PostFxShader} shader
- * @returns {BOOL}}
- */
-PostFxShadersManager.prototype.isCurrentShader = function(shader) 
-{
-	return (this.currentShaderUsing === shader);
-};
-
-/**
- * Returns the current active shader.
- * @param {PostFxShader} shader
- * @returns {BOOL}}
- */
-PostFxShadersManager.prototype.useProgram = function(shader) 
-{
-	if (!this.isCurrentShader(shader))
-	{
-		shader.useProgram();
-		this.currentShaderUsing = shader;
-	}
-};
-
-/**
- * 어떤 일을 하고 있습니까?
- * @param gl 변수
- * @param source 변수
- * @param type 변수
- * @param typeString 변수
- * @returns shader
- */
-PostFxShadersManager.prototype.getShader = function(shaderName) 
-{
-	return this.shadersMap[shaderName];
-};
-
-/**
- * 어떤 일을 하고 있습니까?
- * @param gl 변수
- * @param source 변수
- * @param type 변수
- * @param typeString 변수
- * @returns shader
- */
-PostFxShadersManager.prototype.createShaderProgram = function(gl, vertexSource, fragmentSource, shaderName, magoManager) 
-{
-	var shader = this.newShader(shaderName);
-	shader.program = gl.createProgram();
-	shader.shader_vertex = this.createShader(gl, vertexSource, gl.VERTEX_SHADER, "VERTEX");
-	shader.shader_fragment = this.createShader(gl, fragmentSource, gl.FRAGMENT_SHADER, "FRAGMENT");
-
-	gl.attachShader(shader.program, shader.shader_vertex);
-	gl.attachShader(shader.program, shader.shader_fragment);
-	shader.bindAttribLocations(gl, shader); // Do this before linkProgram.
-	gl.linkProgram(shader.program);
-			
-	shader.createUniformGenerals(gl, shader, magoManager.sceneState);
-	shader.createUniformLocals(gl, shader, magoManager.sceneState);
-	
-	
-	// keep shader locations.
-	var numAttributes = gl.getProgramParameter(shader.program, gl.ACTIVE_ATTRIBUTES);
-	for (var i = 0; i < numAttributes; i++) 
-	{
-		var attribute = gl.getActiveAttrib(shader.program, i);
-		shader[attribute.name] = gl.getAttribLocation(shader.program, attribute.name);
-	}
-	var numUniforms = gl.getProgramParameter(shader.program, gl.ACTIVE_UNIFORMS);
-	for (var i = 0; i < numUniforms; i++) 
-	{
-		var uniform = gl.getActiveUniform(shader.program, i);
-		shader[uniform.name] = gl.getUniformLocation(shader.program, uniform.name);
-	}
-
-	return shader;
-};
-
-/**
- * 어떤 일을 하고 있습니까?
- * @param gl 변수
- * @param source 변수
- * @param type 변수
- * @param typeString 변수
- * @returns shader
- */
-PostFxShadersManager.prototype.createShader = function(gl, source, type, typeString) 
-{
-	// Source from internet.
-	var shader = gl.createShader(type);
-	gl.shaderSource(shader, source);
-	gl.compileShader(shader);
-	if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) 
-	{
-		alert("ERROR IN "+typeString+ " SHADER : " + gl.getShaderInfoLog(shader));
-		return false;
-	}
-	return shader;
-};
-
-/**
- * 어떤 일을 하고 있습니까?
- * @param gl 변수
- */
-PostFxShadersManager.prototype.createDefaultShaders = function(gl, sceneState) 
-{
-	this.modelRefSilhouetteShader = this.createSilhouetteShaderModelRef(gl); // 14.
-	this.triPolyhedronShader = this.createSsaoShaderBox(gl); // 12.
-	
-	//this.invertedBoxShader = this.createInvertedBoxShader(gl); // TEST.
-};
-
-/**
- * 어떤 일을 하고 있습니까?
- */
-PostFxShadersManager.prototype.getModelRefSilhouetteShader = function() 
-{
-	return this.modelRefSilhouetteShader;
-};
-
-/**
- * 어떤 일을 하고 있습니까?
- */
-PostFxShadersManager.prototype.getTriPolyhedronDepthShader = function() 
-{
-	return this.triPolyhedronDepthShader;
-};
-
-/**
- * 어떤 일을 하고 있습니까?
- */
-PostFxShadersManager.prototype.getTriPolyhedronShader = function() 
-{
-	return this.triPolyhedronShader;
-};
-
-/**
- * 어떤 일을 하고 있습니까?
- */
-PostFxShadersManager.prototype.getInvertedBoxShader = function() 
-{
-	return this.invertedBoxShader;
-};
-
-// 14) Silhouette shader.
-/**
- * 어떤 일을 하고 있습니까?
- * @param gl 변수
- */
-PostFxShadersManager.prototype.createSilhouetteShaderModelRef = function(gl) 
-{
-	// 14.
-	var shader = new PostFxShader(this.gl);
-	shader.name = "SilhouetteShaderModelRef";
-	this.pFx_shaders_array.push(undefined);
-
-	var ssao_vs_source = ShaderSource.SilhouetteVS;
-	var ssao_fs_source = ShaderSource.SilhouetteFS;
-
-	shader.program = gl.createProgram();
-	shader.shader_vertex = this.createShader(gl, ssao_vs_source, gl.VERTEX_SHADER, "VERTEX");
-	shader.shader_fragment = this.createShader(gl, ssao_fs_source, gl.FRAGMENT_SHADER, "FRAGMENT");
-
-	gl.attachShader(shader.program, shader.shader_vertex);
-	gl.attachShader(shader.program, shader.shader_fragment);
-	shader.bindAttribLocations(gl, shader); // Do this before linkProgram.
-	gl.linkProgram(shader.program);
-
-	shader.cameraPosHIGH_loc = gl.getUniformLocation(shader.program, "encodedCameraPositionMCHigh");
-	shader.cameraPosLOW_loc = gl.getUniformLocation(shader.program, "encodedCameraPositionMCLow");
-	shader.buildingPosHIGH_loc = gl.getUniformLocation(shader.program, "buildingPosHIGH");
-	shader.buildingPosLOW_loc = gl.getUniformLocation(shader.program, "buildingPosLOW");
-
-	shader.modelViewProjectionMatrix4RelToEye_loc = gl.getUniformLocation(shader.program, "ModelViewProjectionMatrixRelToEye");
-	shader.refMatrix_loc = gl.getUniformLocation(shader.program, "RefTransfMatrix");
-	shader.buildingRotMatrix_loc = gl.getUniformLocation(shader.program, "buildingRotMatrix");
-	shader.refMatrixType_loc = gl.getUniformLocation(shader.program, "refMatrixType");
-	shader.refTranslationVec_loc = gl.getUniformLocation(shader.program, "refTranslationVec");
-
-	shader.position3_loc = gl.getAttribLocation(shader.program, "position");
-	shader.attribLocationCacheObj.position = gl.getAttribLocation(shader.program, "position");
-
-	shader.aditionalMov_loc = gl.getUniformLocation(shader.program, "aditionalPosition");
-
-	shader.color4Aux_loc = gl.getUniformLocation(shader.program, "vColor4Aux");
-	shader.camSpacePixelTranslation_loc = gl.getUniformLocation(shader.program, "camSpacePixelTranslation");
-	shader.screenSize_loc = gl.getUniformLocation(shader.program, "screenSize");
-	shader.ProjectionMatrix_loc = gl.getUniformLocation(shader.program, "ProjectionMatrix");
-	shader.ModelViewMatrixRelToEye_loc = gl.getUniformLocation(shader.program, "ModelViewMatrixRelToEye");
-	
-	return shader;
-};
-
-// box Shader.
-/**
- * 어떤 일을 하고 있습니까?
- * @param gl 변수
- */
-PostFxShadersManager.prototype.createSsaoShaderBox = function(gl) 
-{
-	// 8.
-	var shader = new PostFxShader(this.gl);
-	this.pFx_shaders_array.push(shader);
-
-	var ssao_vs_source = ShaderSource.BoxSsaoVS;
-	var ssao_fs_source = ShaderSource.BoxSsaoFS;
-
-	shader.program = gl.createProgram();
-	shader.shader_vertex = this.createShader(gl, ssao_vs_source, gl.VERTEX_SHADER, "VERTEX");
-	shader.shader_fragment = this.createShader(gl, ssao_fs_source, gl.FRAGMENT_SHADER, "FRAGMENT");
-
-	gl.attachShader(shader.program, shader.shader_vertex);
-	gl.attachShader(shader.program, shader.shader_fragment);
-	shader.bindAttribLocations(gl, shader); // Do this before linkProgram.
-	gl.linkProgram(shader.program);
-
-	shader.cameraPosHIGH_loc = gl.getUniformLocation(shader.program, "encodedCameraPositionMCHigh");
-	shader.cameraPosLOW_loc = gl.getUniformLocation(shader.program, "encodedCameraPositionMCLow");
-	shader.buildingPosHIGH_loc = gl.getUniformLocation(shader.program, "buildingPosHIGH");
-	shader.buildingPosLOW_loc = gl.getUniformLocation(shader.program, "buildingPosLOW");
-
-	shader.modelViewMatrix4RelToEye_loc = gl.getUniformLocation(shader.program, "modelViewMatrixRelToEye");
-	shader.modelViewProjectionMatrix4RelToEye_loc = gl.getUniformLocation(shader.program, "ModelViewProjectionMatrixRelToEye");
-	shader.normalMatrix4_loc = gl.getUniformLocation(shader.program, "normalMatrix4");
-	shader.projectionMatrix4_loc = gl.getUniformLocation(shader.program, "projectionMatrix");
-	shader.modelViewMatrix4_loc = gl.getUniformLocation(shader.program, "modelViewMatrix");
-	//shader.refMatrix_loc = gl.getUniformLocation(shader.program, "RefTransfMatrix");
-	shader.buildingRotMatrix_loc = gl.getUniformLocation(shader.program, "buildingRotMatrix");
-	shader.bUse1Color_loc = gl.getUniformLocation(shader.program, "bUse1Color");
-	shader.oneColor4_loc = gl.getUniformLocation(shader.program, "oneColor4");
-	shader.bUseNormal_loc = gl.getUniformLocation(shader.program, "bUseNormal");
-	shader.bScale_loc = gl.getUniformLocation(shader.program, "bScale");
-	shader.scale_loc = gl.getUniformLocation(shader.program, "scale");
-
-
-	
-	gl.bindAttribLocation(shader.program, 0, "position");
-	gl.bindAttribLocation(shader.program, 1, "normal");
-	gl.bindAttribLocation(shader.program, 2, "texCoord");
-	gl.bindAttribLocation(shader.program, 3, "color4");
-	
-	
-	shader.position3_loc = gl.getAttribLocation(shader.program, "position");
-	//shader.texCoord2_loc = gl.getAttribLocation(shader.program, "texCoord");
-	shader.normal3_loc = gl.getAttribLocation(shader.program, "normal");
-	shader.color4_loc = gl.getAttribLocation(shader.program, "color4");
-	
-	
-	shader.attribLocationCacheObj.position = gl.getAttribLocation(shader.program, "position");
-	shader.attribLocationCacheObj.normal = gl.getAttribLocation(shader.program, "normal");
-	shader.attribLocationCacheObj.color4 = gl.getAttribLocation(shader.program, "color4");
-
-	//
-	shader.aditionalMov_loc = gl.getUniformLocation(shader.program, "aditionalPosition");
-
-	// ssao uniforms.*
-	shader.noiseScale2_loc = gl.getUniformLocation(shader.program, "noiseScale");
-	shader.kernel16_loc = gl.getUniformLocation(shader.program, "kernel");
-
-	// uniform values.
-	shader.near_loc = gl.getUniformLocation(shader.program, "near");
-	shader.far_loc = gl.getUniformLocation(shader.program, "far");
-	shader.fov_loc = gl.getUniformLocation(shader.program, "fov");
-	shader.aspectRatio_loc = gl.getUniformLocation(shader.program, "aspectRatio");
-
-	shader.screenWidth_loc = gl.getUniformLocation(shader.program, "screenWidth");
-	shader.screenHeight_loc = gl.getUniformLocation(shader.program, "screenHeight");
-
-	shader.hasTexture_loc = gl.getUniformLocation(shader.program, "hasTexture");
-	shader.color4Aux_loc = gl.getUniformLocation(shader.program, "vColor4Aux");
-
-	// uniform samplers.
-	shader.depthTex_loc = gl.getUniformLocation(shader.program, "depthTex");
-	shader.noiseTex_loc = gl.getUniformLocation(shader.program, "noiseTex");
-	shader.diffuseTex_loc = gl.getUniformLocation(shader.program, "diffuseTex");
-
-	// ModelReference.*
-	shader.useRefTransfMatrix_loc = gl.getUniformLocation(shader.program, "useRefTransfMatrix");
-	shader.useTexture_loc = gl.getUniformLocation(shader.program, "useTexture");
-	shader.invertNormals_loc  = gl.getUniformLocation(shader.program, "invertNormals");
-	
-	return shader;
-};
-
-// InvertedBox.
-/**
- * 어떤 일을 하고 있습니까?
- * @param gl 변수
- */
-PostFxShadersManager.prototype.createInvertedBoxShader = function(gl) 
-{
-	var shader = new PostFxShader(this.gl);
-	this.pFx_shaders_array.push(undefined); // old.
-
-	var ssao_vs_source = ShaderSource.InvertedBoxVS;
-	var ssao_fs_source = ShaderSource.InvertedBoxFS;
-
-	shader.program = gl.createProgram();
-	shader.shader_vertex = this.createShader(gl, ssao_vs_source, gl.VERTEX_SHADER, "VERTEX");
-	shader.shader_fragment = this.createShader(gl, ssao_fs_source, gl.FRAGMENT_SHADER, "FRAGMENT");
-
-	gl.attachShader(shader.program, shader.shader_vertex);
-	gl.attachShader(shader.program, shader.shader_fragment);
-	shader.bindAttribLocations(gl, shader); // Do this before linkProgram.
-	gl.linkProgram(shader.program);
-
-	shader.cameraPosHIGH_loc = gl.getUniformLocation(shader.program, "encodedCameraPositionMCHigh"); // sceneState.
-	shader.cameraPosLOW_loc = gl.getUniformLocation(shader.program, "encodedCameraPositionMCLow"); // sceneState.
-	shader.buildingPosHIGH_loc = gl.getUniformLocation(shader.program, "buildingPosHIGH");
-	shader.buildingPosLOW_loc = gl.getUniformLocation(shader.program, "buildingPosLOW");
-
-	shader.modelViewMatrix4RelToEye_loc = gl.getUniformLocation(shader.program, "modelViewMatrixRelToEye"); // sceneState.
-	shader.modelViewProjectionMatrix4RelToEye_loc = gl.getUniformLocation(shader.program, "ModelViewProjectionMatrixRelToEye"); // sceneState.
-	shader.normalMatrix4_loc = gl.getUniformLocation(shader.program, "normalMatrix4"); // sceneState.
-	shader.projectionMatrix4_loc = gl.getUniformLocation(shader.program, "projectionMatrix"); // sceneState.
-	shader.refMatrix_loc = gl.getUniformLocation(shader.program, "RefTransfMatrix");
-	
-	shader.buildingRotMatrix_loc = gl.getUniformLocation(shader.program, "buildingRotMatrix");
-	shader.refMatrixType_loc = gl.getUniformLocation(shader.program, "refMatrixType");
-	shader.refTranslationVec_loc = gl.getUniformLocation(shader.program, "refTranslationVec");
-
-	shader.position3_loc = gl.getAttribLocation(shader.program, "position");
-	shader.texCoord2_loc = gl.getAttribLocation(shader.program, "texCoord");
-	shader.normal3_loc = gl.getAttribLocation(shader.program, "normal");
-	
-	shader.attribLocationCacheObj.position = gl.getAttribLocation(shader.program, "position");
-	shader.attribLocationCacheObj.texCoord = gl.getAttribLocation(shader.program, "texCoord");
-	shader.attribLocationCacheObj.normal = gl.getAttribLocation(shader.program, "normal");
-	//
-	shader.aditionalMov_loc = gl.getUniformLocation(shader.program, "aditionalPosition");
-
-	// ssao uniforms.*
-	shader.noiseScale2_loc = gl.getUniformLocation(shader.program, "noiseScale");
-	shader.kernel16_loc = gl.getUniformLocation(shader.program, "kernel");
-
-	// uniform values.
-	shader.near_loc = gl.getUniformLocation(shader.program, "near"); // sceneState.
-	shader.far_loc = gl.getUniformLocation(shader.program, "far"); // sceneState.
-	shader.fov_loc = gl.getUniformLocation(shader.program, "fov"); // sceneState.
-	shader.aspectRatio_loc = gl.getUniformLocation(shader.program, "aspectRatio"); // sceneState.
-
-	shader.screenWidth_loc = gl.getUniformLocation(shader.program, "screenWidth"); // sceneState.
-	shader.screenHeight_loc = gl.getUniformLocation(shader.program, "screenHeight"); // sceneState.
-	
-	shader.shininessValue_loc = gl.getUniformLocation(shader.program, "shininessValue");
-
-	shader.hasTexture_loc = gl.getUniformLocation(shader.program, "hasTexture");
-	shader.color4Aux_loc = gl.getUniformLocation(shader.program, "vColor4Aux");
-	shader.textureFlipYAxis_loc = gl.getUniformLocation(shader.program, "textureFlipYAxis");
-
-	// uniform samplers.
-	shader.depthTex_loc = gl.getUniformLocation(shader.program, "depthTex");
-	shader.noiseTex_loc = gl.getUniformLocation(shader.program, "noiseTex");
-	shader.diffuseTex_loc = gl.getUniformLocation(shader.program, "diffuseTex"); 
-	
-	// lighting.
-	shader.specularColor_loc = gl.getUniformLocation(shader.program, "specularColor");
-	shader.ssaoRadius_loc = gl.getUniformLocation(shader.program, "radius");  
-
-	shader.ambientReflectionCoef_loc = gl.getUniformLocation(shader.program, "ambientReflectionCoef");
-	shader.diffuseReflectionCoef_loc = gl.getUniformLocation(shader.program, "diffuseReflectionCoef");
-	shader.specularReflectionCoef_loc = gl.getUniformLocation(shader.program, "specularReflectionCoef");
-	
-	return shader;
-};
-'use strict';
-var ShaderSource = {};
-ShaderSource.atmosphereFS = "#ifdef GL_ES\n\
-    precision highp float;\n\
-#endif\n\
-\n\
-uniform sampler2D depthTex;\n\
-uniform sampler2D noiseTex;  \n\
-uniform sampler2D diffuseTex;\n\
-uniform bool textureFlipYAxis;\n\
-uniform bool bIsMakingDepth;\n\
-varying vec3 vNormal;\n\
-uniform mat4 projectionMatrix;\n\
-uniform mat4 m;\n\
-uniform vec2 noiseScale;\n\
-uniform float near;\n\
-uniform float far;            \n\
-uniform float fov;\n\
-uniform float aspectRatio;    \n\
-uniform float screenWidth;    \n\
-uniform float screenHeight;    \n\
-uniform float shininessValue;\n\
-uniform vec3 kernel[16];   \n\
-\n\
-uniform vec4 oneColor4;\n\
-uniform highp int colorType; // 0= oneColor, 1= attribColor, 2= texture.\n\
-\n\
-varying vec2 vTexCoord;   \n\
-varying vec3 vLightWeighting;\n\
-\n\
-varying vec3 diffuseColor;\n\
-uniform vec3 specularColor;\n\
-varying vec3 vertexPos;\n\
-varying float depthValue;\n\
-varying vec3 v3Pos;\n\
-varying vec3 camPos;\n\
-varying vec4 vcolor4;\n\
-\n\
-const int kernelSize = 16;  \n\
-uniform float radius;      \n\
-\n\
-uniform float ambientReflectionCoef;\n\
-uniform float diffuseReflectionCoef;  \n\
-uniform float specularReflectionCoef; \n\
-uniform float externalAlpha;\n\
-const float equatorialRadius = 6378137.0;\n\
-const float polarRadius = 6356752.3142;\n\
-const float PI = 3.1415926535897932384626433832795;\n\
-const float PI_2 = 1.57079632679489661923; \n\
-const float PI_4 = 0.785398163397448309616;\n\
-\n\
-float unpackDepth(const in vec4 rgba_depth)\n\
-{\n\
-    const vec4 bit_shift = vec4(0.000000059605, 0.000015258789, 0.00390625, 1.0);\n\
-    float depth = dot(rgba_depth, bit_shift);\n\
-    return depth;\n\
-} \n\
-\n\
-vec4 packDepth(const in float depth)\n\
-{\n\
-    const vec4 bit_shift = vec4(16777216.0, 65536.0, 256.0, 1.0);\n\
-    const vec4 bit_mask  = vec4(0.0, 0.00390625, 0.00390625, 0.00390625); \n\
-    vec4 res = fract(depth * bit_shift);\n\
-    res -= res.xxyz * bit_mask;\n\
-    return res;  \n\
-}               \n\
-\n\
-//linear view space depth\n\
-float getDepth(vec2 coord)\n\
-{\n\
-    return unpackDepth(texture2D(depthTex, coord.xy));\n\
-}    \n\
-\n\
-void main()\n\
-{  \n\
-	if(bIsMakingDepth)\n\
-	{\n\
-		gl_FragColor = packDepth(-depthValue);\n\
-	}\n\
-	else{\n\
-		vec4 textureColor = oneColor4;\n\
-		if(colorType == 0)\n\
-		{\n\
-			textureColor = oneColor4;\n\
-			\n\
-			if(textureColor.w == 0.0)\n\
-			{\n\
-				discard;\n\
-			}\n\
-		}\n\
-		else if(colorType == 2)\n\
-		{\n\
-			//if(textureFlipYAxis)\n\
-			//{\n\
-			//	textureColor = texture2D(diffuseTex, vec2(vTexCoord.s, 1.0 - vTexCoord.t));\n\
-			//}\n\
-			//else{\n\
-			//	textureColor = texture2D(diffuseTex, vec2(vTexCoord.s, vTexCoord.t));\n\
-			//}\n\
-			\n\
-			if(textureColor.w == 0.0)\n\
-			{\n\
-				discard;\n\
-			}\n\
-		}\n\
-		else{\n\
-			textureColor = oneColor4;\n\
-		}\n\
-		\n\
-		gl_FragColor = vcolor4; \n\
-	}\n\
-}";
-ShaderSource.atmosphereVS = "attribute vec3 position;\n\
-attribute vec3 normal;\n\
-attribute vec4 color4;\n\
-attribute vec2 texCoord;\n\
-\n\
-uniform sampler2D diffuseTex;\n\
-uniform mat4 projectionMatrix;  \n\
-uniform mat4 modelViewMatrix;\n\
-uniform mat4 modelViewMatrixRelToEye; \n\
-uniform mat4 ModelViewProjectionMatrixRelToEye;\n\
-uniform mat4 ModelViewProjectionMatrix;\n\
-uniform mat4 normalMatrix4;\n\
-uniform mat4 buildingRotMatrix;  \n\
-uniform vec3 buildingPosHIGH;\n\
-uniform vec3 buildingPosLOW;\n\
-uniform vec3 encodedCameraPositionMCHigh;\n\
-uniform vec3 encodedCameraPositionMCLow;\n\
-uniform vec3 aditionalPosition;\n\
-uniform vec4 oneColor4;\n\
-uniform bool bUse1Color;\n\
-uniform bool hasTexture;\n\
-uniform bool bIsMakingDepth;\n\
-uniform float near;\n\
-uniform float far;\n\
-\n\
-varying vec3 vNormal;\n\
-varying vec3 v3Pos;\n\
-varying vec2 vTexCoord;   \n\
-varying vec3 uAmbientColor;\n\
-varying vec3 vLightWeighting;\n\
-varying vec4 vcolor4;\n\
-varying vec3 vertexPos;\n\
-varying float depthValue;\n\
-varying vec3 camPos;\n\
-\n\
-const float equatorialRadius = 6378137.0;\n\
-const float polarRadius = 6356752.3142;\n\
-const float PI = 3.1415926535897932384626433832795;\n\
-const float PI_2 = 1.57079632679489661923; \n\
-const float PI_4 = 0.785398163397448309616;\n\
-\n\
-void main()\n\
-{	\n\
-    vec3 objPosHigh = buildingPosHIGH;\n\
-    vec3 objPosLow = buildingPosLOW.xyz + position.xyz;\n\
-    vec3 highDifference = objPosHigh.xyz - encodedCameraPositionMCHigh.xyz;\n\
-    vec3 lowDifference = objPosLow.xyz - encodedCameraPositionMCLow.xyz;\n\
-    vec4 pos4 = vec4(highDifference.xyz + lowDifference.xyz, 1.0);\n\
-	vNormal = (normalMatrix4 * vec4(normal, 1.0)).xyz;\n\
-\n\
-	if(bIsMakingDepth)\n\
-	{\n\
-		depthValue = (modelViewMatrixRelToEye * pos4).z/far;\n\
-	}\n\
-	else\n\
-	{\n\
-		vTexCoord = texCoord;\n\
-	}\n\
-    gl_Position = ModelViewProjectionMatrixRelToEye * pos4;\n\
-	camPos = encodedCameraPositionMCHigh.xyz + encodedCameraPositionMCLow.xyz;\n\
-	v3Pos = vec3((modelViewMatrixRelToEye * pos4).xyz);\n\
-\n\
-	// Calculate color.\n\
-	float distToCam = length(vec3(v3Pos));\n\
-	vec3 camDir = normalize(vec3(v3Pos.x, v3Pos.y, v3Pos.z));\n\
-	vec3 normal = vNormal;\n\
-	float angRad = acos(dot(camDir, normal));\n\
-	float angDeg = angRad*180.0/PI;\n\
-	/*\n\
-	if(angDeg > 130.0)\n\
-		textureColor = vec4(1.0, 0.0, 0.0, 1.0);\n\
-	else if(angDeg > 120.0)\n\
-		textureColor = vec4(0.0, 1.0, 0.0, 1.0);\n\
-	else if(angDeg > 110.0)\n\
-		textureColor = vec4(0.0, 0.0, 1.0, 1.0);\n\
-	else if(angDeg > 100.0)\n\
-		textureColor = vec4(1.0, 1.0, 0.0, 1.0);\n\
-	else if(angDeg > 90.0)\n\
-		textureColor = vec4(1.0, 0.0, 1.0, 1.0);\n\
-		*/\n\
-		\n\
-	//textureColor = vec4(vNormal, 1.0);\n\
-\n\
-	//float maxAngDeg = 100.5;\n\
-	float maxAngDeg = 101.2;\n\
-	float minAngDeg = 90.0;\n\
-\n\
-	float A = 1.0/(maxAngDeg-minAngDeg);\n\
-	float B = -A*minAngDeg;\n\
-	float alphaReal = A*angDeg+B;\n\
-	float alpha2 = alphaReal*alphaReal;\n\
-	float alpha = alpha2*alpha2;\n\
-	if(alpha < 0.0 )\n\
-	alpha = 0.0;\n\
-	else if(alpha > 2.0 )\n\
-	alpha = 2.0;\n\
-	\n\
-	float alphaPlusPerDist = 4.0*(distToCam/equatorialRadius);\n\
-	if(alphaPlusPerDist > 1.0)\n\
-	alphaPlusPerDist = 1.0;\n\
-\n\
-	float extra = (1.0-alpha);\n\
-	if(extra < 0.0)\n\
-	extra = 0.0;\n\
-\n\
-	float extraPerDist = (1.0-alphaPlusPerDist); // near -> more blue.\n\
-\n\
-	alpha *= alphaPlusPerDist;\n\
-	vcolor4 = vec4(alpha*0.75, alpha*0.88 + extra*0.4 + extraPerDist*0.1, alpha + extra*2.5 + extraPerDist*0.8, alpha);\n\
-}";
-ShaderSource.BlendingCubeFS = "	precision lowp float;\n\
-	varying vec4 vColor;\n\
-\n\
-	void main()\n\
-    {\n\
-		gl_FragColor = vColor;\n\
-	}";
-ShaderSource.BlendingCubeVS = "attribute vec3 position;\n\
-uniform mat4 ModelViewProjectionMatrixRelToEye;\n\
-uniform vec3 encodedCameraPositionMCHigh;\n\
-uniform vec3 encodedCameraPositionMCLow;\n\
-attribute vec4 color;\n\
-varying vec4 vColor;\n\
-\n\
-void main()\n\
-{\n\
-    vec3 highDifference = -encodedCameraPositionMCHigh.xyz;\n\
-    vec3 lowDifference = position.xyz - encodedCameraPositionMCLow.xyz;\n\
-    vec4 pos = vec4(position.xyz, 1.0);\n\
-\n\
-    vColor=color;\n\
-\n\
-    gl_Position = ModelViewProjectionMatrixRelToEye * pos;\n\
-}";
-ShaderSource.BlurFS = "#ifdef GL_ES\n\
-    precision highp float;\n\
-    #endif\n\
-uniform sampler2D colorTex;\n\
-uniform vec2 texelSize;\n\
-varying vec2 vTexCoord; 	 	\n\
-\n\
-void main()\n\
-{\n\
-    vec3 result = vec3(0.0);\n\
-    for (int i = 0; i < 4; ++i) {\n\
-        for (int j = 0; j < 4; ++j) {\n\
-            vec2 offset = vec2(texelSize.x * float(j), texelSize.y * float(i));\n\
-            result += texture2D(colorTex, vTexCoord + offset).rgb;\n\
-        }\n\
-    }\n\
-            \n\
-    gl_FragColor.rgb = vec3(result * 0.0625); \n\
-    gl_FragColor.a = 1.0;\n\
-}\n\
-";
-ShaderSource.BlurVS = "attribute vec4 position;\n\
-attribute vec2 texCoord;\n\
-\n\
-uniform mat4 projectionMatrix;\n\
-uniform mat4 modelViewMatrix;  \n\
-\n\
-varying vec2 vTexCoord;\n\
-\n\
-void main()\n\
-{	\n\
-    vTexCoord = texCoord;\n\
-    \n\
-    gl_Position = projectionMatrix * modelViewMatrix * position;\n\
-}\n\
-";
-ShaderSource.BoxSsaoFS = "#ifdef GL_ES\n\
-    precision highp float;\n\
-#endif\n\
-uniform sampler2D depthTex;\n\
-uniform sampler2D noiseTex;  \n\
-uniform sampler2D diffuseTex;\n\
-uniform bool hasTexture;\n\
-varying vec3 vNormal;\n\
-uniform mat4 projectionMatrix;\n\
-uniform mat4 m;\n\
-uniform vec2 noiseScale;\n\
-uniform float near;\n\
-uniform float far;            \n\
-uniform float fov;\n\
-uniform float aspectRatio;    \n\
-uniform float screenWidth;    \n\
-uniform float screenHeight;    \n\
-uniform vec3 kernel[16];   \n\
-uniform vec4 vColor4Aux;\n\
-uniform bool bUseNormal;\n\
-\n\
-varying vec2 vTexCoord;   \n\
-varying vec3 vLightWeighting;\n\
-varying vec4 vcolor4;\n\
-\n\
-const int kernelSize = 16;  \n\
-const float radius = 0.5;      \n\
-\n\
-float unpackDepth(const in vec4 rgba_depth)\n\
-{\n\
-    const vec4 bit_shift = vec4(0.000000059605, 0.000015258789, 0.00390625, 1.0);\n\
-    float depth = dot(rgba_depth, bit_shift);\n\
-    return depth;\n\
-}                \n\
-\n\
-vec3 getViewRay(vec2 tc)\n\
-{\n\
-    float hfar = 2.0 * tan(fov/2.0) * far;\n\
-    float wfar = hfar * aspectRatio;    \n\
-    vec3 ray = vec3(wfar * (tc.x - 0.5), hfar * (tc.y - 0.5), -far);    \n\
-    return ray;                      \n\
-}         \n\
-            \n\
-//linear view space depth\n\
-float getDepth(vec2 coord)\n\
-{                          \n\
-    return unpackDepth(texture2D(depthTex, coord.xy));\n\
-}    \n\
-\n\
-void main()\n\
-{ \n\
-	vec4 textureColor;\n\
-	textureColor = vcolor4;  \n\
-	if(bUseNormal)\n\
-    {\n\
-		vec2 screenPos = vec2(gl_FragCoord.x / screenWidth, gl_FragCoord.y / screenHeight);		                 \n\
-		float linearDepth = getDepth(screenPos);          \n\
-		vec3 origin = getViewRay(screenPos) * linearDepth;   \n\
-		vec3 normal2 = vNormal;   \n\
-				\n\
-		vec3 rvec = texture2D(noiseTex, screenPos.xy * noiseScale).xyz * 2.0 - 1.0;\n\
-		vec3 tangent = normalize(rvec - normal2 * dot(rvec, normal2));\n\
-		vec3 bitangent = cross(normal2, tangent);\n\
-		mat3 tbn = mat3(tangent, bitangent, normal2);        \n\
-		\n\
-		float occlusion = 0.0;\n\
-		for(int i = 0; i < kernelSize; ++i)\n\
-		{    	 \n\
-			vec3 sample = origin + (tbn * kernel[i]) * radius;\n\
-			vec4 offset = projectionMatrix * vec4(sample, 1.0);		\n\
-			offset.xy /= offset.w;\n\
-			offset.xy = offset.xy * 0.5 + 0.5;        \n\
-			float sampleDepth = -sample.z/far;\n\
-			float depthBufferValue = getDepth(offset.xy);				              \n\
-			float range_check = abs(linearDepth - depthBufferValue)+radius*0.998;\n\
-			if (range_check < radius*1.001 && depthBufferValue <= sampleDepth)\n\
-			{\n\
-				occlusion +=  1.0;\n\
-			}\n\
-			\n\
-		}   \n\
-			\n\
-		occlusion = 1.0 - occlusion / float(kernelSize);\n\
-									\n\
-		vec3 lightPos = vec3(10.0, 10.0, 10.0);\n\
-		vec3 L = normalize(lightPos);\n\
-		float DiffuseFactor = dot(normal2, L);\n\
-		float NdotL = abs(DiffuseFactor);\n\
-		vec3 diffuse = vec3(NdotL);\n\
-		vec3 ambient = vec3(1.0);\n\
-		gl_FragColor.rgb = vec3((textureColor.xyz)*vLightWeighting * occlusion); \n\
-		gl_FragColor.a = 1.0; \n\
-	}\n\
-	else\n\
-	{\n\
-		gl_FragColor.rgb = vec3(textureColor.xyz); \n\
-		gl_FragColor.a = 1.0; \n\
-	}	\n\
-}\n\
-";
-ShaderSource.BoxSsaoVS = "attribute vec3 position;\n\
-attribute vec3 normal;\n\
-attribute vec2 texCoord;\n\
-attribute vec4 color4;\n\
-\n\
-uniform mat4 projectionMatrix;  \n\
-uniform mat4 modelViewMatrix;\n\
-uniform mat4 modelViewMatrixRelToEye; \n\
-uniform mat4 ModelViewProjectionMatrixRelToEye;\n\
-uniform mat4 normalMatrix4;\n\
-uniform mat4 buildingRotMatrix;  \n\
-uniform vec3 buildingPosHIGH;\n\
-uniform vec3 buildingPosLOW;\n\
-uniform vec3 encodedCameraPositionMCHigh;\n\
-uniform vec3 encodedCameraPositionMCLow;\n\
-uniform vec3 aditionalPosition;\n\
-uniform vec4 oneColor4;\n\
-uniform bool bUse1Color;\n\
-uniform bool bUseNormal;\n\
-uniform vec3 scale;\n\
-uniform bool bScale;\n\
-\n\
-varying vec3 vNormal;\n\
-varying vec2 vTexCoord;  \n\
-varying vec3 uAmbientColor;\n\
-varying vec3 vLightWeighting;\n\
-varying vec4 vcolor4;\n\
-\n\
-void main()\n\
-{	\n\
-    vec4 position2 = vec4(position.xyz, 1.0);\n\
-    if(bScale)\n\
-    {\n\
-        position2.x *= scale.x;\n\
-        position2.y *= scale.y;\n\
-        position2.z *= scale.z;\n\
-    }\n\
-    vec4 rotatedPos = buildingRotMatrix * vec4(position2.xyz + aditionalPosition.xyz, 1.0);\n\
-    vec3 objPosHigh = buildingPosHIGH;\n\
-    vec3 objPosLow = buildingPosLOW.xyz + rotatedPos.xyz;\n\
-    vec3 highDifference = objPosHigh.xyz - encodedCameraPositionMCHigh.xyz;\n\
-    vec3 lowDifference = objPosLow.xyz - encodedCameraPositionMCLow.xyz;\n\
-    vec4 pos4 = vec4(highDifference.xyz + lowDifference.xyz, 1.0);\n\
-    if(bUseNormal)\n\
-    {\n\
-		vec4 rotatedNormal = buildingRotMatrix * vec4(normal.xyz, 1.0);\n\
-		vLightWeighting = vec3(1.0, 1.0, 1.0);\n\
-		uAmbientColor = vec3(0.8, 0.8, 0.8);\n\
-		vec3 uLightingDirection = vec3(0.5, 0.5, 0.5);\n\
-		vec3 directionalLightColor = vec3(0.6, 0.6, 0.6);\n\
-		vNormal = (normalMatrix4 * vec4(rotatedNormal.x, rotatedNormal.y, rotatedNormal.z, 1.0)).xyz;\n\
-		float directionalLightWeighting = max(dot(vNormal, uLightingDirection), 0.0);\n\
-		vLightWeighting = uAmbientColor + directionalLightColor * directionalLightWeighting;\n\
-	}\n\
-    if(bUse1Color)\n\
-    {\n\
-        vcolor4 = oneColor4;\n\
-    }\n\
-    else\n\
-    {\n\
-        vcolor4 = color4;\n\
-    }\n\
-\n\
-    gl_Position = ModelViewProjectionMatrixRelToEye * pos4;\n\
-}\n\
-";
-ShaderSource.CloudFS = "precision lowp float;\n\
-varying vec3 vColor;\n\
-\n\
-void main()\n\
-{\n\
-    gl_FragColor = vec4(vColor, 1.);\n\
-}";
-ShaderSource.CloudVS = "attribute vec3 position;\n\
-uniform mat4 ModelViewProjectionMatrixRelToEye;\n\
-uniform vec3 cloudPosHIGH;\n\
-uniform vec3 cloudPosLOW;\n\
-uniform vec3 encodedCameraPositionMCHigh;\n\
-uniform vec3 encodedCameraPositionMCLow;\n\
-attribute vec3 color;\n\
-varying vec3 vColor;\n\
-\n\
-void main()\n\
-{\n\
-    vec3 objPosHigh = cloudPosHIGH;\n\
-    vec3 objPosLow = cloudPosLOW.xyz + position.xyz;\n\
-    vec3 highDifference = objPosHigh.xyz - encodedCameraPositionMCHigh.xyz;\n\
-    vec3 lowDifference = objPosLow.xyz - encodedCameraPositionMCLow.xyz;\n\
-    vec4 pos = vec4(highDifference.xyz + lowDifference.xyz, 1.0);\n\
-\n\
-    vColor=color;\n\
-\n\
-    gl_Position = ModelViewProjectionMatrixRelToEye * pos;\n\
-}";
-ShaderSource.ColorFS = "precision mediump float;\n\
-uniform int byteColor_r;\n\
-uniform int byteColor_g;\n\
-uniform int byteColor_b;\n\
-\n\
-void main()\n\
-{\n\
-    float byteMaxValue = 255.0;\n\
-\n\
-    gl_FragColor = vec4(float(byteColor_r)/byteMaxValue, float(byteColor_g)/byteMaxValue, float(byteColor_b)/byteMaxValue, 1);\n\
-}\n\
-";
-ShaderSource.ColorSelectionSsaoFS = "precision highp float;\n\
-uniform vec4 oneColor4;\n\
-\n\
-void main()\n\
-{          \n\
-    gl_FragColor = oneColor4;\n\
-}\n\
-";
-ShaderSource.ColorSelectionSsaoVS = "attribute vec3 position;\n\
-\n\
-uniform mat4 buildingRotMatrix;\n\
-uniform mat4 ModelViewProjectionMatrixRelToEye;\n\
-uniform mat4 RefTransfMatrix;\n\
-uniform vec3 buildingPosHIGH;\n\
-uniform vec3 buildingPosLOW;\n\
-uniform vec3 encodedCameraPositionMCHigh;\n\
-uniform vec3 encodedCameraPositionMCLow;\n\
-uniform vec3 aditionalPosition;\n\
-uniform vec3 refTranslationVec;\n\
-uniform int refMatrixType; // 0= identity, 1= translate, 2= transform\n\
-\n\
-void main()\n\
-{\n\
-    vec4 rotatedPos;\n\
-	if(refMatrixType == 0)\n\
-	{\n\
-		rotatedPos = buildingRotMatrix * vec4(position.xyz, 1.0) + vec4(aditionalPosition.xyz, 0.0);\n\
-	}\n\
-	else if(refMatrixType == 1)\n\
-	{\n\
-		rotatedPos = buildingRotMatrix * vec4(position.xyz + refTranslationVec.xyz, 1.0) + vec4(aditionalPosition.xyz, 0.0);\n\
-	}\n\
-	else if(refMatrixType == 2)\n\
-	{\n\
-		rotatedPos = RefTransfMatrix * vec4(position.xyz, 1.0) + vec4(aditionalPosition.xyz, 0.0);\n\
-	}\n\
-\n\
-    vec3 objPosHigh = buildingPosHIGH;\n\
-    vec3 objPosLow = buildingPosLOW.xyz + rotatedPos.xyz;\n\
-    vec3 highDifference = objPosHigh.xyz - encodedCameraPositionMCHigh.xyz;\n\
-    vec3 lowDifference = objPosLow.xyz - encodedCameraPositionMCLow.xyz;\n\
-    vec4 pos4 = vec4(highDifference.xyz + lowDifference.xyz, 1.0);\n\
-    \n\
-    gl_PointSize = 10.0;\n\
-    gl_Position = ModelViewProjectionMatrixRelToEye * pos4;\n\
-}\n\
-";
-ShaderSource.ColorVS = "attribute vec3 position;\n\
-uniform mat4 ModelViewProjectionMatrixRelToEye;\n\
-uniform vec3 buildingPosHIGH;\n\
-uniform vec3 buildingPosLOW;\n\
-uniform vec3 encodedCameraPositionMCHigh;\n\
-uniform vec3 encodedCameraPositionMCLow;\n\
-uniform mat4 RefTransfMatrix;\n\
-\n\
-void main()\n\
-{\n\
-    vec4 rotatedPos = RefTransfMatrix * vec4(position.xyz, 1.0);\n\
-    vec3 objPosHigh = buildingPosHIGH;\n\
-    vec3 objPosLow = buildingPosLOW.xyz + rotatedPos.xyz;\n\
-    vec3 highDifference = objPosHigh.xyz - encodedCameraPositionMCHigh.xyz;\n\
-    vec3 lowDifference = objPosLow.xyz - encodedCameraPositionMCLow.xyz;\n\
-    vec4 pos = vec4(highDifference.xyz + lowDifference.xyz, 1.0);\n\
-    \n\
-    gl_Position = ModelViewProjectionMatrixRelToEye * pos;\n\
-}\n\
-";
-ShaderSource.draw_frag = "precision mediump float;\n\
-\n\
-uniform sampler2D u_wind;\n\
-uniform vec2 u_wind_min;\n\
-uniform vec2 u_wind_max;\n\
-uniform bool u_flipTexCoordY_windMap;\n\
-uniform bool u_colorScale;\n\
-\n\
-varying vec2 v_particle_pos;\n\
-\n\
-void main() {\n\
-	vec2 windMapTexCoord = v_particle_pos;\n\
-	if(u_flipTexCoordY_windMap)\n\
-	{\n\
-		windMapTexCoord.y = 1.0 - windMapTexCoord.y;\n\
-	}\n\
-    vec2 velocity = mix(u_wind_min, u_wind_max, texture2D(u_wind, windMapTexCoord).rg);\n\
-    float speed_t = length(velocity) / length(u_wind_max);\n\
-\n\
-	\n\
-	if(u_colorScale)\n\
-	{\n\
-		speed_t *= 1.5;\n\
-		if(speed_t > 1.0)speed_t = 1.0;\n\
-		float b = 1.0 - speed_t;\n\
-		float g;\n\
-		if(speed_t > 0.5)\n\
-		{\n\
-			g = 2.0-2.0*speed_t;\n\
-		}\n\
-		else{\n\
-			g = 2.0*speed_t;\n\
-		}\n\
-		float r = speed_t;\n\
-		gl_FragColor = vec4(r,g,b,1.0);\n\
-	}\n\
-	else{\n\
-		float intensity = speed_t*3.0;\n\
-		if(intensity > 1.0)\n\
-			intensity = 1.0;\n\
-		gl_FragColor = vec4(intensity,intensity,intensity,1.0);\n\
-	}\n\
-}\n\
-";
-ShaderSource.draw_frag3D = "precision highp float;\n\
-\n\
-uniform sampler2D u_wind;\n\
-uniform vec2 u_wind_min;\n\
-uniform vec2 u_wind_max;\n\
-uniform bool u_flipTexCoordY_windMap;\n\
-uniform bool u_colorScale;\n\
-uniform float u_tailAlpha;\n\
-uniform float u_externAlpha;\n\
-\n\
-varying vec2 v_particle_pos;\n\
-\n\
-vec3 getRainbowColor_byHeight(float height)\n\
-{\n\
-	float minHeight_rainbow = 0.0;\n\
-	float maxHeight_rainbow = 1.0;\n\
-	float gray = (height - minHeight_rainbow)/(maxHeight_rainbow - minHeight_rainbow);\n\
-	if (gray > 1.0){ gray = 1.0; }\n\
-	else if (gray<0.0){ gray = 0.0; }\n\
-	\n\
-	float r, g, b;\n\
-	\n\
-	if(gray < 0.16666)\n\
-	{\n\
-		b = 0.0;\n\
-		g = gray*6.0;\n\
-		r = 1.0;\n\
-	}\n\
-	else if(gray >= 0.16666 && gray < 0.33333)\n\
-	{\n\
-		b = 0.0;\n\
-		g = 1.0;\n\
-		r = 2.0 - gray*6.0;\n\
-	}\n\
-	else if(gray >= 0.33333 && gray < 0.5)\n\
-	{\n\
-		b = -2.0 + gray*6.0;\n\
-		g = 1.0;\n\
-		r = 0.0;\n\
-	}\n\
-	else if(gray >= 0.5 && gray < 0.66666)\n\
-	{\n\
-		b = 1.0;\n\
-		g = 4.0 - gray*6.0;\n\
-		r = 0.0;\n\
-	}\n\
-	else if(gray >= 0.66666 && gray < 0.83333)\n\
-	{\n\
-		b = 1.0;\n\
-		g = 0.0;\n\
-		r = -4.0 + gray*6.0;\n\
-	}\n\
-	else if(gray >= 0.83333)\n\
-	{\n\
-		b = 6.0 - gray*6.0;\n\
-		g = 0.0;\n\
-		r = 1.0;\n\
-	}\n\
-	\n\
-	float aux = r;\n\
-	r = b;\n\
-	b = aux;\n\
-	\n\
-	//b = -gray + 1.0;\n\
-	//if (gray > 0.5)\n\
-	//{\n\
-	//	g = -gray*2.0 + 2.0; \n\
-	//}\n\
-	//else \n\
-	//{\n\
-	//	g = gray*2.0;\n\
-	//}\n\
-	//r = gray;\n\
-	vec3 resultColor = vec3(r, g, b);\n\
-    return resultColor;\n\
-} \n\
-\n\
-void main() {\n\
-	vec2 windMapTexCoord = v_particle_pos;\n\
-	if(u_flipTexCoordY_windMap)\n\
-	{\n\
-		windMapTexCoord.y = 1.0 - windMapTexCoord.y;\n\
-	}\n\
-    vec2 velocity = mix(u_wind_min, u_wind_max, texture2D(u_wind, windMapTexCoord).rg);\n\
-    float speed_t = length(velocity) / length(u_wind_max);\n\
-\n\
-	\n\
-	if(u_colorScale)\n\
-	{\n\
-		speed_t *= 1.5;\n\
-		if(speed_t > 1.0)speed_t = 1.0;\n\
-		float b = 1.0 - speed_t;\n\
-		float g;\n\
-		if(speed_t > 0.5)\n\
-		{\n\
-			g = 2.0-2.0*speed_t;\n\
-		}\n\
-		else{\n\
-			g = 2.0*speed_t;\n\
-		}\n\
-		vec3 col3 = getRainbowColor_byHeight(speed_t);\n\
-		float r = speed_t;\n\
-		gl_FragColor = vec4(col3.x, col3.y, col3.z ,u_tailAlpha*u_externAlpha);\n\
-	}\n\
-	else{\n\
-		float intensity = speed_t*3.0;\n\
-		if(intensity > 1.0)\n\
-			intensity = 1.0;\n\
-		gl_FragColor = vec4(intensity,intensity,intensity,u_tailAlpha*u_externAlpha);\n\
-	}\n\
-}";
-ShaderSource.draw_vert = "precision mediump float;\n\
-\n\
-attribute float a_index;\n\
-\n\
-uniform sampler2D u_particles;\n\
-uniform float u_particles_res;\n\
-\n\
-varying vec2 v_particle_pos;\n\
-\n\
-void main() {\n\
-    vec4 color = texture2D(u_particles, vec2(\n\
-        fract(a_index / u_particles_res),\n\
-        floor(a_index / u_particles_res) / u_particles_res));\n\
-\n\
-    // decode current particle position from the pixel's RGBA value\n\
-    v_particle_pos = vec2(\n\
-        color.r / 255.0 + color.b,\n\
-        color.g / 255.0 + color.a);\n\
-\n\
-    gl_PointSize = 1.0;\n\
-    gl_Position = vec4(2.0 * v_particle_pos.x - 1.0, 1.0 - 2.0 * v_particle_pos.y, 0, 1);\n\
-}\n\
-";
-ShaderSource.draw_vert3D = "precision highp float;\n\
-\n\
-// This shader draws windParticles in 3d directly from positions on u_particles image.***\n\
-attribute float a_index;\n\
-\n\
-uniform sampler2D u_particles;\n\
-uniform float u_particles_res;\n\
-uniform mat4 buildingRotMatrix;\n\
-uniform mat4 ModelViewProjectionMatrix;\n\
-uniform mat4 ModelViewProjectionMatrixRelToEye;\n\
-uniform vec3 buildingPosHIGH;\n\
-uniform vec3 buildingPosLOW;\n\
-uniform vec3 encodedCameraPositionMCHigh;\n\
-uniform vec3 encodedCameraPositionMCLow;\n\
-uniform vec3 u_camPosWC;\n\
-uniform vec3 u_geoCoordRadiansMax;\n\
-uniform vec3 u_geoCoordRadiansMin;\n\
-uniform float pendentPointSize;\n\
-uniform float u_tailAlpha;\n\
-uniform float u_layerAltitude;\n\
-\n\
-varying vec2 v_particle_pos;\n\
-\n\
-#define M_PI 3.1415926535897932384626433832795\n\
-\n\
-vec2 splitValue(float value)\n\
-{\n\
-	float doubleHigh;\n\
-	vec2 resultSplitValue;\n\
-	if (value >= 0.0) \n\
-	{\n\
-		doubleHigh = floor(value / 65536.0) * 65536.0; //unsigned short max\n\
-		resultSplitValue.x = doubleHigh;\n\
-		resultSplitValue.y = value - doubleHigh;\n\
-	}\n\
-	else \n\
-	{\n\
-		doubleHigh = floor(-value / 65536.0) * 65536.0;\n\
-		resultSplitValue.x = -doubleHigh;\n\
-		resultSplitValue.y = value + doubleHigh;\n\
-	}\n\
-	\n\
-	return resultSplitValue;\n\
-}\n\
-	\n\
-vec3 geographicToWorldCoord(float lonRad, float latRad, float alt)\n\
-{\n\
-	// defined in the LINZ standard LINZS25000 (Standard for New Zealand Geodetic Datum 2000)\n\
-	// https://www.linz.govt.nz/data/geodetic-system/coordinate-conversion/geodetic-datum-conversions/equations-used-datum\n\
-	// a = semi-major axis.\n\
-	// e2 = firstEccentricitySquared.\n\
-	// v = a / sqrt(1 - e2 * sin2(lat)).\n\
-	// x = (v+h)*cos(lat)*cos(lon).\n\
-	// y = (v+h)*cos(lat)*sin(lon).\n\
-	// z = [v*(1-e2)+h]*sin(lat).\n\
-	float equatorialRadius = 6378137.0; // meters.\n\
-	float firstEccentricitySquared = 6.69437999014E-3;\n\
-	float cosLon = cos(lonRad);\n\
-	float cosLat = cos(latRad);\n\
-	float sinLon = sin(lonRad);\n\
-	float sinLat = sin(latRad);\n\
-	float a = equatorialRadius;\n\
-	float e2 = firstEccentricitySquared;\n\
-	float v = a/sqrt(1.0 - e2 * sinLat * sinLat);\n\
-	float h = alt;\n\
-	\n\
-	float x = (v+h)*cosLat*cosLon;\n\
-	float y = (v+h)*cosLat*sinLon;\n\
-	float z = (v*(1.0-e2)+h)*sinLat;\n\
-	\n\
-	\n\
-	vec3 resultCartesian = vec3(x, y, z);\n\
-	\n\
-	return resultCartesian;\n\
-}\n\
-\n\
-void main() {\n\
-	\n\
-    vec4 color = texture2D(u_particles, vec2(\n\
-        fract(a_index / u_particles_res),\n\
-        floor(a_index / u_particles_res) / u_particles_res));\n\
-\n\
-    // decode current particle position from the pixel's RGBA value\n\
-    v_particle_pos = vec2(\n\
-        color.r / 255.0 + color.b,\n\
-        color.g / 255.0 + color.a);\n\
-\n\
-	// Now, must calculate geographic coords of the pos2d.***\n\
-	float altitude = u_layerAltitude;\n\
-	float minLonRad = u_geoCoordRadiansMin.x;\n\
-	float maxLonRad = u_geoCoordRadiansMax.x;\n\
-	float minLatRad = u_geoCoordRadiansMin.y;\n\
-	float maxLatRad = u_geoCoordRadiansMax.y;\n\
-	float lonRadRange = maxLonRad - minLonRad;\n\
-	float latRadRange = maxLatRad - minLatRad;\n\
-	float longitudeRad = -minLonRad + v_particle_pos.x * lonRadRange;\n\
-	float latitudeRad = maxLatRad - v_particle_pos.y * latRadRange;\n\
-	\n\
-	// Now, calculate worldPosition of the geographicCoords (lon, lat, alt).***\n\
-	//vec3 posWC = geographicToWorldCoord(longitudeRad, latitudeRad, altitude);\n\
-	//vec4 posCC = vec4((posWC - encodedCameraPositionMCHigh) - encodedCameraPositionMCLow, 1.0);\n\
-	\n\
-	// Alternative.\n\
-	\n\
-	vec3 buildingPos = buildingPosHIGH + buildingPosLOW;\n\
-	float radius = length(buildingPos);\n\
-	float distortion = cos((minLatRad + v_particle_pos.y * latRadRange ));\n\
-	float xOffset = (v_particle_pos.x - 0.5)*distortion * lonRadRange * radius;\n\
-	float yOffset = (0.5 - v_particle_pos.y) * latRadRange * radius;\n\
-	vec4 rotatedPos = buildingRotMatrix * vec4(xOffset, yOffset, 0.0, 1.0);\n\
-	\n\
-	\n\
-	vec4 posWC = vec4((rotatedPos.xyz+buildingPosLOW) +( buildingPosHIGH ), 1.0);\n\
-	vec4 posCC = vec4((rotatedPos.xyz+buildingPosLOW- encodedCameraPositionMCLow) +( buildingPosHIGH- encodedCameraPositionMCHigh), 1.0);\n\
-	\n\
-	// Now calculate the position on camCoord.***\n\
-	//gl_Position = ModelViewProjectionMatrix * posWC;\n\
-	gl_Position = ModelViewProjectionMatrixRelToEye * posCC;\n\
-	//gl_Position = vec4(2.0 * v_particle_pos.x - 1.0, 1.0 - 2.0 * v_particle_pos.y, 0, 1);\n\
-	//gl_Position = vec4(v_particle_pos.x, v_particle_pos.y, 0, 1);\n\
-	\n\
-	// Now calculate the point size.\n\
-	float dist = distance(vec4(u_camPosWC.xyz, 1.0), vec4(posWC.xyz, 1.0));\n\
-	gl_PointSize = (1.0 + pendentPointSize/(dist))*u_tailAlpha; \n\
-	\n\
-	if(gl_PointSize > 10.0)\n\
-	gl_PointSize = 10.0;\n\
-}\n\
-\n\
-\n\
-\n\
-\n\
-\n\
-\n\
-\n\
-\n\
-\n\
-\n\
-\n\
-\n\
-";
-ShaderSource.filterSilhouetteFS = "precision mediump float;\n\
-\n\
-uniform sampler2D depthTex;\n\
-uniform sampler2D noiseTex;  \n\
-uniform mat4 projectionMatrix;\n\
-uniform vec2 noiseScale;\n\
-uniform float near;\n\
-uniform float far;            \n\
-uniform float fov;\n\
-uniform float aspectRatio;    \n\
-uniform float screenWidth;    \n\
-uniform float screenHeight;    \n\
-uniform vec3 kernel[16];   \n\
-\n\
-\n\
-const int kernelSize = 16;  \n\
-uniform float radius;      \n\
-\n\
-uniform bool bApplySsao;\n\
-\n\
-float unpackDepth(const in vec4 rgba_depth)\n\
-{\n\
-    const vec4 bit_shift = vec4(0.000000059605, 0.000015258789, 0.00390625, 1.0);\n\
-    float depth = dot(rgba_depth, bit_shift);\n\
-    return depth;\n\
-}                \n\
-\n\
-vec3 getViewRay(vec2 tc)\n\
-{\n\
-    float hfar = 2.0 * tan(fov/2.0) * far;\n\
-    float wfar = hfar * aspectRatio;    \n\
-    vec3 ray = vec3(wfar * (tc.x - 0.5), hfar * (tc.y - 0.5), -far);    \n\
-    return ray;                      \n\
-}         \n\
-            \n\
-//linear view space depth\n\
-float getDepth(vec2 coord)\n\
-{\n\
-    return unpackDepth(texture2D(depthTex, coord.xy));\n\
-}    \n\
-\n\
-void main()\n\
-{\n\
-	float occlusion = 0.0;\n\
-	vec3 normal2 = vec3(0.0, 0.0, 1.0);\n\
-	float radiusAux = radius * 5.0;\n\
-	if(bApplySsao)\n\
-	{          \n\
-		vec2 screenPos = vec2(gl_FragCoord.x / screenWidth, gl_FragCoord.y / screenHeight);		                 \n\
-		float linearDepth = getDepth(screenPos); \n\
-		vec3 origin = getViewRay(screenPos) * linearDepth;   \n\
-\n\
-		vec3 rvec = texture2D(noiseTex, screenPos.xy * noiseScale).xyz * 2.0 - 1.0;\n\
-		vec3 tangent = normalize(rvec - normal2 * dot(rvec, normal2));\n\
-		vec3 bitangent = cross(normal2, tangent);\n\
-		mat3 tbn = mat3(tangent, bitangent, normal2);        \n\
-		\n\
-		for(int i = 0; i < kernelSize; ++i)\n\
-		{    	 \n\
-			//vec3 sample = origin + (tbn * kernel[i]) * radiusAux;\n\
-			vec3 sample = origin + (kernel[i]) * radiusAux;\n\
-			vec4 offset = projectionMatrix * vec4(sample, 1.0);		\n\
-			offset.xy /= offset.w;\n\
-			offset.xy = offset.xy * 0.5 + 0.5;        \n\
-			float sampleDepth = -sample.z/far;\n\
-			if(sampleDepth > 0.49)\n\
-				continue;\n\
-			float depthBufferValue = getDepth(offset.xy);\n\
-			float range_check = abs(linearDepth - depthBufferValue)+radiusAux*0.998;\n\
-			if (range_check > radius*1.001 && depthBufferValue <= sampleDepth)\n\
-			{\n\
-				occlusion +=  1.0;\n\
-			}\n\
-		}   \n\
-		\n\
-		if(occlusion > float(kernelSize)*0.4)\n\
-		{\n\
-			occlusion = occlusion / float(kernelSize);\n\
-		}\n\
-		else{\n\
-			occlusion = 0.0;\n\
-		}\n\
-		//occlusion = 1.0 - occlusion / float(kernelSize);\n\
-	}\n\
-	else{\n\
-		occlusion = 0.0;\n\
-	}\n\
-\n\
-    vec4 finalColor;\n\
-	finalColor = vec4(1.0, 1.0, 1.0, occlusion*0.9);\n\
-    gl_FragColor = finalColor; \n\
-}\n\
-";
-ShaderSource.ImageViewerRectangleShaderFS = "#ifdef GL_ES\n\
-    precision highp float;\n\
-#endif\n\
-\n\
-uniform sampler2D depthTex;\n\
-uniform sampler2D noiseTex;  \n\
-uniform sampler2D diffuseTex;\n\
-uniform bool textureFlipYAxis;\n\
-varying vec3 vNormal;\n\
-uniform mat4 projectionMatrix;\n\
-uniform mat4 m;\n\
-uniform vec2 noiseScale;\n\
-uniform float near;\n\
-uniform float far;            \n\
-uniform float fov;\n\
-uniform float aspectRatio;    \n\
-uniform float screenWidth;    \n\
-uniform float screenHeight;    \n\
-uniform float shininessValue;\n\
-uniform vec3 kernel[16];   \n\
-uniform vec4 oneColor4;\n\
-varying vec4 aColor4; // color from attributes\n\
-uniform bool bApplyScpecularLighting;\n\
-uniform highp int colorType; // 0= oneColor, 1= attribColor, 2= texture.\n\
-\n\
-varying vec2 vTexCoord;   \n\
-varying vec3 vLightWeighting;\n\
-\n\
-varying vec3 diffuseColor;\n\
-uniform vec3 specularColor;\n\
-varying vec3 vertexPos;\n\
-\n\
-const int kernelSize = 16;  \n\
-uniform float radius;      \n\
-\n\
-uniform float ambientReflectionCoef;\n\
-uniform float diffuseReflectionCoef;  \n\
-uniform float specularReflectionCoef; \n\
-varying float applySpecLighting;\n\
-uniform bool bApplySsao;\n\
-uniform float externalAlpha;\n\
-\n\
-float unpackDepth(const in vec4 rgba_depth)\n\
-{\n\
-    const vec4 bit_shift = vec4(0.000000059605, 0.000015258789, 0.00390625, 1.0);\n\
-    float depth = dot(rgba_depth, bit_shift);\n\
-    return depth;\n\
-}  \n\
-\n\
-float UnpackDepth32( in vec4 pack )\n\
-{\n\
-    float depth = dot( pack, 1.0 / vec4(1.0, 256.0, 256.0*256.0, 16777216.0) ); // 256.0*256.0*256.0 = 16777216.0\n\
-    return depth * (16777216.0) / (16777216.0 - 1.0);\n\
-}              \n\
-\n\
-vec3 getViewRay(vec2 tc)\n\
-{\n\
-    float hfar = 2.0 * tan(fov/2.0) * far;\n\
-    float wfar = hfar * aspectRatio;    \n\
-    vec3 ray = vec3(wfar * (tc.x - 0.5), hfar * (tc.y - 0.5), -far);    \n\
-    return ray;                      \n\
-}         \n\
-            \n\
-//linear view space depth\n\
-float getDepth(vec2 coord)\n\
-{\n\
-    return UnpackDepth32(texture2D(depthTex, coord.xy));\n\
-}    \n\
-\n\
-void main()\n\
-{\n\
-	vec4 textureColor = texture2D(diffuseTex, vec2(vTexCoord.s, vTexCoord.t));\n\
-	float alfa = externalAlpha;\n\
-	float depth = UnpackDepth32(textureColor);\n\
-	\n\
-    vec4 finalColor;\n\
-	finalColor = vec4(depth, depth, depth, alfa);\n\
-\n\
-	//finalColor = vec4(vNormal, 1.0); // test to render normal color coded.***\n\
-    gl_FragColor = finalColor; \n\
-}";
-ShaderSource.ImageViewerRectangleShaderVS = "	attribute vec3 position;\n\
-	attribute vec3 normal;\n\
-	attribute vec2 texCoord;\n\
-	attribute vec4 color4;\n\
-	\n\
-	uniform mat4 buildingRotMatrix; \n\
-	uniform mat4 projectionMatrix;  \n\
-	uniform mat4 modelViewMatrix;\n\
-	uniform mat4 modelViewMatrixRelToEye; \n\
-	uniform mat4 ModelViewProjectionMatrixRelToEye;\n\
-	uniform mat4 RefTransfMatrix;\n\
-	uniform mat4 normalMatrix4;\n\
-	uniform vec3 buildingPosHIGH;\n\
-	uniform vec3 buildingPosLOW;\n\
-	uniform vec3 encodedCameraPositionMCHigh;\n\
-	uniform vec3 encodedCameraPositionMCLow;\n\
-	uniform vec3 aditionalPosition;\n\
-	uniform vec3 refTranslationVec;\n\
-	uniform int refMatrixType; // 0= identity, 1= translate, 2= transform\n\
-	uniform bool bApplySpecularLighting;\n\
-	uniform highp int colorType; // 0= oneColor, 1= attribColor, 2= texture.\n\
-\n\
-	varying vec3 vNormal;\n\
-	varying vec2 vTexCoord;  \n\
-	varying vec3 uAmbientColor;\n\
-	varying vec3 vLightWeighting;\n\
-	varying vec3 vertexPos;\n\
-	varying float applySpecLighting;\n\
-	varying vec4 aColor4; // color from attributes\n\
-	\n\
-	void main()\n\
-    {	\n\
-		vec4 rotatedPos;\n\
-		mat3 currentTMat;\n\
-		if(refMatrixType == 0)\n\
-		{\n\
-			rotatedPos = buildingRotMatrix * vec4(position.xyz, 1.0) + vec4(aditionalPosition.xyz, 0.0);\n\
-			currentTMat = mat3(buildingRotMatrix);\n\
-		}\n\
-		else if(refMatrixType == 1)\n\
-		{\n\
-			rotatedPos = buildingRotMatrix * vec4(position.xyz + refTranslationVec.xyz, 1.0) + vec4(aditionalPosition.xyz, 0.0);\n\
-			currentTMat = mat3(buildingRotMatrix);\n\
-		}\n\
-		else if(refMatrixType == 2)\n\
-		{\n\
-			rotatedPos = RefTransfMatrix * vec4(position.xyz, 1.0) + vec4(aditionalPosition.xyz, 0.0);\n\
-			currentTMat = mat3(RefTransfMatrix);\n\
-		}\n\
-\n\
-		vec3 objPosHigh = buildingPosHIGH;\n\
-		vec3 objPosLow = buildingPosLOW.xyz + rotatedPos.xyz;\n\
-		vec3 highDifference = objPosHigh.xyz - encodedCameraPositionMCHigh.xyz;\n\
-		vec3 lowDifference = objPosLow.xyz - encodedCameraPositionMCLow.xyz;\n\
-		vec4 pos4 = vec4(highDifference.xyz + lowDifference.xyz, 1.0);\n\
-\n\
-		//vertexPos = vec3(modelViewMatrixRelToEye * pos4);\n\
-		vec3 rotatedNormal = currentTMat * normal;\n\
-		vLightWeighting = vec3(1.0, 1.0, 1.0);\n\
-		uAmbientColor = vec3(0.8);\n\
-		vec3 uLightingDirection = vec3(0.6, 0.6, 0.6);\n\
-		vec3 directionalLightColor = vec3(0.7, 0.7, 0.7);\n\
-		vNormal = (normalMatrix4 * vec4(rotatedNormal.x, rotatedNormal.y, rotatedNormal.z, 1.0)).xyz;\n\
-		vTexCoord = texCoord;\n\
-		float directionalLightWeighting = max(dot(vNormal, uLightingDirection), 0.0);\n\
-		vLightWeighting = uAmbientColor + directionalLightColor * directionalLightWeighting;\n\
-		\n\
-		if(bApplySpecularLighting)\n\
-			applySpecLighting = 1.0;\n\
-		else\n\
-			applySpecLighting = -1.0;\n\
-\n\
-        gl_Position = ModelViewProjectionMatrixRelToEye * pos4;\n\
-		\n\
-		if(colorType == 1)\n\
-			aColor4 = color4;\n\
-	}";
-ShaderSource.InvertedBoxFS = "#ifdef GL_ES\n\
-    precision highp float;\n\
-#endif\n\
-\n\
-uniform sampler2D depthTex;\n\
-uniform sampler2D noiseTex;  \n\
-uniform sampler2D diffuseTex;\n\
-uniform bool hasTexture;\n\
-uniform bool textureFlipYAxis;\n\
-varying vec3 vNormal;\n\
-uniform mat4 projectionMatrix;\n\
-uniform mat4 m;\n\
-uniform vec2 noiseScale;\n\
-uniform float near;\n\
-uniform float far;            \n\
-uniform float fov;\n\
-uniform float aspectRatio;    \n\
-uniform float screenWidth;    \n\
-uniform float screenHeight;    \n\
-uniform float shininessValue;\n\
-uniform vec3 kernel[16];   \n\
-uniform vec4 vColor4Aux;\n\
-\n\
-varying vec2 vTexCoord;   \n\
-varying vec3 vLightWeighting;\n\
-\n\
-varying vec3 diffuseColor;\n\
-uniform vec3 specularColor;\n\
-varying vec3 vertexPos;\n\
-\n\
-const int kernelSize = 16;  \n\
-uniform float radius;      \n\
-\n\
-uniform float ambientReflectionCoef;\n\
-uniform float diffuseReflectionCoef;  \n\
-uniform float specularReflectionCoef; \n\
-\n\
-float unpackDepth(const in vec4 rgba_depth)\n\
-{\n\
-    const vec4 bit_shift = vec4(0.000000059605, 0.000015258789, 0.00390625, 1.0);\n\
-    float depth = dot(rgba_depth, bit_shift);\n\
-    return depth;\n\
-}                \n\
-\n\
-vec3 getViewRay(vec2 tc)\n\
-{\n\
-    float hfar = 2.0 * tan(fov/2.0) * far;\n\
-    float wfar = hfar * aspectRatio;    \n\
-    vec3 ray = vec3(wfar * (tc.x - 0.5), hfar * (tc.y - 0.5), -far);    \n\
-    return ray;                      \n\
-}         \n\
-            \n\
-//linear view space depth\n\
-float getDepth(vec2 coord)\n\
-{\n\
-    return unpackDepth(texture2D(depthTex, coord.xy));\n\
-}    \n\
-\n\
-void main()\n\
-{          \n\
-    vec2 screenPos = vec2(gl_FragCoord.x / screenWidth, gl_FragCoord.y / screenHeight);		                 \n\
-    float linearDepth = getDepth(screenPos);          \n\
-    vec3 origin = getViewRay(screenPos) * linearDepth;   \n\
-\n\
-    vec3 normal2 = vNormal;\n\
-            \n\
-    vec3 rvec = texture2D(noiseTex, screenPos.xy * noiseScale).xyz * 2.0 - 1.0;\n\
-    vec3 tangent = normalize(rvec - normal2 * dot(rvec, normal2));\n\
-    vec3 bitangent = cross(normal2, tangent);\n\
-    mat3 tbn = mat3(tangent, bitangent, normal2);        \n\
-    \n\
-    float occlusion = 0.0;\n\
-    for(int i = 0; i < kernelSize; ++i)\n\
-    {    	 \n\
-        vec3 sample = origin + (tbn * kernel[i]) * radius;\n\
-        vec4 offset = projectionMatrix * vec4(sample, 1.0);		\n\
-        offset.xy /= offset.w;\n\
-        offset.xy = offset.xy * 0.5 + 0.5;        \n\
-        float sampleDepth = -sample.z/far;\n\
-		if(sampleDepth > 0.49)\n\
-			continue;\n\
-        float depthBufferValue = getDepth(offset.xy);				              \n\
-        float range_check = abs(linearDepth - depthBufferValue)+radius*0.998;\n\
-        if (range_check < radius*1.001 && depthBufferValue <= sampleDepth)\n\
-        {\n\
-            occlusion +=  1.0;\n\
-        }\n\
-    }   \n\
-        \n\
-    occlusion = 1.0 - occlusion / float(kernelSize);\n\
-\n\
-    vec3 lightPos = vec3(20.0, 60.0, 20.0);\n\
-    vec3 L = normalize(lightPos - vertexPos);\n\
-    float lambertian = max(dot(normal2, L), 0.0);\n\
-    float specular = 0.0;\n\
-    if(lambertian > 0.0)\n\
-    {\n\
-        vec3 R = reflect(-L, normal2);      // Reflected light vector\n\
-        vec3 V = normalize(-vertexPos); // Vector to viewer\n\
-        \n\
-        // Compute the specular term\n\
-        float specAngle = max(dot(R, V), 0.0);\n\
-        specular = pow(specAngle, shininessValue);\n\
-    }\n\
-	\n\
-	if(lambertian < 0.5)\n\
-    {\n\
-		lambertian = 0.5;\n\
-	}\n\
-\n\
-    vec4 textureColor;\n\
-    if(hasTexture)\n\
-    {\n\
-        if(textureFlipYAxis)\n\
-        {\n\
-            textureColor = texture2D(diffuseTex, vec2(vTexCoord.s, 1.0 - vTexCoord.t));\n\
-        }\n\
-        else{\n\
-            textureColor = texture2D(diffuseTex, vec2(vTexCoord.s, vTexCoord.t));\n\
-        }\n\
-		\n\
-        if(textureColor.w == 0.0)\n\
-        {\n\
-            discard;\n\
-        }\n\
-    }\n\
-    else{\n\
-        textureColor = vColor4Aux;\n\
-    }\n\
-	\n\
-	vec3 ambientColor = vec3(textureColor.x, textureColor.y, textureColor.z);\n\
-\n\
-    gl_FragColor = vec4((ambientReflectionCoef * ambientColor + diffuseReflectionCoef * lambertian * textureColor.xyz + specularReflectionCoef * specular * specularColor)*vLightWeighting * occlusion, 1.0); \n\
-}\n\
-";
-ShaderSource.InvertedBoxVS = "	attribute vec3 position;\n\
-	attribute vec3 normal;\n\
-	attribute vec2 texCoord;\n\
-	\n\
-	uniform mat4 buildingRotMatrix; \n\
-	uniform mat4 projectionMatrix;  \n\
-	uniform mat4 modelViewMatrix;\n\
-	uniform mat4 modelViewMatrixRelToEye; \n\
-	uniform mat4 ModelViewProjectionMatrixRelToEye;\n\
-	uniform mat4 RefTransfMatrix;\n\
-	uniform mat4 normalMatrix4;\n\
-	uniform vec3 buildingPosHIGH;\n\
-	uniform vec3 buildingPosLOW;\n\
-	uniform vec3 encodedCameraPositionMCHigh;\n\
-	uniform vec3 encodedCameraPositionMCLow;\n\
-	uniform vec3 aditionalPosition;\n\
-	uniform vec3 refTranslationVec;\n\
-	uniform int refMatrixType; // 0= identity, 1= translate, 2= transform\n\
-\n\
-	varying vec3 vNormal;\n\
-	varying vec2 vTexCoord;  \n\
-	varying vec3 uAmbientColor;\n\
-	varying vec3 vLightWeighting;\n\
-	varying vec3 vertexPos;\n\
-	\n\
-	void main()\n\
-    {	\n\
-		vec4 rotatedPos;\n\
-		mat3 currentTMat;\n\
-		if(refMatrixType == 0)\n\
-		{\n\
-			rotatedPos = buildingRotMatrix * vec4(position.xyz, 1.0) + vec4(aditionalPosition.xyz, 0.0);\n\
-			currentTMat = mat3(buildingRotMatrix);\n\
-		}\n\
-		else if(refMatrixType == 1)\n\
-		{\n\
-			rotatedPos = buildingRotMatrix * vec4(position.xyz + refTranslationVec.xyz, 1.0) + vec4(aditionalPosition.xyz, 0.0);\n\
-			currentTMat = mat3(buildingRotMatrix);\n\
-		}\n\
-		else if(refMatrixType == 2)\n\
-		{\n\
-			rotatedPos = RefTransfMatrix * vec4(position.xyz, 1.0) + vec4(aditionalPosition.xyz, 0.0);\n\
-			currentTMat = mat3(RefTransfMatrix);\n\
-		}\n\
-\n\
-		vec3 objPosHigh = buildingPosHIGH;\n\
-		vec3 objPosLow = buildingPosLOW.xyz + rotatedPos.xyz;\n\
-		vec3 highDifference = objPosHigh.xyz - encodedCameraPositionMCHigh.xyz;\n\
-		vec3 lowDifference = objPosLow.xyz - encodedCameraPositionMCLow.xyz;\n\
-		vec4 pos4 = vec4(highDifference.xyz + lowDifference.xyz, 1.0);\n\
-\n\
-		vertexPos = vec3(modelViewMatrixRelToEye * pos4);\n\
-		vec3 rotatedNormal = currentTMat * normal;\n\
-		vLightWeighting = vec3(1.0, 1.0, 1.0);\n\
-		uAmbientColor = vec3(0.8);\n\
-		vec3 uLightingDirection = vec3(0.6, 0.6, 0.6);\n\
-		vec3 directionalLightColor = vec3(0.7, 0.7, 0.7);\n\
-		vNormal = (normalMatrix4 * vec4(rotatedNormal.x, rotatedNormal.y, rotatedNormal.z, 1.0)).xyz;\n\
-		vTexCoord = texCoord;\n\
-		float directionalLightWeighting = max(dot(vNormal, uLightingDirection), 0.0);\n\
-		vLightWeighting = uAmbientColor + directionalLightColor * directionalLightWeighting;\n\
-\n\
-        gl_Position = ModelViewProjectionMatrixRelToEye * pos4;\n\
-	}\n\
-";
-ShaderSource.ModelRefSsaoFS = "#ifdef GL_ES\n\
-    precision highp float;\n\
-#endif\n\
-\n\
-uniform sampler2D depthTex;\n\
-uniform sampler2D noiseTex;  \n\
-uniform sampler2D diffuseTex;\n\
-uniform sampler2D shadowMapTex;\n\
-uniform sampler2D shadowMapTex2;\n\
-uniform bool textureFlipYAxis;\n\
-uniform mat4 projectionMatrix;\n\
-uniform mat4 m;\n\
-uniform vec2 noiseScale;\n\
-uniform float near;\n\
-uniform float far;            \n\
-uniform float fov;\n\
-uniform float tangentOfHalfFovy;\n\
-uniform float aspectRatio;    \n\
-uniform float screenWidth;    \n\
-uniform float screenHeight;   \n\
-uniform float shadowMapWidth;    \n\
-uniform float shadowMapHeight; \n\
-uniform float shininessValue;\n\
-uniform vec3 kernel[16];   \n\
-uniform vec4 oneColor4;\n\
-varying vec4 aColor4; // color from attributes\n\
-uniform bool bApplyScpecularLighting;\n\
-uniform highp int colorType; // 0= oneColor, 1= attribColor, 2= texture.\n\
-\n\
-uniform vec3 specularColor;\n\
-uniform vec3 ambientColor;\n\
-\n\
-const int kernelSize = 16;  \n\
-uniform float radius;      \n\
-\n\
-uniform float ambientReflectionCoef;\n\
-uniform float diffuseReflectionCoef;  \n\
-uniform float specularReflectionCoef; \n\
-uniform bool bApplySsao;\n\
-uniform bool bApplyShadow;\n\
-uniform float externalAlpha;\n\
-uniform vec4 colorMultiplier;\n\
-\n\
-//uniform int sunIdx;\n\
-\n\
-// clipping planes.***\n\
-//uniform bool bApplyClippingPlanes;\n\
-//uniform int clippingPlanesCount;\n\
-//uniform vec4 clippingPlanes[6];\n\
-\n\
-varying vec3 vNormal;\n\
-varying vec2 vTexCoord;   \n\
-varying vec3 vLightWeighting;\n\
-varying vec3 diffuseColor;\n\
-varying vec3 vertexPos;\n\
-varying float applySpecLighting;\n\
-varying vec4 vPosRelToLight; \n\
-varying vec3 vLightDir; \n\
-varying vec3 vNormalWC;\n\
-varying float currSunIdx; \n\
-varying float discardFrag;\n\
-\n\
-float unpackDepth(const in vec4 rgba_depth)\n\
-{\n\
-    const vec4 bit_shift = vec4(0.000000059605, 0.000015258789, 0.00390625, 1.0);// original.***\n\
-    float depth = dot(rgba_depth, bit_shift);\n\
-    return depth;\n\
-}  \n\
-\n\
-\n\
-float UnpackDepth32( in vec4 pack )\n\
-{\n\
-	float depth = dot( pack, vec4(1.0, 0.00390625, 0.000015258789, 0.000000059605) );\n\
-    return depth * 1.000000059605;// 1.000000059605 = (16777216.0) / (16777216.0 - 1.0);\n\
-}             \n\
-\n\
-vec3 getViewRay(vec2 tc)\n\
-{\n\
-	/*\n\
-	// The \"far\" for depthTextures if fixed in \"RenderShowDepthVS\" shader.\n\
-	float farForDepth = 30000.0;\n\
-	float hfar = 2.0 * tangentOfHalfFovy * farForDepth;\n\
-    float wfar = hfar * aspectRatio;    \n\
-    vec3 ray = vec3(wfar * (tc.x - 0.5), hfar * (tc.y - 0.5), -farForDepth);  \n\
-	*/	\n\
-	\n\
-	\n\
-	float hfar = 2.0 * tangentOfHalfFovy * far;\n\
-    float wfar = hfar * aspectRatio;    \n\
-    vec3 ray = vec3(wfar * (tc.x - 0.5), hfar * (tc.y - 0.5), -far);    \n\
-	\n\
-    return ray;                      \n\
-}         \n\
-            \n\
-//linear view space depth\n\
-float getDepth(vec2 coord)\n\
-{\n\
-	return unpackDepth(texture2D(depthTex, coord.xy));\n\
-}   \n\
-\n\
-float getDepthShadowMap(vec2 coord)\n\
-{\n\
-	// currSunIdx\n\
-	if(currSunIdx > 0.0 && currSunIdx < 1.0)\n\
-	{\n\
-		return UnpackDepth32(texture2D(shadowMapTex, coord.xy));\n\
-	}\n\
-    else if(currSunIdx > 1.0 && currSunIdx < 2.0)\n\
-	{\n\
-		return UnpackDepth32(texture2D(shadowMapTex2, coord.xy));\n\
-	}\n\
-	else\n\
-		return -1.0;\n\
-}  \n\
-\n\
-bool clipVertexByPlane(in vec4 plane, in vec3 point)\n\
-{\n\
-	float dist = plane.x * point.x + plane.y * point.y + plane.z * point.z + plane.w;\n\
-	\n\
-	if(dist < 0.0)\n\
-	return true;\n\
-	else return false;\n\
-}\n\
-\n\
-void main()\n\
-{\n\
-	// 1rst, check if there are clipping planes.\n\
-	/*\n\
-	if(bApplyClippingPlanes)\n\
-	{\n\
-		bool discardFrag = true;\n\
-		for(int i=0; i<6; i++)\n\
-		{\n\
-			vec4 plane = clippingPlanes[i];\n\
-			if(!clipVertexByPlane(plane, vertexPos))\n\
-			{\n\
-				discardFrag = false;\n\
-				break;\n\
-			}\n\
-			if(i >= clippingPlanesCount)\n\
-			break;\n\
-		}\n\
-		\n\
-		if(discardFrag)\n\
-		discard;\n\
-	}\n\
-	*/\n\
-\n\
-	//bool testBool = false;\n\
-	float occlusion = 1.0; // ambient occlusion.***\n\
-	float shadow_occlusion = 1.0;\n\
-	vec3 normal2 = vNormal;	\n\
-		\n\
-	if(bApplySsao)\n\
-	{        \n\
-		////float farForDepth = 30000.0;\n\
-		vec2 screenPos = vec2(gl_FragCoord.x / screenWidth, gl_FragCoord.y / screenHeight);\n\
-		float linearDepth = getDepth(screenPos);  \n\
-		vec3 ray = getViewRay(screenPos); // The \"far\" for depthTextures if fixed in \"RenderShowDepthVS\" shader.\n\
-		vec3 origin = ray * linearDepth;  \n\
-		float tolerance = radius/far; // original.***\n\
-		////float tolerance = radius/(far-near);// test.***\n\
-		////float tolerance = radius/farForDepth;\n\
-\n\
-		vec3 rvec = texture2D(noiseTex, screenPos.xy * noiseScale).xyz * 2.0 - 1.0;\n\
-		vec3 tangent = normalize(rvec - normal2 * dot(rvec, normal2));\n\
-		vec3 bitangent = cross(normal2, tangent);\n\
-		mat3 tbn = mat3(tangent, bitangent, normal2);   \n\
-		float minDepthBuffer;\n\
-		float maxDepthBuffer;\n\
-		for(int i = 0; i < kernelSize; ++i)\n\
-		{    	 \n\
-			vec3 sample = origin + (tbn * vec3(kernel[i].x*1.0, kernel[i].y*1.0, kernel[i].z)) * radius*2.0;\n\
-			vec4 offset = projectionMatrix * vec4(sample, 1.0);					\n\
-			offset.xy /= offset.w;\n\
-			offset.xy = offset.xy * 0.5 + 0.5;  				\n\
-			float sampleDepth = -sample.z/far;// original.***\n\
-			////float sampleDepth = -sample.z/(far-near);// test.***\n\
-			////float sampleDepth = -sample.z/farForDepth;\n\
-\n\
-			float depthBufferValue = getDepth(offset.xy);\n\
-\n\
-			if(depthBufferValue > 0.00391 && depthBufferValue < 0.00393)\n\
-			{\n\
-				if (depthBufferValue < sampleDepth-tolerance*1000.0)\n\
-				{\n\
-					occlusion +=  0.5;\n\
-				}\n\
-				\n\
-				continue;\n\
-			}			\n\
-			\n\
-			if (depthBufferValue < sampleDepth-tolerance)\n\
-			{\n\
-				occlusion +=  1.0;\n\
-			}\n\
-		} \n\
-\n\
-		occlusion = 1.0 - occlusion / float(kernelSize);	\n\
-	}\n\
-	\n\
-    // Do specular lighting.***\n\
-	float lambertian;\n\
-	float specular;\n\
-	\n\
-	if(applySpecLighting> 0.0)\n\
-	{\n\
-		vec3 L;\n\
-		if(bApplyShadow)\n\
-		{\n\
-			L = vLightDir;// test.***\n\
-			lambertian = max(dot(normal2, L), 0.0); // original.***\n\
-			//lambertian = max(dot(vNormalWC, L), 0.0); // test.\n\
-		}\n\
-		else\n\
-		{\n\
-			vec3 lightPos = vec3(1.0, 1.0, 1.0);\n\
-			L = normalize(lightPos - vertexPos);\n\
-			lambertian = max(dot(normal2, L), 0.0);\n\
-		}\n\
-		\n\
-		specular = 0.0;\n\
-		if(lambertian > 0.0)\n\
-		{\n\
-			vec3 R = reflect(-L, normal2);      // Reflected light vector\n\
-			vec3 V = normalize(-vertexPos); // Vector to viewer\n\
-			\n\
-			// Compute the specular term\n\
-			float specAngle = max(dot(R, V), 0.0);\n\
-			specular = pow(specAngle, shininessValue);\n\
-			\n\
-			if(specular > 1.0)\n\
-			{\n\
-				specular = 1.0;\n\
-			}\n\
-		}\n\
-		\n\
-		if(lambertian < 0.5)\n\
-		{\n\
-			lambertian = 0.5;\n\
-		}\n\
-\n\
-	}\n\
-	\n\
-	if(bApplyShadow)\n\
-	{\n\
-		if(currSunIdx > 0.0)\n\
-		{\n\
-			float ligthAngle = dot(vLightDir, vNormalWC);\n\
-			if(ligthAngle > 0.0)\n\
-			{\n\
-				// The angle between the light direction & face normal is less than 90 degree, so, the face is in shadow.***\n\
-				shadow_occlusion = 0.5;\n\
-			}\n\
-			else\n\
-			{\n\
-				vec3 posRelToLight = vPosRelToLight.xyz / vPosRelToLight.w;\n\
-				float tolerance = 0.9963;\n\
-				posRelToLight = posRelToLight * 0.5 + 0.5; // transform to [0,1] range\n\
-				if(posRelToLight.x >= 0.0 && posRelToLight.x <= 1.0)\n\
-				{\n\
-					if(posRelToLight.y >= 0.0 && posRelToLight.y <= 1.0)\n\
-					{\n\
-						float depthRelToLight = getDepthShadowMap(posRelToLight.xy);\n\
-						if(posRelToLight.z > depthRelToLight*tolerance )\n\
-						{\n\
-							shadow_occlusion = 0.5;\n\
-						}\n\
-					}\n\
-				}\n\
-\n\
-				// test. Calculate the zone inside the pixel.************************************\n\
-				//https://docs.microsoft.com/ko-kr/windows/win32/dxtecharts/cascaded-shadow-maps\n\
-			}\n\
-		}\n\
-	}\n\
-	\n\
-\n\
-    vec4 textureColor;\n\
-    if(colorType == 2)\n\
-    {\n\
-        if(textureFlipYAxis)\n\
-        {\n\
-            textureColor = texture2D(diffuseTex, vec2(vTexCoord.s, 1.0 - vTexCoord.t));\n\
-        }\n\
-        else{\n\
-            textureColor = texture2D(diffuseTex, vec2(vTexCoord.s, vTexCoord.t));\n\
-        }\n\
-		\n\
-        if(textureColor.w == 0.0)\n\
-        {\n\
-            discard;\n\
-        }\n\
-    }\n\
-    else if(colorType == 0)\n\
-	{\n\
-        textureColor = oneColor4;\n\
-    }\n\
-	else if(colorType == 1)\n\
-	{\n\
-        textureColor = aColor4;\n\
-    }\n\
-	\n\
-	//textureColor = vec4(0.85, 0.85, 0.85, 1.0);\n\
-	\n\
-	vec3 ambientColorAux = vec3(textureColor.x*ambientColor.x, textureColor.y*ambientColor.y, textureColor.z*ambientColor.z);\n\
-	float alfa = textureColor.w * externalAlpha;\n\
-\n\
-    vec4 finalColor;\n\
-	if(applySpecLighting> 0.0)\n\
-	{\n\
-		finalColor = vec4((ambientReflectionCoef * ambientColorAux + \n\
-							diffuseReflectionCoef * lambertian * textureColor.xyz + \n\
-							specularReflectionCoef * specular * specularColor)*vLightWeighting * occlusion * shadow_occlusion, alfa); \n\
-	}\n\
-	else{\n\
-		finalColor = vec4((textureColor.xyz) * occlusion * shadow_occlusion, alfa);\n\
-	}\n\
-	\n\
-	//if(testBool)\n\
-	//finalColor *= vec4(0.99, 0.33, 0.32, 1.0);\n\
-	\n\
-	finalColor *= colorMultiplier;\n\
-\n\
-\n\
-	//finalColor = vec4(linearDepth, linearDepth, linearDepth, 1.0); // test to render depth color coded.***\n\
-    gl_FragColor = finalColor; \n\
-\n\
-}";
-ShaderSource.ModelRefSsaoVS = "\n\
-	attribute vec3 position;\n\
-	attribute vec3 normal;\n\
-	attribute vec2 texCoord;\n\
-	attribute vec4 color4;\n\
-	\n\
-	uniform mat4 buildingRotMatrix; \n\
-	uniform mat4 projectionMatrix;  \n\
-	uniform mat4 modelViewMatrix;\n\
-	uniform mat4 modelViewMatrixRelToEye; \n\
-	uniform mat4 ModelViewProjectionMatrixRelToEye;\n\
-	uniform mat4 RefTransfMatrix;\n\
-	uniform mat4 normalMatrix4;\n\
-	uniform mat4 sunMatrix[2]; \n\
-	uniform vec3 buildingPosHIGH;\n\
-	uniform vec3 buildingPosLOW;\n\
-	uniform float near;\n\
-	uniform float far;\n\
-	uniform vec3 scaleLC;\n\
-	uniform vec3 sunPosHIGH[2];\n\
-	uniform vec3 sunPosLOW[2];\n\
-	uniform int sunIdx;\n\
-	uniform vec3 sunDirWC;\n\
-	uniform vec3 encodedCameraPositionMCHigh;\n\
-	uniform vec3 encodedCameraPositionMCLow;\n\
-	uniform vec3 aditionalPosition;\n\
-	uniform vec3 refTranslationVec;\n\
-	uniform int refMatrixType; // 0= identity, 1= translate, 2= transform\n\
-	uniform bool bApplySpecularLighting;\n\
-	uniform highp int colorType; // 0= oneColor, 1= attribColor, 2= texture.\n\
-	\n\
-	uniform bool bApplyShadow;\n\
-	uniform bool bUseLogarithmicDepth;\n\
-	\n\
-	// clipping planes.***\n\
-	uniform mat4 clippingPlanesRotMatrix; \n\
-	uniform vec3 clippingPlanesPosHIGH;\n\
-	uniform vec3 clippingPlanesPosLOW;\n\
-	uniform bool bApplyClippingPlanes;\n\
-	uniform int clippingPlanesCount;\n\
-	uniform vec4 clippingPlanes[6];\n\
-\n\
-	varying vec3 vNormal;\n\
-	varying vec2 vTexCoord;  \n\
-	varying vec3 uAmbientColor;\n\
-	varying vec3 vLightWeighting;\n\
-	varying vec3 vertexPos;\n\
-	varying float applySpecLighting;\n\
-	varying vec4 aColor4; // color from attributes\n\
-	varying vec4 vPosRelToLight; \n\
-	varying vec3 vLightDir; \n\
-	varying vec3 vNormalWC; \n\
-	varying float currSunIdx;  \n\
-	varying float discardFrag;\n\
-	\n\
-	bool clipVertexByPlane(in vec4 plane, in vec3 point)\n\
-	{\n\
-		float dist = plane.x * point.x + plane.y * point.y + plane.z * point.z + plane.w;\n\
-		\n\
-		if(dist < 0.0)\n\
-		return true;\n\
-		else return false;\n\
-	}\n\
-	\n\
-	void main()\n\
-    {	\n\
-		vec4 scaledPos = vec4(position.x * scaleLC.x, position.y * scaleLC.y, position.z * scaleLC.z, 1.0);\n\
-		vec4 rotatedPos;\n\
-		mat3 currentTMat;\n\
-		if(refMatrixType == 0)\n\
-		{\n\
-			rotatedPos = buildingRotMatrix * vec4(scaledPos.xyz, 1.0) + vec4(aditionalPosition.xyz, 0.0);\n\
-			currentTMat = mat3(buildingRotMatrix);\n\
-		}\n\
-		else if(refMatrixType == 1)\n\
-		{\n\
-			rotatedPos = buildingRotMatrix * vec4(scaledPos.xyz + refTranslationVec.xyz, 1.0) + vec4(aditionalPosition.xyz, 0.0);\n\
-			currentTMat = mat3(buildingRotMatrix);\n\
-		}\n\
-		else if(refMatrixType == 2)\n\
-		{\n\
-			rotatedPos = RefTransfMatrix * vec4(scaledPos.xyz, 1.0) + vec4(aditionalPosition.xyz, 0.0);\n\
-			currentTMat = mat3(RefTransfMatrix);\n\
-		}\n\
-\n\
-		vec3 objPosHigh = buildingPosHIGH;\n\
-		vec3 objPosLow = buildingPosLOW.xyz + rotatedPos.xyz;\n\
-		vec3 highDifference = objPosHigh.xyz - encodedCameraPositionMCHigh.xyz;\n\
-		vec3 lowDifference = objPosLow.xyz - encodedCameraPositionMCLow.xyz;\n\
-		vec4 pos4 = vec4(highDifference.xyz + lowDifference.xyz, 1.0);\n\
-		vec3 rotatedNormal = currentTMat * normal;\n\
-		\n\
-		// Check if clipping.********************************************\n\
-		if(bApplyClippingPlanes)\n\
-		{\n\
-			discardFrag = 1.0; // true.\n\
-			for(int i=0; i<6; i++)\n\
-			{\n\
-				vec4 plane = clippingPlanes[i];\n\
-				\n\
-				// calculate any point of the plane.\n\
-				\n\
-				\n\
-				if(!clipVertexByPlane(plane, vertexPos))\n\
-				{\n\
-					discardFrag = -1.0; // false.\n\
-					break;\n\
-				}\n\
-				if(i >= clippingPlanesCount)\n\
-				break;\n\
-			}\n\
-			\n\
-			//if(discardFrag)\n\
-			//discard;\n\
-		}\n\
-		//----------------------------------------------------------------\n\
-		\n\
-		vec3 uLightingDirection = vec3(-0.1320580393075943, -0.9903827905654907, 0.041261956095695496); \n\
-		uAmbientColor = vec3(1.0);\n\
-		vNormalWC = rotatedNormal;\n\
-		vNormal = normalize((normalMatrix4 * vec4(rotatedNormal.x, rotatedNormal.y, rotatedNormal.z, 1.0)).xyz); // original.***\n\
-		vTexCoord = texCoord;\n\
-		vLightDir = vec3(-0.1320580393075943, -0.9903827905654907, 0.041261956095695496);\n\
-		vec3 directionalLightColor = vec3(0.7, 0.7, 0.7);\n\
-		float directionalLightWeighting = 1.0;\n\
-		\n\
-		currSunIdx = -1.0; // initially no apply shadow.\n\
-		if(bApplyShadow)\n\
-		{\n\
-			//vLightDir = normalize(vec3(normalMatrix4 * vec4(sunDirWC.xyz, 1.0)).xyz); // test.***\n\
-			vLightDir = sunDirWC;\n\
-			vNormalWC = rotatedNormal;\n\
-						\n\
-			// the sun lights count are 2.\n\
-			\n\
-			vec3 currSunPosLOW;\n\
-			vec3 currSunPosHIGH;\n\
-			mat4 currSunMatrix;\n\
-			if(sunIdx == 0)\n\
-			{\n\
-				currSunPosLOW = sunPosLOW[0];\n\
-				currSunPosHIGH = sunPosHIGH[0];\n\
-				currSunMatrix = sunMatrix[0];\n\
-				currSunIdx = 0.5;\n\
-			}\n\
-			else if(sunIdx == 1)\n\
-			{\n\
-				currSunPosLOW = sunPosLOW[1];\n\
-				currSunPosHIGH = sunPosHIGH[1];\n\
-				currSunMatrix = sunMatrix[1];\n\
-				currSunIdx = 1.5;\n\
-			}\n\
-			\n\
-			// Calculate the vertex relative to light.***\n\
-			vec3 highDifferenceSun = objPosHigh.xyz - currSunPosHIGH.xyz;\n\
-			vec3 lowDifferenceSun = objPosLow.xyz - currSunPosLOW.xyz;\n\
-			vec4 pos4Sun = vec4(highDifferenceSun.xyz + lowDifferenceSun.xyz, 1.0);\n\
-			vPosRelToLight = currSunMatrix * pos4Sun;\n\
-			\n\
-			uLightingDirection = sunDirWC; \n\
-			//directionalLightColor = vec3(0.9, 0.9, 0.9);\n\
-			directionalLightWeighting = max(dot(rotatedNormal, -sunDirWC), 0.0);\n\
-		}\n\
-		else\n\
-		{\n\
-			uAmbientColor = vec3(0.8);\n\
-			uLightingDirection = normalize(vec3(0.6, 0.6, 0.6));\n\
-			directionalLightWeighting = max(dot(vNormal, uLightingDirection), 0.0);\n\
-		}\n\
-\n\
-		vLightWeighting = uAmbientColor + directionalLightColor * directionalLightWeighting;\n\
-		\n\
-		if(bApplySpecularLighting)\n\
-			applySpecLighting = 1.0;\n\
-		else\n\
-			applySpecLighting = -1.0;\n\
-\n\
-        gl_Position = ModelViewProjectionMatrixRelToEye * pos4;\n\
-\n\
-		if(bUseLogarithmicDepth)\n\
-		{\n\
-			// logarithmic zBuffer:\n\
-			// https://www.gamasutra.com/blogs/BranoKemen/20090812/85207/Logarithmic_Depth_Buffer.php\n\
-			// z = log(C*z + 1) / log(C*Far + 1) * w\n\
-			float z = gl_Position.z;\n\
-			//float C = 1.0;\n\
-			float w = gl_Position.w;\n\
-			////gl_Position.z = log(C*z + 1.0) / log(C*far + 1.0) * w;\n\
-			gl_Position.z = log(z/near) / log(far/near)*w; // another way.\n\
-		}\n\
-\n\
-		vertexPos = (modelViewMatrixRelToEye * pos4).xyz;\n\
-		//vertexPos = objPosHigh + objPosLow;\n\
-		\n\
-		if(colorType == 1)\n\
-			aColor4 = color4;\n\
-		gl_PointSize = 5.0;\n\
-	}";
-ShaderSource.OrthogonalDepthShaderFS = "#ifdef GL_ES\n\
-precision highp float;\n\
-#endif\n\
-uniform float near;\n\
-uniform float far;\n\
-\n\
-varying float depth;  \n\
-\n\
-vec4 packDepth(const in float depth)\n\
-{\n\
-    const vec4 bit_shift = vec4(16777216.0, 65536.0, 256.0, 1.0);\n\
-    const vec4 bit_mask  = vec4(0.0, 0.00390625, 0.00390625, 0.00390625); \n\
-    //vec4 res = fract(depth * bit_shift); // Is not precise.\n\
-	vec4 res = mod(depth * bit_shift * vec4(255), vec4(256) ) / vec4(255); // Is better.\n\
-    res -= res.xxyz * bit_mask;\n\
-    return res;  \n\
-}\n\
-\n\
-vec4 PackDepth32( in float depth )\n\
-{\n\
-    depth *= (16777216.0 - 1.0) / (16777216.0);\n\
-    vec4 encode = fract( depth * vec4(1.0, 256.0, 256.0*256.0, 16777216.0) );// 256.0*256.0*256.0 = 16777216.0\n\
-    return vec4( encode.xyz - encode.yzw / 256.0, encode.w ) + 1.0/512.0;\n\
-}\n\
-\n\
-void main()\n\
-{     \n\
-    gl_FragData[0] = PackDepth32(depth);\n\
-	//gl_FragData[0] = packDepth(-depth);\n\
-}";
-ShaderSource.OrthogonalDepthShaderVS = "attribute vec3 position;\n\
-\n\
-uniform mat4 buildingRotMatrix; \n\
-uniform mat4 modelViewMatrixRelToEye; \n\
-uniform mat4 RefTransfMatrix;\n\
-uniform mat4 ModelViewProjectionMatrixRelToEye;\n\
-uniform vec3 buildingPosHIGH;\n\
-uniform vec3 buildingPosLOW;\n\
-uniform vec3 encodedCameraPositionMCHigh;\n\
-uniform vec3 encodedCameraPositionMCLow;\n\
-uniform float near;\n\
-uniform float far;\n\
-uniform vec3 aditionalPosition;\n\
-uniform vec3 refTranslationVec;\n\
-uniform int refMatrixType; // 0= identity, 1= translate, 2= transform\n\
-\n\
-varying float depth;\n\
-  \n\
-void main()\n\
-{	\n\
-	vec4 rotatedPos;\n\
-\n\
-	if(refMatrixType == 0)\n\
-	{\n\
-		rotatedPos = buildingRotMatrix * vec4(position.xyz, 1.0) + vec4(aditionalPosition.xyz, 0.0);\n\
-	}\n\
-	else if(refMatrixType == 1)\n\
-	{\n\
-		rotatedPos = buildingRotMatrix * vec4(position.xyz + refTranslationVec.xyz, 1.0) + vec4(aditionalPosition.xyz, 0.0);\n\
-	}\n\
-	else if(refMatrixType == 2)\n\
-	{\n\
-		rotatedPos = RefTransfMatrix * vec4(position.xyz, 1.0) + vec4(aditionalPosition.xyz, 0.0);\n\
-	}\n\
-\n\
-    vec3 objPosHigh = buildingPosHIGH;\n\
-    vec3 objPosLow = buildingPosLOW.xyz + rotatedPos.xyz;\n\
-    vec3 highDifference = objPosHigh.xyz - encodedCameraPositionMCHigh.xyz;\n\
-    vec3 lowDifference = objPosLow.xyz - encodedCameraPositionMCLow.xyz;\n\
-    vec4 pos4 = vec4(highDifference.xyz + lowDifference.xyz, 1.0);\n\
-    \n\
-    //linear depth in camera space (0..far)\n\
-    //depth = (modelViewMatrixRelToEye * pos4).z/far; // original.***\n\
-\n\
-	gl_Position = ModelViewProjectionMatrixRelToEye * pos4;\n\
-	depth = gl_Position.z*0.5+0.5;\n\
-}\n\
-";
-ShaderSource.PngImageFS = "precision highp float;\n\
-varying vec2 v_texcoord;\n\
-uniform bool textureFlipYAxis;\n\
-uniform sampler2D u_texture;\n\
-uniform highp int colorType; // 0= oneColor, 1= attribColor, 2= texture.\n\
-uniform vec4 oneColor4;\n\
-\n\
-\n\
-varying vec2 imageSizeInPixels;\n\
-\n\
-void main()\n\
-{\n\
-    vec4 textureColor;\n\
-\n\
-	// 1rst, check if the texture.w != 0.\n\
-	if(textureFlipYAxis)\n\
-	{\n\
-		textureColor = texture2D(u_texture, vec2(v_texcoord.s, 1.0 - v_texcoord.t));\n\
-	}\n\
-	else\n\
-	{\n\
-		textureColor = texture2D(u_texture, v_texcoord);\n\
-	}\n\
-	//if(textureColor.w < 0.005)\n\
-	if(textureColor.w == 0.0)\n\
-	{\n\
-		discard;\n\
-	}\n\
-	if(colorType == 2)\n\
-	{\n\
-		// do nothing.\n\
-	}\n\
-	else if( colorType == 0)\n\
-	{\n\
-		textureColor = oneColor4;\n\
-	}\n\
-\n\
-    gl_FragColor = textureColor;\n\
-}";
-ShaderSource.PngImageVS = "attribute vec4 position;\n\
-attribute vec2 texCoord;\n\
-uniform mat4 buildingRotMatrix;\n\
-uniform mat4 modelViewMatrixRelToEye;  \n\
-uniform mat4 ModelViewProjectionMatrixRelToEye;  \n\
-uniform mat4 projectionMatrix;\n\
-uniform vec3 buildingPosHIGH;\n\
-uniform vec3 buildingPosLOW;\n\
-uniform vec3 encodedCameraPositionMCHigh;\n\
-uniform vec3 encodedCameraPositionMCLow;\n\
-uniform vec2 scale2d;\n\
-uniform vec2 size2d;\n\
-uniform vec3 aditionalOffset;\n\
-uniform vec2 imageSize;\n\
-uniform float screenWidth;    \n\
-uniform float screenHeight;\n\
-uniform bool bUseOriginalImageSize;\n\
-varying vec2 v_texcoord;\n\
-varying vec2 imageSizeInPixels;\n\
-\n\
-void main()\n\
-{\n\
-    vec4 position2 = vec4(position.xyz, 1.0);\n\
-    vec4 rotatedPos = buildingRotMatrix * vec4(position2.xyz, 1.0);\n\
-    vec3 objPosHigh = buildingPosHIGH;\n\
-    vec3 objPosLow = buildingPosLOW.xyz + rotatedPos.xyz;\n\
-    vec3 highDifference = objPosHigh.xyz - encodedCameraPositionMCHigh.xyz;\n\
-    vec3 lowDifference = objPosLow.xyz - encodedCameraPositionMCLow.xyz;\n\
-    vec4 pos4 = vec4(highDifference.xyz + lowDifference.xyz, 1.0);\n\
-	\n\
-	//imageSizeInPixels = vec2(imageSize.x, imageSize.y);\n\
-	\n\
-	float order_w = position.w;\n\
-	float sense = 1.0;\n\
-	int orderInt = 0;\n\
-	if(order_w > 0.0)\n\
-	{\n\
-		sense = -1.0;\n\
-		if(order_w < 1.5)\n\
-		{\n\
-			orderInt = 1;\n\
-		}\n\
-		else{\n\
-			orderInt = 2;\n\
-		}\n\
-	}\n\
-	else\n\
-	{\n\
-		sense = 1.0;\n\
-		if(order_w > -1.5)\n\
-		{\n\
-			orderInt = -1;\n\
-		}\n\
-		else{\n\
-			orderInt = -2;\n\
-		}\n\
-	}\n\
-	\n\
-    v_texcoord = texCoord;\n\
-	vec4 projected = ModelViewProjectionMatrixRelToEye * pos4;\n\
-	//vec4 projected2 = modelViewMatrixRelToEye * pos4;\n\
-\n\
-	// Now, calculate the pixelSize in the plane of the projected point.\n\
-	float pixelWidthRatio = 2. / (screenWidth * projectionMatrix[0][0]);\n\
-	// alternative : float pixelWidthRatio = 2. / (screenHeight * projectionMatrix[1][1]);\n\
-	float pixelWidth = projected.w * pixelWidthRatio;\n\
-	\n\
-	if(projected.w < 5.0)\n\
-		pixelWidth = 5.0 * pixelWidthRatio;\n\
-	\n\
-	vec4 offset;\n\
-	float offsetX;\n\
-	float offsetY;\n\
-	if(bUseOriginalImageSize)\n\
-	{\n\
-		offsetX = pixelWidth*imageSize.x/2.0;\n\
-		offsetY = pixelWidth*imageSize.y/2.0;\n\
-	}\n\
-	else{\n\
-		offsetX = pixelWidth*size2d.x/2.0;\n\
-		offsetY = pixelWidth*size2d.y/2.0;\n\
-	}\n\
-	\n\
-	// Offset our position along the normal\n\
-	if(orderInt == 1)\n\
-	{\n\
-		offset = vec4(-offsetX*scale2d.x, 0.0, 0.0, 1.0);\n\
-	}\n\
-	else if(orderInt == -1)\n\
-	{\n\
-		offset = vec4(offsetX*scale2d.x, 0.0, 0.0, 1.0);\n\
-	}\n\
-	else if(orderInt == 2)\n\
-	{\n\
-		offset = vec4(-offsetX*scale2d.x, offsetY*4.0*scale2d.y, 0.0, 1.0);\n\
-	}\n\
-	else if(orderInt == -2)\n\
-	{\n\
-		offset = vec4(offsetX*scale2d.x, offsetY*4.0*scale2d.y, 0.0, 1.0);\n\
-	}\n\
-\n\
-	gl_Position = projected + offset + vec4(aditionalOffset.x*pixelWidth, aditionalOffset.y*pixelWidth, aditionalOffset.z*pixelWidth, 0.0); \n\
-}\n\
-\n\
-\n\
-\n\
-\n\
-\n\
-\n\
-\n\
-\n\
-\n\
-\n\
-\n\
-\n\
-\n\
-\n\
-\n\
-\n\
-\n\
-\n\
-\n\
-\n\
-\n\
-\n\
-\n\
-\n\
-\n\
-\n\
-\n\
-\n\
-\n\
-\n\
-\n\
-\n\
-";
-ShaderSource.PointCloudDepthFS = "#ifdef GL_ES\n\
-precision highp float;\n\
-#endif\n\
-uniform float near;\n\
-uniform float far;\n\
-\n\
-// clipping planes.***\n\
-uniform bool bApplyClippingPlanes;\n\
-uniform int clippingPlanesCount;\n\
-uniform vec4 clippingPlanes[6];\n\
-\n\
-varying float depth;  \n\
-\n\
-vec4 packDepth(const in float depth)\n\
-{\n\
-    const vec4 bit_shift = vec4(16777216.0, 65536.0, 256.0, 1.0);\n\
-    const vec4 bit_mask  = vec4(0.0, 0.00390625, 0.00390625, 0.00390625); \n\
-    vec4 res = fract(depth * bit_shift);\n\
-    res -= res.xxyz * bit_mask;\n\
-    return res;  \n\
-}\n\
-\n\
-vec4 PackDepth32( in float depth )\n\
-{\n\
-    depth *= (16777216.0 - 1.0) / (16777216.0);\n\
-    vec4 encode = fract( depth * vec4(1.0, 256.0, 256.0*256.0, 16777216.0) );// 256.0*256.0*256.0 = 16777216.0\n\
-    return vec4( encode.xyz - encode.yzw / 256.0, encode.w ) + 1.0/512.0;\n\
-}\n\
-\n\
-void main()\n\
-{     \n\
-    gl_FragData[0] = packDepth(-depth);\n\
-	//gl_FragData[0] = PackDepth32(depth);\n\
-}";
-ShaderSource.PointCloudDepthVS = "attribute vec3 position;\n\
-uniform mat4 ModelViewProjectionMatrixRelToEye;\n\
-uniform mat4 modelViewMatrixRelToEye; \n\
-uniform vec3 buildingPosHIGH;\n\
-uniform vec3 buildingPosLOW;\n\
-uniform mat4 buildingRotMatrix;\n\
-uniform vec3 encodedCameraPositionMCHigh;\n\
-uniform vec3 encodedCameraPositionMCLow;\n\
-uniform float near;\n\
-uniform float far;\n\
-uniform bool bPositionCompressed;\n\
-uniform vec3 minPosition;\n\
-uniform vec3 bboxSize;\n\
-attribute vec4 color4;\n\
-uniform bool bUse1Color;\n\
-uniform vec4 oneColor4;\n\
-uniform float fixPointSize;\n\
-uniform float maxPointSize;\n\
-uniform float minPointSize;\n\
-uniform float pendentPointSize;\n\
-uniform bool bUseFixPointSize;\n\
-varying vec4 vColor;\n\
-//varying float glPointSize;\n\
-varying float depth;  \n\
-\n\
-void main()\n\
-{\n\
-	vec3 realPos;\n\
-	vec4 rotatedPos;\n\
-	if(bPositionCompressed)\n\
-	{\n\
-		float maxShort = 65535.0;\n\
-		realPos = vec3(float(position.x)/maxShort*bboxSize.x + minPosition.x, float(position.y)/maxShort*bboxSize.y + minPosition.y, float(position.z)/maxShort*bboxSize.z + minPosition.z);\n\
-	}\n\
-	else\n\
-	{\n\
-		realPos = position;\n\
-	}\n\
-	rotatedPos = buildingRotMatrix * vec4(realPos.xyz, 1.0);\n\
-    vec3 objPosHigh = buildingPosHIGH;\n\
-    vec3 objPosLow = buildingPosLOW.xyz + rotatedPos.xyz;\n\
-    vec3 highDifference = objPosHigh.xyz - encodedCameraPositionMCHigh.xyz;\n\
-    vec3 lowDifference = objPosLow.xyz - encodedCameraPositionMCLow.xyz;\n\
-    vec4 pos = vec4(highDifference.xyz + lowDifference.xyz, 1.0);\n\
-	\n\
-    if(bUse1Color)\n\
-	{\n\
-		vColor=oneColor4;\n\
-	}\n\
-	else\n\
-		vColor=color4;\n\
-	\n\
-    gl_Position = ModelViewProjectionMatrixRelToEye * pos;\n\
-	float z_b = gl_Position.z/gl_Position.w;\n\
-	float z_n = 2.0 * z_b - 1.0;\n\
-    float z_e = 2.0 * near * far / (far + near - z_n * (far - near));\n\
-	gl_PointSize = minPointSize + pendentPointSize/z_e; // Original.***\n\
-    if(gl_PointSize > maxPointSize)\n\
-        gl_PointSize = maxPointSize;\n\
-	if(gl_PointSize < 2.0)\n\
-		gl_PointSize = 2.0;\n\
-		\n\
-	depth = (modelViewMatrixRelToEye * pos).z/far; // original.***\n\
-}\n\
-";
-ShaderSource.PointCloudFS = "	precision lowp float;\n\
-	uniform vec4 uStrokeColor;\n\
-	varying vec4 vColor;\n\
-	varying float glPointSize;\n\
-	uniform int uPointAppereance; // square, circle, romboide,...\n\
-	uniform int uStrokeSize;\n\
-\n\
-	void main()\n\
-    {\n\
-		vec2 pt = gl_PointCoord - vec2(0.5);\n\
-		float distSquared = pt.x*pt.x+pt.y*pt.y;\n\
-		if(distSquared > 0.25)\n\
-			discard;\n\
-\n\
-		vec4 finalColor = vColor;\n\
-		float strokeDist = 0.1;\n\
-		if(glPointSize > 10.0)\n\
-		strokeDist = 0.15;\n\
-\n\
-		if(uStrokeSize > 0)\n\
-		{\n\
-			if(distSquared >= strokeDist)\n\
-			{\n\
-				finalColor = uStrokeColor;\n\
-			}\n\
-		}\n\
-		gl_FragColor = finalColor;\n\
-	}";
-ShaderSource.PointCloudSsaoFS = "#ifdef GL_ES\n\
-    precision highp float;\n\
-#endif\n\
-\n\
-uniform sampler2D depthTex;\n\
-uniform mat4 projectionMatrix;\n\
-uniform float near;\n\
-uniform float far;            \n\
-uniform float fov;\n\
-uniform float aspectRatio;    \n\
-uniform float screenWidth;    \n\
-uniform float screenHeight;    \n\
-uniform vec3 kernel[16];   \n\
-uniform vec4 oneColor4;\n\
-varying vec4 aColor4; // color from attributes\n\
-varying vec4 vColor;\n\
-varying float glPointSize;\n\
-\n\
-const int kernelSize = 16;  \n\
-uniform float radius;      \n\
-\n\
-uniform bool bApplySsao;\n\
-uniform float externalAlpha;\n\
-\n\
-float unpackDepth(const in vec4 rgba_depth)\n\
-{\n\
-    const vec4 bit_shift = vec4(0.000000059605, 0.000015258789, 0.00390625, 1.0);\n\
-    float depth = dot(rgba_depth, bit_shift);\n\
-    return depth;\n\
-}                \n\
-\n\
-vec3 getViewRay(vec2 tc)\n\
-{\n\
-    float hfar = 2.0 * tan(fov/2.0) * far;\n\
-    float wfar = hfar * aspectRatio;    \n\
-    vec3 ray = vec3(wfar * (tc.x - 0.5), hfar * (tc.y - 0.5), -far);    \n\
-    return ray;                      \n\
-}         \n\
-            \n\
-//linear view space depth\n\
-float getDepth(vec2 coord)\n\
-{\n\
-    return unpackDepth(texture2D(depthTex, coord.xy));\n\
-}    \n\
-\n\
-void main()\n\
-{\n\
-	vec2 pt = gl_PointCoord - vec2(0.5);\n\
-	if(pt.x*pt.x+pt.y*pt.y > 0.25)\n\
-		discard;\n\
-	\n\
-	float occlusion = 0.0;\n\
-	if(bApplySsao)\n\
-	{          \n\
-		vec2 screenPos = vec2(gl_FragCoord.x / screenWidth, gl_FragCoord.y / screenHeight);\n\
-		float linearDepth = getDepth(screenPos);\n\
-		vec3 origin = getViewRay(screenPos) * linearDepth;\n\
-		float radiusAux = glPointSize/1.9;\n\
-		radiusAux = 1.5;\n\
-		vec2 screenPosAdjacent;\n\
-		\n\
-		for(int j = 0; j < 1; ++j)\n\
-		{\n\
-			radiusAux = 1.5 *(float(j)+1.0);\n\
-			for(int i = 0; i < 8; ++i)\n\
-			{    	 \n\
-				if(i == 0)\n\
-					screenPosAdjacent = vec2((gl_FragCoord.x - radiusAux)/ screenWidth, (gl_FragCoord.y - radiusAux) / screenHeight);\n\
-				else if(i == 1)\n\
-					screenPosAdjacent = vec2((gl_FragCoord.x)/ screenWidth, (gl_FragCoord.y - radiusAux) / screenHeight);\n\
-				else if(i == 2)\n\
-					screenPosAdjacent = vec2((gl_FragCoord.x + radiusAux)/ screenWidth, (gl_FragCoord.y - radiusAux) / screenHeight);\n\
-				else if(i == 3)\n\
-					screenPosAdjacent = vec2((gl_FragCoord.x + radiusAux)/ screenWidth, (gl_FragCoord.y) / screenHeight);\n\
-				else if(i == 4)\n\
-					screenPosAdjacent = vec2((gl_FragCoord.x + radiusAux)/ screenWidth, (gl_FragCoord.y + radiusAux) / screenHeight);\n\
-				else if(i == 5)\n\
-					screenPosAdjacent = vec2((gl_FragCoord.x)/ screenWidth, (gl_FragCoord.y + radiusAux) / screenHeight);\n\
-				else if(i == 6)\n\
-					screenPosAdjacent = vec2((gl_FragCoord.x - radiusAux)/ screenWidth, (gl_FragCoord.y + radiusAux) / screenHeight);\n\
-				else if(i == 7)\n\
-					screenPosAdjacent = vec2((gl_FragCoord.x - radiusAux)/ screenWidth, (gl_FragCoord.y) / screenHeight);\n\
-				float depthBufferValue = getDepth(screenPosAdjacent);\n\
-				float range_check = abs(linearDepth - depthBufferValue)*far;\n\
-				if (range_check > 1.5 && depthBufferValue > linearDepth)\n\
-				{\n\
-					if (range_check < 20.0)\n\
-						occlusion +=  1.0;\n\
-				}\n\
-			}   \n\
-		}   \n\
-			\n\
-		if(occlusion > 6.0)\n\
-			occlusion = 8.0;\n\
-		//else occlusion = 0.0;\n\
-		occlusion = 1.0 - occlusion / 8.0;\n\
-	}\n\
-	else{\n\
-		occlusion = 1.0;\n\
-	}\n\
-\n\
-    vec4 finalColor;\n\
-	finalColor = vec4((vColor.xyz) * occlusion, externalAlpha);\n\
-	//finalColor = vec4(vec3(0.8, 0.8, 0.8) * occlusion, externalAlpha);\n\
-    gl_FragColor = finalColor; \n\
-}";
-ShaderSource.PointCloudSsaoFS_rainbow = "#ifdef GL_ES\n\
-    precision highp float;\n\
-#endif\n\
-\n\
-uniform sampler2D depthTex;\n\
-uniform mat4 projectionMatrix;\n\
-uniform float near;\n\
-uniform float far;            \n\
-uniform float fov;\n\
-uniform float aspectRatio;    \n\
-uniform float screenWidth;    \n\
-uniform float screenHeight;    \n\
-uniform vec3 kernel[16];   \n\
-uniform vec4 oneColor4;\n\
-uniform bool bUseColorCodingByHeight;\n\
-uniform float minHeight_rainbow;   \n\
-uniform float maxHeight_rainbow;  \n\
-varying vec4 aColor4; // color from attributes\n\
-varying vec4 vColor;\n\
-varying float glPointSize;\n\
-varying float realHeigh;\n\
-\n\
-const int kernelSize = 16;  \n\
-uniform float radius;      \n\
-\n\
-uniform bool bApplySsao;\n\
-uniform float externalAlpha;\n\
-\n\
-float unpackDepth(const in vec4 rgba_depth)\n\
-{\n\
-    const vec4 bit_shift = vec4(0.000000059605, 0.000015258789, 0.00390625, 1.0);\n\
-    float depth = dot(rgba_depth, bit_shift);\n\
-    return depth;\n\
-}                \n\
-\n\
-vec3 getViewRay(vec2 tc)\n\
-{\n\
-    float hfar = 2.0 * tan(fov/2.0) * far;\n\
-    float wfar = hfar * aspectRatio;    \n\
-    vec3 ray = vec3(wfar * (tc.x - 0.5), hfar * (tc.y - 0.5), -far);    \n\
-    return ray;                      \n\
-}         \n\
-            \n\
-//linear view space depth\n\
-float getDepth(vec2 coord)\n\
-{\n\
-    return unpackDepth(texture2D(depthTex, coord.xy));\n\
-}  \n\
-\n\
-vec3 getRainbowColor_byHeight(float height)\n\
-{\n\
-	float gray = (height - minHeight_rainbow)/(maxHeight_rainbow - minHeight_rainbow);\n\
-	if (gray > 1.0){ gray = 1.0; }\n\
-	else if (gray<0.0){ gray = 0.0; }\n\
-	\n\
-	float r, g, b;\n\
-	\n\
-	if(gray < 0.16666)\n\
-	{\n\
-		b = 0.0;\n\
-		g = gray*6.0;\n\
-		r = 1.0;\n\
-	}\n\
-	else if(gray >= 0.16666 && gray < 0.33333)\n\
-	{\n\
-		b = 0.0;\n\
-		g = 1.0;\n\
-		r = 2.0 - gray*6.0;\n\
-	}\n\
-	else if(gray >= 0.33333 && gray < 0.5)\n\
-	{\n\
-		b = -2.0 + gray*6.0;\n\
-		g = 1.0;\n\
-		r = 0.0;\n\
-	}\n\
-	else if(gray >= 0.5 && gray < 0.66666)\n\
-	{\n\
-		b = 1.0;\n\
-		g = 4.0 - gray*6.0;\n\
-		r = 0.0;\n\
-	}\n\
-	else if(gray >= 0.66666 && gray < 0.83333)\n\
-	{\n\
-		b = 1.0;\n\
-		g = 0.0;\n\
-		r = -4.0 + gray*6.0;\n\
-	}\n\
-	else if(gray >= 0.83333)\n\
-	{\n\
-		b = 6.0 - gray*6.0;\n\
-		g = 0.0;\n\
-		r = 1.0;\n\
-	}\n\
-	\n\
-	float aux = r;\n\
-	r = b;\n\
-	b = aux;\n\
-	\n\
-	//b = -gray + 1.0;\n\
-	//if (gray > 0.5)\n\
-	//{\n\
-	//	g = -gray*2.0 + 2.0; \n\
-	//}\n\
-	//else \n\
-	//{\n\
-	//	g = gray*2.0;\n\
-	//}\n\
-	//r = gray;\n\
-	vec3 resultColor = vec3(r, g, b);\n\
-    return resultColor;\n\
-}   \n\
-\n\
-void main()\n\
-{\n\
-	float occlusion = 0.0;\n\
-	if(bApplySsao)\n\
-	{          \n\
-		vec2 screenPos = vec2(gl_FragCoord.x / screenWidth, gl_FragCoord.y / screenHeight);\n\
-		float linearDepth = getDepth(screenPos);\n\
-		vec3 origin = getViewRay(screenPos) * linearDepth;\n\
-		float radiusAux = glPointSize/1.9;\n\
-		radiusAux = 1.5;\n\
-		vec2 screenPosAdjacent;\n\
-		\n\
-		for(int j = 0; j < 1; ++j)\n\
-		{\n\
-			radiusAux = 1.5 *(float(j)+1.0);\n\
-			for(int i = 0; i < 8; ++i)\n\
-			{    	 \n\
-				if(i == 0)\n\
-					screenPosAdjacent = vec2((gl_FragCoord.x - radiusAux)/ screenWidth, (gl_FragCoord.y - radiusAux) / screenHeight);\n\
-				else if(i == 1)\n\
-					screenPosAdjacent = vec2((gl_FragCoord.x)/ screenWidth, (gl_FragCoord.y - radiusAux) / screenHeight);\n\
-				else if(i == 2)\n\
-					screenPosAdjacent = vec2((gl_FragCoord.x + radiusAux)/ screenWidth, (gl_FragCoord.y - radiusAux) / screenHeight);\n\
-				else if(i == 3)\n\
-					screenPosAdjacent = vec2((gl_FragCoord.x + radiusAux)/ screenWidth, (gl_FragCoord.y) / screenHeight);\n\
-				else if(i == 4)\n\
-					screenPosAdjacent = vec2((gl_FragCoord.x + radiusAux)/ screenWidth, (gl_FragCoord.y + radiusAux) / screenHeight);\n\
-				else if(i == 5)\n\
-					screenPosAdjacent = vec2((gl_FragCoord.x)/ screenWidth, (gl_FragCoord.y + radiusAux) / screenHeight);\n\
-				else if(i == 6)\n\
-					screenPosAdjacent = vec2((gl_FragCoord.x - radiusAux)/ screenWidth, (gl_FragCoord.y + radiusAux) / screenHeight);\n\
-				else if(i == 7)\n\
-					screenPosAdjacent = vec2((gl_FragCoord.x - radiusAux)/ screenWidth, (gl_FragCoord.y) / screenHeight);\n\
-				float depthBufferValue = getDepth(screenPosAdjacent);\n\
-				float range_check = abs(linearDepth - depthBufferValue)*far;\n\
-				if (range_check > 1.5 && depthBufferValue > linearDepth)\n\
-				{\n\
-					if (range_check < 20.0)\n\
-						occlusion +=  1.0;\n\
-				}\n\
-			}   \n\
-		}   \n\
-			\n\
-		if(occlusion > 6.0)\n\
-			occlusion = 8.0;\n\
-		//else occlusion = 0.0;\n\
-		occlusion = 1.0 - occlusion / 8.0;\n\
-	}\n\
-	else{\n\
-		occlusion = 1.0;\n\
-	}\n\
-\n\
-    vec4 finalColor;\n\
-	if(bUseColorCodingByHeight)\n\
-	{\n\
-		float rainbow = 0.5;\n\
-		float texCol = 0.5;\n\
-		vec3 rainbowColor3 = getRainbowColor_byHeight(realHeigh);\n\
-		vec3 blendedColor3 = vec3(vColor.x * texCol + rainbowColor3.r * rainbow, vColor.y * texCol + rainbowColor3.g * rainbow, vColor.z * texCol + rainbowColor3.b * rainbow);\n\
-		finalColor = vec4(blendedColor3 * occlusion, externalAlpha);\n\
-	}\n\
-	else\n\
-		finalColor = vec4((vColor.xyz) * occlusion, externalAlpha);\n\
-	//finalColor = vec4(vec3(0.8, 0.8, 0.8) * occlusion, externalAlpha);\n\
-    gl_FragColor = finalColor; \n\
-}\n\
-\n\
-\n\
-\n\
-\n\
-\n\
-\n\
-\n\
-\n\
-\n\
-\n\
-\n\
-\n\
-\n\
-\n\
-\n\
-\n\
-\n\
-";
-ShaderSource.PointCloudVS = "attribute vec3 position;\n\
-attribute vec3 normal;\n\
-attribute vec2 texCoord;\n\
-attribute vec4 color4;\n\
-uniform mat4 ModelViewProjectionMatrixRelToEye;\n\
-uniform vec3 buildingPosHIGH;\n\
-uniform vec3 buildingPosLOW;\n\
-uniform mat4 buildingRotMatrix;\n\
-uniform vec3 encodedCameraPositionMCHigh;\n\
-uniform vec3 encodedCameraPositionMCLow;\n\
-uniform float near;\n\
-uniform float far;\n\
-uniform bool bPositionCompressed;\n\
-uniform vec3 minPosition;\n\
-uniform vec3 bboxSize;\n\
-uniform bool bUse1Color;\n\
-uniform vec4 oneColor4;\n\
-uniform float fixPointSize;\n\
-uniform float maxPointSize;\n\
-uniform float minPointSize;\n\
-uniform float pendentPointSize;\n\
-uniform bool bUseFixPointSize;\n\
-uniform bool bUseColorCodingByHeight;\n\
-uniform bool bUseLogarithmicDepth;\n\
-varying vec4 vColor;\n\
-varying float glPointSize;\n\
-\n\
-void main()\n\
-{\n\
-	vec3 realPos;\n\
-	vec4 rotatedPos;\n\
-	if(bPositionCompressed)\n\
-	{\n\
-		float maxShort = 65535.0;\n\
-		realPos = vec3(float(position.x)/maxShort*bboxSize.x + minPosition.x, float(position.y)/maxShort*bboxSize.y + minPosition.y, float(position.z)/maxShort*bboxSize.z + minPosition.z);\n\
-	}\n\
-	else\n\
-	{\n\
-		realPos = position;\n\
-	}\n\
-	rotatedPos = buildingRotMatrix * vec4(realPos.xyz, 1.0);\n\
-    vec3 objPosHigh = buildingPosHIGH;\n\
-    vec3 objPosLow = buildingPosLOW.xyz + rotatedPos.xyz;\n\
-    vec3 highDifference = objPosHigh.xyz - encodedCameraPositionMCHigh.xyz;\n\
-    vec3 lowDifference = objPosLow.xyz - encodedCameraPositionMCLow.xyz;\n\
-    vec4 pos = vec4(highDifference.xyz + lowDifference.xyz, 1.0);\n\
-	\n\
-    if(bUse1Color)\n\
-	{\n\
-		vColor=oneColor4;\n\
-	}\n\
-	else\n\
-		vColor=color4;\n\
-	\n\
-    gl_Position = ModelViewProjectionMatrixRelToEye * pos;\n\
-\n\
-	if(bUseLogarithmicDepth)\n\
-	{\n\
-		// logarithmic zBuffer:\n\
-		// https://www.gamasutra.com/blogs/BranoKemen/20090812/85207/Logarithmic_Depth_Buffer.php\n\
-		// z = log(C*z + 1) / log(C*Far + 1) * w\n\
-		float z = gl_Position.z;\n\
-		//float C = 1.0;\n\
-		float w = gl_Position.w;\n\
-		////gl_Position.z = log(C*z + 1.0) / log(C*far + 1.0) * w;\n\
-		gl_Position.z = log(z/near) / log(far/near)*w; // another way.\n\
-	}\n\
-\n\
-	if(bUseFixPointSize)\n\
-	{\n\
-		gl_PointSize = fixPointSize;\n\
-	}\n\
-	else{\n\
-		float z_b = gl_Position.z/gl_Position.w;\n\
-		float z_n = 2.0 * z_b - 1.0;\n\
-		float z_e = 2.0 * near * far / (far + near - z_n * (far - near));\n\
-		gl_PointSize = minPointSize + pendentPointSize/z_e; // Original.***\n\
-		if(gl_PointSize > maxPointSize)\n\
-			gl_PointSize = maxPointSize;\n\
-		if(gl_PointSize < 2.0)\n\
-			gl_PointSize = 2.0;\n\
-	}\n\
-	glPointSize = gl_PointSize;\n\
-}";
-ShaderSource.PointCloudVS_rainbow = "attribute vec3 position;\n\
-attribute vec3 normal;\n\
-attribute vec2 texCoord;\n\
-attribute vec4 color4;\n\
-uniform mat4 ModelViewProjectionMatrixRelToEye;\n\
-uniform vec3 buildingPosHIGH;\n\
-uniform vec3 buildingPosLOW;\n\
-uniform mat4 buildingRotMatrix;\n\
-uniform vec3 encodedCameraPositionMCHigh;\n\
-uniform vec3 encodedCameraPositionMCLow;\n\
-uniform float near;\n\
-uniform float far;\n\
-uniform bool bPositionCompressed;\n\
-uniform vec3 minPosition;\n\
-uniform vec3 bboxSize;\n\
-uniform bool bUse1Color;\n\
-uniform vec4 oneColor4;\n\
-uniform float fixPointSize;\n\
-uniform float maxPointSize;\n\
-uniform float minPointSize;\n\
-uniform float pendentPointSize;\n\
-uniform bool bUseFixPointSize;\n\
-varying vec4 vColor;\n\
-varying float glPointSize;\n\
-varying float realHeigh;\n\
-\n\
-void main()\n\
-{\n\
-	vec3 realPos;\n\
-	vec4 rotatedPos;\n\
-	if(bPositionCompressed)\n\
-	{\n\
-		float maxShort = 65535.0;\n\
-		realPos = vec3(float(position.x)/maxShort*bboxSize.x + minPosition.x, float(position.y)/maxShort*bboxSize.y + minPosition.y, float(position.z)/maxShort*bboxSize.z + minPosition.z);\n\
-	}\n\
-	else\n\
-	{\n\
-		realPos = position;\n\
-	}\n\
-	realHeigh = realPos.z;\n\
-	rotatedPos = buildingRotMatrix * vec4(realPos.xyz, 1.0);\n\
-    vec3 objPosHigh = buildingPosHIGH;\n\
-    vec3 objPosLow = buildingPosLOW.xyz + rotatedPos.xyz;\n\
-    vec3 highDifference = objPosHigh.xyz - encodedCameraPositionMCHigh.xyz;\n\
-    vec3 lowDifference = objPosLow.xyz - encodedCameraPositionMCLow.xyz;\n\
-    vec4 pos = vec4(highDifference.xyz + lowDifference.xyz, 1.0);\n\
-	\n\
-    if(bUse1Color)\n\
-	{\n\
-		vColor=oneColor4;\n\
-	}\n\
-	else\n\
-		vColor=color4;\n\
-	\n\
-    gl_Position = ModelViewProjectionMatrixRelToEye * pos;\n\
-	float z_b = gl_Position.z/gl_Position.w;\n\
-	float z_n = 2.0 * z_b - 1.0;\n\
-    float z_e = 2.0 * near * far / (far + near - z_n * (far - near));\n\
-    gl_PointSize = minPointSize + pendentPointSize/z_e; // Original.***\n\
-    if(gl_PointSize > maxPointSize)\n\
-        gl_PointSize = maxPointSize;\n\
-    if(gl_PointSize < 2.0)\n\
-        gl_PointSize = 2.0;\n\
-        \n\
-    glPointSize = gl_PointSize;\n\
-}\n\
-";
-ShaderSource.quad_vert = "precision mediump float;\n\
-\n\
-attribute vec2 a_pos;\n\
-\n\
-varying vec2 v_tex_pos;\n\
-\n\
-void main() {\n\
-    v_tex_pos = a_pos;\n\
-    gl_Position = vec4(1.0 - 2.0 * a_pos, 0, 1);\n\
-}\n\
-";
-ShaderSource.RenderShowDepthFS = "#ifdef GL_ES\n\
-precision highp float;\n\
-#endif\n\
-uniform float near;\n\
-uniform float far;\n\
-\n\
-// clipping planes.***\n\
-uniform bool bApplyClippingPlanes;\n\
-uniform int clippingPlanesCount;\n\
-uniform vec4 clippingPlanes[6];\n\
-\n\
-varying float depth;  \n\
-varying vec3 vertexPos;\n\
-\n\
-vec4 packDepth(const in float depth)\n\
-{\n\
-    const vec4 bit_shift = vec4(16777216.0, 65536.0, 256.0, 1.0); // original.***\n\
-    const vec4 bit_mask  = vec4(0.0, 0.00390625, 0.00390625, 0.00390625);  // original.*** \n\
-	\n\
-    //vec4 res = fract(depth * bit_shift); // Is not precise.\n\
-	vec4 res = mod(depth * bit_shift * vec4(255), vec4(256) ) / vec4(255); // Is better.\n\
-    res -= res.xxyz * bit_mask;\n\
-    return res;  \n\
-}\n\
-\n\
-\n\
-//vec4 PackDepth32( in float depth )\n\
-//{\n\
-//    depth *= (16777216.0 - 1.0) / (16777216.0);\n\
-//    vec4 encode = fract( depth * vec4(1.0, 256.0, 256.0*256.0, 16777216.0) );// 256.0*256.0*256.0 = 16777216.0\n\
-//    return vec4( encode.xyz - encode.yzw / 256.0, encode.w ) + 1.0/512.0;\n\
-//}\n\
-\n\
-bool clipVertexByPlane(in vec4 plane, in vec3 point)\n\
-{\n\
-	float dist = plane.x * point.x + plane.y * point.y + plane.z * point.z + plane.w;\n\
-	\n\
-	if(dist < 0.0)\n\
-	return true;\n\
-	else return false;\n\
-}\n\
-\n\
-void main()\n\
-{     \n\
-	// 1rst, check if there are clipping planes.\n\
-	if(bApplyClippingPlanes)\n\
-	{\n\
-		bool discardFrag = true;\n\
-		for(int i=0; i<6; i++)\n\
-		{\n\
-			vec4 plane = clippingPlanes[i];\n\
-			if(!clipVertexByPlane(plane, vertexPos))\n\
-			{\n\
-				discardFrag = false;\n\
-				break;\n\
-			}\n\
-			if(i >= clippingPlanesCount)\n\
-			break;\n\
-		}\n\
-		\n\
-		if(discardFrag)\n\
-		discard;\n\
-	}\n\
-	\n\
-    gl_FragData[0] = packDepth(-depth);\n\
-	//gl_FragData[0] = PackDepth32(depth);\n\
-}";
-ShaderSource.RenderShowDepthVS = "attribute vec3 position;\n\
-\n\
-uniform mat4 buildingRotMatrix; \n\
-uniform mat4 modelViewMatrix;\n\
-uniform mat4 modelViewMatrixRelToEye; \n\
-uniform mat4 RefTransfMatrix;\n\
-uniform mat4 ModelViewProjectionMatrixRelToEye;\n\
-uniform vec3 buildingPosHIGH;\n\
-uniform vec3 buildingPosLOW;\n\
-uniform vec3 scaleLC;\n\
-uniform vec3 encodedCameraPositionMCHigh;\n\
-uniform vec3 encodedCameraPositionMCLow;\n\
-uniform float near;\n\
-uniform float far;\n\
-uniform vec3 aditionalPosition;\n\
-uniform vec3 refTranslationVec;\n\
-uniform int refMatrixType; // 0= identity, 1= translate, 2= transform\n\
-\n\
-varying float depth;\n\
-varying vec3 vertexPos;\n\
-  \n\
-void main()\n\
-{	\n\
-	vec4 scaledPos = vec4(position.x * scaleLC.x, position.y * scaleLC.y, position.z * scaleLC.z, 1.0);\n\
-	vec4 rotatedPos;\n\
-\n\
-	if(refMatrixType == 0)\n\
-	{\n\
-		rotatedPos = buildingRotMatrix * vec4(scaledPos.xyz, 1.0) + vec4(aditionalPosition.xyz, 0.0);\n\
-	}\n\
-	else if(refMatrixType == 1)\n\
-	{\n\
-		rotatedPos = buildingRotMatrix * vec4(scaledPos.xyz + refTranslationVec.xyz, 1.0) + vec4(aditionalPosition.xyz, 0.0);\n\
-	}\n\
-	else if(refMatrixType == 2)\n\
-	{\n\
-		rotatedPos = RefTransfMatrix * vec4(scaledPos.xyz, 1.0) + vec4(aditionalPosition.xyz, 0.0);\n\
-	}\n\
-\n\
-    vec3 objPosHigh = buildingPosHIGH;\n\
-    vec3 objPosLow = buildingPosLOW.xyz + rotatedPos.xyz;\n\
-    vec3 highDifference = objPosHigh.xyz - encodedCameraPositionMCHigh.xyz;\n\
-    vec3 lowDifference = objPosLow.xyz - encodedCameraPositionMCLow.xyz;\n\
-    vec4 pos4 = vec4(highDifference.xyz + lowDifference.xyz, 1.0);\n\
-    \n\
-    //linear depth in camera space (0..far)\n\
-	vec4 posCC = modelViewMatrixRelToEye * pos4;\n\
-    depth = posCC.z/far; // original.***\n\
-	//depth = posCC.z/(far-near); // test.***\n\
-	//float farForDepth = 30000.0;\n\
-	//depth = posCC.z/farForDepth; // test.***\n\
-\n\
-    gl_Position = ModelViewProjectionMatrixRelToEye * pos4;\n\
-	vertexPos = posCC.xyz;\n\
-}";
-ShaderSource.ScreenQuadFS = "#ifdef GL_ES\n\
-    precision highp float;\n\
-#endif\n\
-\n\
-uniform sampler2D depthTex;\n\
-uniform sampler2D shadowMapTex;\n\
-uniform sampler2D shadowMapTex2;\n\
-uniform mat4 modelViewMatrix;\n\
-uniform mat4 modelViewMatrixRelToEye; \n\
-uniform mat4 modelViewMatrixInv;\n\
-uniform mat4 modelViewProjectionMatrixInv;\n\
-uniform mat4 modelViewMatrixRelToEyeInv;\n\
-uniform mat4 projectionMatrix;\n\
-uniform mat4 projectionMatrixInv;\n\
-uniform vec3 encodedCameraPositionMCHigh;\n\
-uniform vec3 encodedCameraPositionMCLow;\n\
-uniform bool bApplyShadow;\n\
-uniform bool bSilhouette;\n\
-uniform mat4 sunMatrix[2]; \n\
-uniform vec3 sunPosHIGH[2];\n\
-uniform vec3 sunPosLOW[2];\n\
-uniform int sunIdx;\n\
-uniform float screenWidth;    \n\
-uniform float screenHeight;   \n\
-uniform float near;\n\
-uniform float far;\n\
-uniform float fov;\n\
-uniform float tangentOfHalfFovy;\n\
-uniform float aspectRatio;\n\
-varying vec4 vColor; \n\
-\n\
-float unpackDepth(vec4 packedDepth)\n\
-{\n\
-	// See Aras Pranckevičius' post Encoding Floats to RGBA\n\
-	// http://aras-p.info/blog/2009/07/30/encoding-floats-to-rgba-the-final/\n\
-	return dot(packedDepth, vec4(1.0, 1.0 / 255.0, 1.0 / 65025.0, 1.0 / 16581375.0));\n\
-}\n\
-\n\
-float unpackDepthMago(const in vec4 rgba_depth)\n\
-{\n\
-    const vec4 bit_shift = vec4(0.000000059605, 0.000015258789, 0.00390625, 1.0);// original.***\n\
-    float depth = dot(rgba_depth, bit_shift);\n\
-    return depth;\n\
-} \n\
-\n\
-float UnpackDepth32( in vec4 pack )\n\
-{\n\
-	float depth = dot( pack, vec4(1.0, 0.00390625, 0.000015258789, 0.000000059605) );\n\
-    return depth * 1.000000059605;// 1.000000059605 = (16777216.0) / (16777216.0 - 1.0);\n\
-}  \n\
-\n\
-float getDepthShadowMap(vec2 coord)\n\
-{\n\
-	// currSunIdx\n\
-	if(sunIdx == 0)\n\
-	{\n\
-		return UnpackDepth32(texture2D(shadowMapTex, coord.xy));\n\
-	}\n\
-    else if(sunIdx ==1)\n\
-	{\n\
-		return UnpackDepth32(texture2D(shadowMapTex2, coord.xy));\n\
-	}\n\
-	else\n\
-		return -1.0;\n\
-}\n\
-\n\
-bool isInShadow(vec4 pointWC, int currSunIdx)\n\
-{\n\
-	bool inShadow = false;\n\
-	vec3 currSunPosLOW;\n\
-	vec3 currSunPosHIGH;\n\
-	mat4 currSunMatrix;\n\
-	if(currSunIdx == 0)\n\
-	{\n\
-		currSunPosLOW = sunPosLOW[0];\n\
-		currSunPosHIGH = sunPosHIGH[0];\n\
-		currSunMatrix = sunMatrix[0];\n\
-	}\n\
-	else if(currSunIdx == 1)\n\
-	{\n\
-		currSunPosLOW = sunPosLOW[1];\n\
-		currSunPosHIGH = sunPosHIGH[1];\n\
-		currSunMatrix = sunMatrix[1];\n\
-	}\n\
-	else\n\
-	return false;\n\
-	\n\
-		\n\
-	vec3 highDifferenceSun = pointWC.xyz -currSunPosHIGH.xyz;\n\
-	vec3 lowDifferenceSun = -currSunPosLOW.xyz;\n\
-	vec4 pos4Sun = vec4(highDifferenceSun.xyz + lowDifferenceSun.xyz, 1.0);\n\
-	vec4 vPosRelToLight = currSunMatrix * pos4Sun;\n\
-\n\
-	vec3 posRelToLight = vPosRelToLight.xyz / vPosRelToLight.w;\n\
-	float tolerance = 0.9963;\n\
-	posRelToLight = posRelToLight * 0.5 + 0.5; // transform to [0,1] range\n\
-	if(posRelToLight.x >= 0.0 && posRelToLight.x <= 1.0)\n\
-	{\n\
-		if(posRelToLight.y >= 0.0 && posRelToLight.y <= 1.0)\n\
-		{\n\
-			float depthRelToLight;\n\
-			if(currSunIdx == 0)\n\
-			{depthRelToLight = UnpackDepth32(texture2D(shadowMapTex, posRelToLight.xy));}\n\
-			else if(currSunIdx == 1)\n\
-			{depthRelToLight = UnpackDepth32(texture2D(shadowMapTex2, posRelToLight.xy));}\n\
-			if(posRelToLight.z > depthRelToLight*tolerance )\n\
-			{\n\
-				inShadow = true;\n\
-			}\n\
-		}\n\
-	}\n\
-	\n\
-	return inShadow;\n\
-}\n\
-\n\
-void main()\n\
-{\n\
-	// 1rst, check if this is silhouette rendering.\n\
-	if(bSilhouette)\n\
-	{\n\
-		// Check the adjacent pixels to decide if this is silhouette.\n\
-		// Analize a 5x5 rectangle of the depthTexture: if there are objectDepth & backgroundDepth => is silhouette.\n\
-		float pixelSizeW = 1.0/screenWidth;\n\
-		float pixelSizeH = 1.0/screenHeight;\n\
-		int objectDepthCount = 0;\n\
-		int backgroundDepthCount = 0;\n\
-		float tolerance = 0.9963;\n\
-		tolerance = 0.9963;\n\
-		\n\
-		vec2 screenPos = vec2(gl_FragCoord.x / screenWidth, gl_FragCoord.y / screenHeight); // centerPos.\n\
-		vec2 screenPos_LD = vec2(screenPos.x - pixelSizeW*1.5, screenPos.y - pixelSizeH*1.5); // left-down corner.\n\
-		\n\
-		for(int w = 0; w<3; w++)\n\
-		{\n\
-			for(int h=0; h<3; h++)\n\
-			{\n\
-				vec2 screenPosAux = vec2(screenPos_LD.x + pixelSizeW*float(w), screenPos_LD.y + pixelSizeH*float(h));\n\
-				float z_window  = unpackDepthMago(texture2D(depthTex, screenPosAux.xy)); // z_window  is [0.0, 1.0] range depth.\n\
-\n\
-				if(z_window > tolerance)\n\
-				{\n\
-					// is background.\n\
-					backgroundDepthCount += 1;\n\
-				}\n\
-				else\n\
-				{\n\
-					// is object.\n\
-					objectDepthCount += 1;\n\
-				}\n\
-\n\
-				if(backgroundDepthCount > 0 && objectDepthCount > 0)\n\
-				{\n\
-					// is silhouette.\n\
-					gl_FragColor = vec4(0.2, 1.0, 0.3, 1.0);\n\
-					return;\n\
-				}\n\
-				\n\
-			}\n\
-		}\n\
-		\n\
-		return;\n\
-	}\n\
-	\n\
-	float shadow_occlusion = 1.0;\n\
-	float alpha = 0.0;\n\
-	vec4 finalColor;\n\
-	finalColor = vec4(0.2, 0.2, 0.2, 0.8);\n\
-	if(bApplyShadow)\n\
-	{\n\
-		// the sun lights count are 2.\n\
-		// 1rst, calculate the pixelPosWC.\n\
-		vec2 screenPos = vec2(gl_FragCoord.x / screenWidth, gl_FragCoord.y / screenHeight);\n\
-		float z_window  = unpackDepth(texture2D(depthTex, screenPos.xy)); // z_window  is [0.0, 1.0] range depth.\n\
-		if(z_window < 0.001)\n\
-		discard;\n\
-		\n\
-		// https://stackoverflow.com/questions/11277501/how-to-recover-view-space-position-given-view-space-depth-value-and-ndc-xy\n\
-		float depthRange_near = 0.0;\n\
-		float depthRange_far = 1.0;\n\
-		float x_ndc = 2.0 * screenPos.x - 1.0;\n\
-		float y_ndc = 2.0 * screenPos.y - 1.0;\n\
-		float z_ndc = (2.0 * z_window - depthRange_near - depthRange_far) / (depthRange_far - depthRange_near);\n\
-		\n\
-		vec4 viewPosH = projectionMatrixInv * vec4(x_ndc, y_ndc, z_ndc, 1.0);\n\
-		vec3 posCC = viewPosH.xyz/viewPosH.w;\n\
-		vec4 posWC = modelViewMatrixRelToEyeInv * vec4(posCC.xyz, 1.0) + vec4((encodedCameraPositionMCHigh + encodedCameraPositionMCLow).xyz, 1.0);\n\
-		//----------------------------------------------------------------\n\
-	\n\
-		// 2nd, calculate the vertex relative to light.***\n\
-		// 1rst, try with the closest sun. sunIdx = 0.\n\
-		bool pointIsinShadow = isInShadow(posWC, 0);\n\
-		if(!pointIsinShadow)\n\
-		{\n\
-			pointIsinShadow = isInShadow(posWC, 1);\n\
-		}\n\
-\n\
-		if(pointIsinShadow)\n\
-		{\n\
-			shadow_occlusion = 0.5;\n\
-			alpha = 0.5;\n\
-		}\n\
-		\n\
-	}\n\
-    gl_FragColor = vec4(finalColor.rgb*shadow_occlusion, alpha);\n\
-}";
-ShaderSource.ScreenQuadVS = "precision mediump float;\n\
-\n\
-attribute vec2 position;\n\
-varying vec4 vColor; \n\
-\n\
-void main() {\n\
-	vColor = vec4(0.2, 0.2, 0.2, 0.5);\n\
-    gl_Position = vec4(1.0 - 2.0 * position, 0.0, 1.0);\n\
-}";
-ShaderSource.screen_frag = "precision mediump float;\n\
-\n\
-uniform sampler2D u_screen;\n\
-uniform float u_opacity;\n\
-\n\
-varying vec2 v_tex_pos;\n\
-\n\
-void main() {\n\
-    vec4 color = texture2D(u_screen, 1.0 - v_tex_pos);\n\
-    // a hack to guarantee opacity fade out even with a value close to 1.0\n\
-    gl_FragColor = vec4(floor(255.0 * color * u_opacity) / 255.0);\n\
-}\n\
-";
-ShaderSource.SilhouetteFS = "precision highp float;\n\
-uniform vec4 vColor4Aux;\n\
-\n\
-void main()\n\
-{          \n\
-    gl_FragColor = vColor4Aux;\n\
-}";
-ShaderSource.SilhouetteVS = "attribute vec3 position;\n\
-\n\
-uniform mat4 buildingRotMatrix; \n\
-uniform mat4 ModelViewProjectionMatrixRelToEye;\n\
-uniform mat4 ModelViewMatrixRelToEye;\n\
-uniform mat4 ProjectionMatrix;\n\
-uniform mat4 RefTransfMatrix;\n\
-uniform vec3 buildingPosHIGH;\n\
-uniform vec3 buildingPosLOW;\n\
-uniform vec3 encodedCameraPositionMCHigh;\n\
-uniform vec3 encodedCameraPositionMCLow;\n\
-uniform vec3 aditionalPosition;\n\
-uniform vec3 refTranslationVec;\n\
-uniform int refMatrixType; // 0= identity, 1= translate, 2= transform\n\
-uniform vec2 camSpacePixelTranslation;\n\
-uniform vec2 screenSize;   \n\
-varying vec2 camSpaceTranslation;\n\
-\n\
-void main()\n\
-{    \n\
-    vec4 rotatedPos;\n\
-	if(refMatrixType == 0)\n\
-	{\n\
-		rotatedPos = buildingRotMatrix * vec4(position.xyz, 1.0) + vec4(aditionalPosition.xyz, 0.0);\n\
-	}\n\
-	else if(refMatrixType == 1)\n\
-	{\n\
-		rotatedPos = buildingRotMatrix * vec4(position.xyz + refTranslationVec.xyz, 1.0) + vec4(aditionalPosition.xyz, 0.0);\n\
-	}\n\
-	else if(refMatrixType == 2)\n\
-	{\n\
-		rotatedPos = RefTransfMatrix * vec4(position.xyz, 1.0) + vec4(aditionalPosition.xyz, 0.0);\n\
-	}\n\
-\n\
-    vec3 objPosHigh = buildingPosHIGH;\n\
-    vec3 objPosLow = buildingPosLOW.xyz + rotatedPos.xyz;\n\
-    vec3 highDifference = objPosHigh.xyz - encodedCameraPositionMCHigh.xyz;\n\
-    vec3 lowDifference = objPosLow.xyz - encodedCameraPositionMCLow.xyz;\n\
-    vec4 pos4 = vec4(highDifference.xyz + lowDifference.xyz, 1.0);\n\
-    vec4 camSpacePos = ModelViewMatrixRelToEye * pos4;\n\
-    vec4 translationVec = ProjectionMatrix * vec4(camSpacePixelTranslation.x*(-camSpacePos.z), camSpacePixelTranslation.y*(-camSpacePos.z), 0.0, 1.0);\n\
-\n\
-    gl_Position = ModelViewProjectionMatrixRelToEye * pos4;\n\
-    gl_Position += translationVec;  \n\
-}";
-ShaderSource.StandardFS = "precision lowp float;\n\
-varying vec3 vColor;\n\
-\n\
-void main()\n\
-{\n\
-    gl_FragColor = vec4(vColor, 1.);\n\
-}";
-ShaderSource.StandardVS = "attribute vec3 position;\n\
-uniform mat4 ModelViewProjectionMatrixRelToEye;\n\
-uniform vec3 buildingPosHIGH;\n\
-uniform vec3 buildingPosLOW;\n\
-uniform vec3 encodedCameraPositionMCHigh;\n\
-uniform vec3 encodedCameraPositionMCLow;\n\
-uniform mat4 RefTransfMatrix;\n\
-attribute vec3 color;\n\
-varying vec3 vColor;\n\
-\n\
-void main()\n\
-{\n\
-    vec4 rotatedPos = RefTransfMatrix * vec4(position.xyz, 1.0);\n\
-    vec3 objPosHigh = buildingPosHIGH;\n\
-    vec3 objPosLow = buildingPosLOW.xyz + rotatedPos.xyz;\n\
-    vec3 highDifference = objPosHigh.xyz - encodedCameraPositionMCHigh.xyz;\n\
-    vec3 lowDifference = objPosLow.xyz - encodedCameraPositionMCLow.xyz;\n\
-    vec4 pos = vec4(highDifference.xyz + lowDifference.xyz, 1.0);\n\
- \n\
-    vColor=color;\n\
-\n\
-    gl_Position = ModelViewProjectionMatrixRelToEye * pos;\n\
-}";
-ShaderSource.Test_QuadFS = "#ifdef GL_ES\n\
-    precision highp float;\n\
-#endif\n\
- \n\
-uniform sampler2D diffuseTex;  \n\
-varying vec2 vTexCoord; \n\
-void main()\n\
-{          \n\
-    vec4 textureColor = texture2D(diffuseTex, vec2(vTexCoord.s, vTexCoord.t));\n\
-    gl_FragColor = textureColor; \n\
-}\n\
-";
-ShaderSource.Test_QuadVS = "attribute vec3 position;\n\
-attribute vec2 texCoord;\n\
-\n\
-uniform sampler2D diffuseTex;\n\
-uniform mat4 projectionMatrix;  \n\
-uniform mat4 modelViewMatrix;\n\
-uniform mat4 modelViewMatrixRelToEye; \n\
-uniform mat4 ModelViewProjectionMatrixRelToEye;\n\
-uniform mat4 normalMatrix4;\n\
-uniform mat4 buildingRotMatrix;  \n\
-uniform vec3 buildingPosHIGH;\n\
-uniform vec3 buildingPosLOW;\n\
-uniform vec3 encodedCameraPositionMCHigh;\n\
-uniform vec3 encodedCameraPositionMCLow;\n\
-\n\
-varying vec3 vNormal;\n\
-varying vec2 vTexCoord;   \n\
-\n\
-void main()\n\
-{	\n\
-    vec4 rotatedPos = buildingRotMatrix * vec4(position.xyz, 1.0);\n\
-    vec3 objPosHigh = buildingPosHIGH;\n\
-    vec3 objPosLow = buildingPosLOW.xyz + rotatedPos.xyz;\n\
-    vec3 highDifference = objPosHigh.xyz - encodedCameraPositionMCHigh.xyz;\n\
-    vec3 lowDifference = objPosLow.xyz - encodedCameraPositionMCLow.xyz;\n\
-    vec4 pos4 = vec4(highDifference.xyz + lowDifference.xyz, 1.0);\n\
-	\n\
-    vTexCoord = texCoord;\n\
-\n\
-    gl_Position = ModelViewProjectionMatrixRelToEye * pos4;\n\
-}\n\
-";
-ShaderSource.TextureA1FS = "precision mediump float;\n\
-varying vec4 vColor;\n\
-varying vec2 vTextureCoord;\n\
-uniform sampler2D uSampler;\n\
-\n\
-void main()\n\
-{\n\
-    gl_FragColor = texture2D(uSampler, vec2(vTextureCoord.s, vTextureCoord.t));\n\
-}\n\
-";
-ShaderSource.TextureA1VS = "attribute vec3 position;\n\
-attribute vec4 aVertexColor;\n\
-attribute vec2 aTextureCoord;\n\
-uniform mat4 ModelViewProjectionMatrixRelToEye;\n\
-uniform vec3 buildingPosHIGH;\n\
-uniform vec3 buildingPosLOW;\n\
-uniform vec3 encodedCameraPositionMCHigh;\n\
-uniform vec3 encodedCameraPositionMCLow;\n\
-varying vec4 vColor;\n\
-varying vec2 vTextureCoord;\n\
-\n\
-void main()\n\
-{\n\
-    vec3 objPosHigh = buildingPosHIGH;\n\
-    vec3 objPosLow = buildingPosLOW.xyz + position.xyz;\n\
-    vec3 highDifference = objPosHigh.xyz - encodedCameraPositionMCHigh.xyz;\n\
-    vec3 lowDifference = objPosLow.xyz - encodedCameraPositionMCLow.xyz;\n\
-    vec4 pos = vec4(highDifference.xyz + lowDifference.xyz, 1.0);\n\
- \n\
-    vColor=aVertexColor;\n\
-    vTextureCoord = aTextureCoord;\n\
-\n\
-    gl_Position = ModelViewProjectionMatrixRelToEye * pos;\n\
-}";
-ShaderSource.TextureFS = "precision mediump float;\n\
-varying vec4 vColor;\n\
-varying vec2 vTextureCoord;\n\
-uniform sampler2D uSampler;\n\
-\n\
-void main()\n\
-{\n\
-    gl_FragColor = texture2D(uSampler, vec2(vTextureCoord.s, vTextureCoord.t));\n\
-}";
-ShaderSource.TextureNormalFS = "	precision mediump float;\n\
-	varying vec4 vColor;\n\
-	varying vec2 vTextureCoord;\n\
-	uniform sampler2D uSampler;\n\
-	varying vec3 vLightWeighting;\n\
-\n\
-	void main()\n\
-    {\n\
-		vec4 textureColor = texture2D(uSampler, vec2(vTextureCoord.s, vTextureCoord.t));\n\
-        \n\
-		gl_FragColor = vec4(textureColor.rgb * vLightWeighting, textureColor.a);\n\
-	}\n\
-";
-ShaderSource.TextureNormalVS = "attribute vec3 position;\n\
-attribute vec4 aVertexColor;\n\
-attribute vec2 aTextureCoord;\n\
-uniform mat4 ModelViewProjectionMatrixRelToEye;\n\
-uniform vec3 buildingPosHIGH;\n\
-uniform vec3 buildingPosLOW;\n\
-uniform vec3 encodedCameraPositionMCHigh;\n\
-uniform vec3 encodedCameraPositionMCLow;\n\
-varying vec4 vColor;\n\
-varying vec2 vTextureCoord;\n\
-attribute vec3 aVertexNormal;\n\
-varying vec3 uAmbientColor;\n\
-varying vec3 vLightWeighting;\n\
-uniform mat3 uNMatrix;\n\
-\n\
-void main()\n\
-{\n\
-    vec3 objPosHigh = buildingPosHIGH;\n\
-    vec3 objPosLow = buildingPosLOW.xyz + position.xyz;\n\
-    vec3 highDifference = objPosHigh.xyz - encodedCameraPositionMCHigh.xyz;\n\
-    vec3 lowDifference = objPosLow.xyz - encodedCameraPositionMCLow.xyz;\n\
-    vec4 pos = vec4(highDifference.xyz + lowDifference.xyz, 1.0);\n\
-    \n\
-    vColor = aVertexColor;\n\
-    vTextureCoord = aTextureCoord;\n\
-    \n\
-    vLightWeighting = vec3(1.0, 1.0, 1.0);\n\
-    uAmbientColor = vec3(0.7, 0.7, 0.7);\n\
-    vec3 uLightingDirection = vec3(0.8, 0.2, -0.9);\n\
-    vec3 directionalLightColor = vec3(0.4, 0.4, 0.4);\n\
-    vec3 transformedNormal = uNMatrix * aVertexNormal;\n\
-    float directionalLightWeighting = max(dot(transformedNormal, uLightingDirection), 0.0);\n\
-    vLightWeighting = uAmbientColor + directionalLightColor * directionalLightWeighting;\n\
-\n\
-    gl_Position = ModelViewProjectionMatrixRelToEye * pos;\n\
-}\n\
-";
-ShaderSource.texturesMergerFS = "#ifdef GL_ES\n\
-    precision highp float;\n\
-#endif\n\
-\n\
-uniform sampler2D texture_0;  \n\
-uniform sampler2D texture_1;\n\
-uniform sampler2D texture_2;\n\
-uniform sampler2D texture_3;\n\
-uniform sampler2D texture_4;\n\
-uniform sampler2D texture_5;\n\
-uniform sampler2D texture_6;\n\
-uniform sampler2D texture_7;\n\
-\n\
-uniform float externalAlphasArray[8];\n\
-uniform int uActiveTextures[8];\n\
-\n\
-varying vec2 v_tex_pos;\n\
-\n\
-//vec4 mixColor(sampler2D tex)\n\
-\n\
-void main()\n\
-{           \n\
-    vec2 texCoord = vec2(1.0 - v_tex_pos.x, 1.0 - v_tex_pos.y);\n\
-\n\
-    // Take the base color.\n\
-    vec4 textureColor = vec4(0.0, 0.0, 0.0, 0.0);\n\
-    vec4 currColor4 = vec4(0.0, 0.0, 0.0, 0.0);\n\
-    float externalAlpha;\n\
-    bool victory = false;\n\
-    if(uActiveTextures[0] == 1)\n\
-    {\n\
-        currColor4 = texture2D(texture_0, texCoord);\n\
-        externalAlpha = externalAlphasArray[0];\n\
-        if(currColor4.w > 0.0 && externalAlpha > 0.0)\n\
-        {\n\
-            if(victory)\n\
-            {\n\
-                textureColor = mix(textureColor, currColor4, currColor4.w*externalAlpha);\n\
-            }\n\
-            else{\n\
-                currColor4.w *= externalAlpha;\n\
-                textureColor = currColor4;\n\
-            }\n\
-            \n\
-            victory = true;\n\
-        }\n\
-    }\n\
-    \n\
-    if(uActiveTextures[1] == 1)\n\
-    {\n\
-        currColor4 = texture2D(texture_1, texCoord);\n\
-        externalAlpha = externalAlphasArray[1];\n\
-        if(currColor4.w > 0.0 && externalAlpha > 0.0)\n\
-        {\n\
-             if(victory)\n\
-            {\n\
-                textureColor = mix(textureColor, currColor4, currColor4.w*externalAlpha);\n\
-            }\n\
-            else{\n\
-                currColor4.w *= externalAlpha;\n\
-                textureColor = currColor4;\n\
-            }\n\
-            victory = true;\n\
-        }\n\
-    }\n\
-    \n\
-    if(uActiveTextures[2] == 1)\n\
-    {\n\
-        currColor4 = texture2D(texture_2, texCoord);\n\
-        externalAlpha = externalAlphasArray[2];\n\
-        if(currColor4.w > 0.0 && externalAlpha > 0.0)\n\
-        {\n\
-             if(victory)\n\
-            {\n\
-                textureColor = mix(textureColor, currColor4, currColor4.w*externalAlpha);\n\
-            }\n\
-            else{\n\
-                currColor4.w *= externalAlpha;\n\
-                textureColor = currColor4;\n\
-            }\n\
-            victory = true;\n\
-        }\n\
-    }\n\
-\n\
-    if(uActiveTextures[3] == 1)\n\
-    {\n\
-        currColor4 = texture2D(texture_3, texCoord);\n\
-        externalAlpha = externalAlphasArray[3];\n\
-        if(currColor4.w > 0.0 && externalAlpha > 0.0)\n\
-        {\n\
-             if(victory)\n\
-            {\n\
-                textureColor = mix(textureColor, currColor4, currColor4.w*externalAlpha);\n\
-            }\n\
-            else{\n\
-                currColor4.w *= externalAlpha;\n\
-                textureColor = currColor4;\n\
-            }\n\
-            victory = true;\n\
-        }\n\
-    }\n\
-\n\
-    if(uActiveTextures[4] == 1)\n\
-    {\n\
-        currColor4 = texture2D(texture_4, texCoord);\n\
-        externalAlpha = externalAlphasArray[4];\n\
-        if(currColor4.w > 0.0 && externalAlpha > 0.0)\n\
-        {\n\
-             if(victory)\n\
-            {\n\
-                textureColor = mix(textureColor, currColor4, currColor4.w*externalAlpha);\n\
-            }\n\
-            else{\n\
-                currColor4.w *= externalAlpha;\n\
-                textureColor = currColor4;\n\
-            }\n\
-            victory = true;\n\
-        }\n\
-    }\n\
-\n\
-    if(uActiveTextures[5] == 1)\n\
-    {\n\
-        currColor4 = texture2D(texture_5, texCoord);\n\
-        externalAlpha = externalAlphasArray[5];\n\
-        if(currColor4.w > 0.0 && externalAlpha > 0.0)\n\
-        {\n\
-             if(victory)\n\
-            {\n\
-                textureColor = mix(textureColor, currColor4, currColor4.w*externalAlpha);\n\
-            }\n\
-            else{\n\
-                currColor4.w *= externalAlpha;\n\
-                textureColor = currColor4;\n\
-            }\n\
-            victory = true;\n\
-        }\n\
-    }\n\
-\n\
-    if(uActiveTextures[6] == 1)\n\
-    {\n\
-        currColor4 = texture2D(texture_6, texCoord);\n\
-        externalAlpha = externalAlphasArray[6];\n\
-        if(currColor4.w > 0.0 && externalAlpha > 0.0)\n\
-        {\n\
-             if(victory)\n\
-            {\n\
-                textureColor = mix(textureColor, currColor4, currColor4.w*externalAlpha);\n\
-            }\n\
-            else{\n\
-                currColor4.w *= externalAlpha;\n\
-                textureColor = currColor4;\n\
-            }\n\
-            victory = true;\n\
-        }\n\
-    }\n\
-\n\
-    if(uActiveTextures[7] == 1)\n\
-    {\n\
-        currColor4 = texture2D(texture_7, texCoord);\n\
-        externalAlpha = externalAlphasArray[7];\n\
-        if(currColor4.w > 0.0 && externalAlpha > 0.0)\n\
-        {\n\
-             if(victory)\n\
-            {\n\
-                textureColor = mix(textureColor, currColor4, currColor4.w*externalAlpha);\n\
-            }\n\
-            else{\n\
-                currColor4.w *= externalAlpha;\n\
-                textureColor = currColor4;\n\
-            }\n\
-            victory = true;\n\
-        }\n\
-    }\n\
-    if(!victory)\n\
-    discard;\n\
-    \n\
-    gl_FragColor = textureColor;\n\
-	\n\
-}";
-ShaderSource.texturesMergerVS = "precision mediump float;\n\
-\n\
-attribute vec2 a_pos;\n\
-\n\
-varying vec2 v_tex_pos;\n\
-\n\
-void main() {\n\
-    v_tex_pos = a_pos;\n\
-    //vec2 pos = a_pos*0.5;\n\
-    gl_Position = vec4(1.0 - 2.0 * a_pos, 0, 1);\n\
-}";
-ShaderSource.TextureVS = "attribute vec3 position;\n\
-attribute vec4 aVertexColor;\n\
-attribute vec2 aTextureCoord;\n\
-uniform mat4 Mmatrix;\n\
-uniform mat4 ModelViewProjectionMatrixRelToEye;\n\
-uniform vec3 buildingPosHIGH;\n\
-uniform vec3 buildingPosLOW;\n\
-uniform vec3 encodedCameraPositionMCHigh;\n\
-uniform vec3 encodedCameraPositionMCLow;\n\
-varying vec4 vColor;\n\
-varying vec2 vTextureCoord;\n\
-\n\
-void main()\n\
-{\n\
-    vec4 rotatedPos = Mmatrix * vec4(position.xyz, 1.0);\n\
-    vec3 objPosHigh = buildingPosHIGH;\n\
-    vec3 objPosLow = buildingPosLOW.xyz + rotatedPos.xyz;\n\
-    vec3 highDifference = objPosHigh.xyz - encodedCameraPositionMCHigh.xyz;\n\
-    vec3 lowDifference = objPosLow.xyz - encodedCameraPositionMCLow.xyz;\n\
-    vec4 pos = vec4(highDifference.xyz + lowDifference.xyz, 1.0);\n\
-\n\
-    vColor=aVertexColor;\n\
-    vTextureCoord = aTextureCoord;\n\
-\n\
-    gl_Position = ModelViewProjectionMatrixRelToEye * pos;\n\
-    \n\
-}";
-ShaderSource.thickLineDepthVS = "\n\
-attribute vec4 prev;\n\
-attribute vec4 current;\n\
-attribute vec4 next;\n\
-attribute vec4 color4;\n\
-\n\
-uniform float thickness;\n\
-uniform mat4 buildingRotMatrix;\n\
-uniform mat4 projectionMatrix;\n\
-uniform mat4 modelViewMatrix;\n\
-uniform mat4 modelViewMatrixRelToEye; \n\
-uniform mat4 ModelViewProjectionMatrixRelToEye;\n\
-uniform vec2 viewport;\n\
-uniform vec3 buildingPosHIGH;\n\
-uniform vec3 buildingPosLOW;\n\
-uniform vec3 encodedCameraPositionMCHigh;\n\
-uniform vec3 encodedCameraPositionMCLow;\n\
-uniform vec4 oneColor4;\n\
-uniform highp int colorType; // 0= oneColor, 1= attribColor, 2= texture.\n\
-\n\
-uniform float near;\n\
-uniform float far;\n\
-\n\
-varying vec4 vColor;\n\
-varying float depth;\n\
-\n\
-const float error = 0.001;\n\
-\n\
-// see https://weekly-geekly.github.io/articles/331164/index.html\n\
-// see too https://github.com/ridiculousfish/wavefiz/blob/master/ts/polyline.ts#L306\n\
-\n\
-vec2 project(vec4 p){\n\
-	return (0.5 * p.xyz / p.w + 0.5).xy * viewport;\n\
-}\n\
-\n\
-bool isEqual(float value, float valueToCompare)\n\
-{\n\
-	if(value + error > valueToCompare && value - error < valueToCompare)\n\
-	return true;\n\
-	\n\
-	return false;\n\
-}\n\
-\n\
-vec4 getPointRelToEye(in vec4 point)\n\
-{\n\
-	vec4 rotatedCurrent = buildingRotMatrix * vec4(point.xyz, 1.0);\n\
-	vec3 objPosHigh = buildingPosHIGH;\n\
-	vec3 objPosLow = buildingPosLOW.xyz + rotatedCurrent.xyz;\n\
-	vec3 highDifference = objPosHigh.xyz - encodedCameraPositionMCHigh.xyz;\n\
-	vec3 lowDifference = objPosLow.xyz - encodedCameraPositionMCLow.xyz;\n\
-	return vec4(highDifference.xyz + lowDifference.xyz, 1.0);\n\
-}\n\
-\n\
-void main(){\n\
-	// current, prev & next.***\n\
-	vec4 vCurrent = getPointRelToEye(vec4(current.xyz, 1.0));\n\
-	vec4 vPrev = getPointRelToEye(vec4(prev.xyz, 1.0));\n\
-	vec4 vNext = getPointRelToEye(vec4(next.xyz, 1.0));\n\
-	\n\
-	float order_w = current.w;\n\
-	//float order_w = float(order);\n\
-	float sense = 1.0;\n\
-	int orderInt = 0;\n\
-	if(order_w > 0.0)\n\
-	{\n\
-		sense = -1.0;\n\
-		if(order_w < 1.5)\n\
-		{\n\
-			orderInt = 1;\n\
-		}\n\
-		else{\n\
-			orderInt = 2;\n\
-		}\n\
-	}\n\
-	else\n\
-	{\n\
-		sense = 1.0;\n\
-		if(order_w > -1.5)\n\
-		{\n\
-			orderInt = -1;\n\
-		}\n\
-		else{\n\
-			orderInt = -2;\n\
-		}\n\
-	}\n\
-	\n\
-	float aspect = viewport.x / viewport.y;\n\
-	vec2 aspectVec = vec2(aspect, 1.0);\n\
-	\n\
-	vec4 previousProjected = ModelViewProjectionMatrixRelToEye * vPrev;\n\
-	vec4 currentProjected = ModelViewProjectionMatrixRelToEye * vCurrent;\n\
-	vec4 nextProjected = ModelViewProjectionMatrixRelToEye * vNext;\n\
-	\n\
-	float projectedDepth = currentProjected.w;                \n\
-	// Get 2D screen space with W divide and aspect correction\n\
-	vec2 currentScreen = currentProjected.xy / currentProjected.w * aspectVec;\n\
-	vec2 previousScreen = previousProjected.xy / previousProjected.w * aspectVec;\n\
-	vec2 nextScreen = nextProjected.xy / nextProjected.w * aspectVec;\n\
-					\n\
-	// This helps us handle 90 degree turns correctly\n\
-	vec2 tangentNext = normalize(nextScreen - currentScreen);\n\
-	vec2 tangentPrev = normalize(currentScreen - previousScreen);\n\
-	vec2 normal; \n\
-	if(orderInt == 1 || orderInt == -1)\n\
-	{\n\
-		normal = vec2(-tangentPrev.y, tangentPrev.x);\n\
-	}\n\
-	else{\n\
-		normal = vec2(-tangentNext.y, tangentNext.x);\n\
-	}\n\
-	normal *= thickness/2.0;\n\
-	normal.x /= aspect;\n\
-	float direction = (thickness*sense*projectedDepth)/1000.0;\n\
-	// Offset our position along the normal\n\
-	vec4 offset = vec4(normal * direction, 0.0, 1.0);\n\
-	gl_Position = currentProjected + offset; \n\
-\n\
-    depth = (modelViewMatrixRelToEye * current).z/far; // original.***\n\
-\n\
-	\n\
-	if(colorType == 0)\n\
-		vColor = oneColor4;\n\
-	else if(colorType == 1)\n\
-		vColor = color4; //vec4(color4.r+0.8, color4.g+0.8, color4.b+0.8, color4.a+0.8);\n\
-	else\n\
-		vColor = oneColor4;\n\
-}\n\
-\n\
-\n\
-\n\
-\n\
-\n\
-\n\
-\n\
-\n\
-\n\
-\n\
-\n\
-\n\
-";
-ShaderSource.thickLineFS = "precision highp float;\n\
-\n\
-varying vec4 vColor;\n\
-\n\
-void main() {\n\
-	gl_FragColor = vColor;\n\
-}";
-ShaderSource.thickLineVS = "\n\
-attribute vec4 prev;\n\
-attribute vec4 current;\n\
-attribute vec4 next;\n\
-attribute vec4 color4;\n\
-\n\
-uniform float thickness;\n\
-uniform mat4 buildingRotMatrix;\n\
-uniform mat4 projectionMatrix;\n\
-uniform mat4 modelViewMatrix;\n\
-uniform mat4 modelViewMatrixRelToEye; \n\
-uniform mat4 ModelViewProjectionMatrixRelToEye;\n\
-uniform vec2 viewport;\n\
-uniform vec3 buildingPosHIGH;\n\
-uniform vec3 buildingPosLOW;\n\
-uniform vec3 encodedCameraPositionMCHigh;\n\
-uniform vec3 encodedCameraPositionMCLow;\n\
-uniform vec4 oneColor4;\n\
-uniform highp int colorType; // 0= oneColor, 1= attribColor, 2= texture.\n\
-uniform float near;\n\
-uniform float far;\n\
-uniform bool bUseLogarithmicDepth;\n\
-\n\
-varying vec4 vColor;\n\
-\n\
-const float error = 0.001;\n\
-\n\
-// see https://weekly-geekly.github.io/articles/331164/index.html\n\
-// see too https://github.com/ridiculousfish/wavefiz/blob/master/ts/polyline.ts#L306\n\
-\n\
-vec2 project(vec4 p){\n\
-	return (0.5 * p.xyz / p.w + 0.5).xy * viewport;\n\
-}\n\
-\n\
-bool isEqual(float value, float valueToCompare)\n\
-{\n\
-	if(value + error > valueToCompare && value - error < valueToCompare)\n\
-	return true;\n\
-	\n\
-	return false;\n\
-}\n\
-\n\
-vec4 getPointRelToEye(in vec4 point)\n\
-{\n\
-	vec4 rotatedCurrent = buildingRotMatrix * vec4(point.xyz, 1.0);\n\
-	vec3 objPosHigh = buildingPosHIGH;\n\
-	vec3 objPosLow = buildingPosLOW.xyz + rotatedCurrent.xyz;\n\
-	vec3 highDifference = objPosHigh.xyz - encodedCameraPositionMCHigh.xyz;\n\
-	vec3 lowDifference = objPosLow.xyz - encodedCameraPositionMCLow.xyz;\n\
-	return vec4(highDifference.xyz + lowDifference.xyz, 1.0);\n\
-}\n\
-\n\
-void main(){\n\
-	// current, prev & next.***\n\
-	vec4 vCurrent = getPointRelToEye(vec4(current.xyz, 1.0));\n\
-	vec4 vPrev = getPointRelToEye(vec4(prev.xyz, 1.0));\n\
-	vec4 vNext = getPointRelToEye(vec4(next.xyz, 1.0));\n\
-	\n\
-	float order_w = current.w;\n\
-	//float order_w = float(order);\n\
-	float sense = 1.0;\n\
-	int orderInt = 0;\n\
-	if(order_w > 0.0)\n\
-	{\n\
-		sense = -1.0;\n\
-		if(order_w < 1.5)\n\
-		{\n\
-			orderInt = 1;\n\
-		}\n\
-		else{\n\
-			orderInt = 2;\n\
-		}\n\
-	}\n\
-	else\n\
-	{\n\
-		sense = 1.0;\n\
-		if(order_w > -1.5)\n\
-		{\n\
-			orderInt = -1;\n\
-		}\n\
-		else{\n\
-			orderInt = -2;\n\
-		}\n\
-	}\n\
-	\n\
-	float aspect = viewport.x / viewport.y;\n\
-	vec2 aspectVec = vec2(aspect, 1.0);\n\
-	\n\
-	vec4 previousProjected = ModelViewProjectionMatrixRelToEye * vPrev;\n\
-	vec4 currentProjected = ModelViewProjectionMatrixRelToEye * vCurrent;\n\
-	vec4 nextProjected = ModelViewProjectionMatrixRelToEye * vNext;\n\
-	\n\
-	float projectedDepth = currentProjected.w;                \n\
-	// Get 2D screen space with W divide and aspect correction\n\
-	vec2 currentScreen = currentProjected.xy / currentProjected.w * aspectVec;\n\
-	vec2 previousScreen = previousProjected.xy / previousProjected.w * aspectVec;\n\
-	vec2 nextScreen = nextProjected.xy / nextProjected.w * aspectVec;\n\
-					\n\
-	// This helps us handle 90 degree turns correctly\n\
-	vec2 tangentNext = normalize(nextScreen - currentScreen);\n\
-	vec2 tangentPrev = normalize(currentScreen - previousScreen);\n\
-	vec2 normal; \n\
-	if(orderInt == 1 || orderInt == -1)\n\
-	{\n\
-		normal = vec2(-tangentPrev.y, tangentPrev.x);\n\
-	}\n\
-	else{\n\
-		normal = vec2(-tangentNext.y, tangentNext.x);\n\
-	}\n\
-	normal *= thickness/2.0;\n\
-	normal.x /= aspect;\n\
-	float direction = (thickness*sense*projectedDepth)/1000.0;\n\
-	// Offset our position along the normal\n\
-	vec4 offset = vec4(normal * direction, 0.0, 1.0);\n\
-	gl_Position = currentProjected + offset; \n\
-\n\
-	if(bUseLogarithmicDepth)\n\
-	{\n\
-		// logarithmic zBuffer:\n\
-		// https://www.gamasutra.com/blogs/BranoKemen/20090812/85207/Logarithmic_Depth_Buffer.php\n\
-		// z = log(C*z + 1) / log(C*Far + 1) * w\n\
-		float z = gl_Position.z;\n\
-		//float C = 1.0;\n\
-		float w = gl_Position.w;\n\
-		////gl_Position.z = log(C*z + 1.0) / log(C*far + 1.0) * w;\n\
-		gl_Position.z = log(z/near) / log(far/near)*w; // another way.\n\
-	}\n\
-	\n\
-	if(colorType == 0)\n\
-		vColor = oneColor4;\n\
-	else if(colorType == 1)\n\
-		vColor = color4; //vec4(color4.r+0.8, color4.g+0.8, color4.b+0.8, color4.a+0.8);\n\
-	else\n\
-		vColor = oneColor4;\n\
-}\n\
-\n\
-\n\
-\n\
-\n\
-\n\
-\n\
-\n\
-\n\
-\n\
-\n\
-\n\
-\n\
-";
-ShaderSource.TinTerrainAltitudesFS = "#ifdef GL_ES\n\
-precision highp float;\n\
-#endif\n\
-\n\
-varying float vAltitude;  \n\
-\n\
-vec4 packDepth(const in float depth)\n\
-{\n\
-    const vec4 bit_shift = vec4(16777216.0, 65536.0, 256.0, 1.0);\n\
-    const vec4 bit_mask  = vec4(0.0, 0.00390625, 0.00390625, 0.00390625); \n\
-    //vec4 res = fract(depth * bit_shift); // Is not precise.\n\
-	vec4 res = mod(depth * bit_shift * vec4(255), vec4(256) ) / vec4(255); // Is better.\n\
-    res -= res.xxyz * bit_mask;\n\
-    return res;  \n\
-}\n\
-\n\
-vec4 PackDepth32( in float depth )\n\
-{\n\
-    depth *= (16777216.0 - 1.0) / (16777216.0);\n\
-    vec4 encode = fract( depth * vec4(1.0, 256.0, 256.0*256.0, 16777216.0) );// 256.0*256.0*256.0 = 16777216.0\n\
-    return vec4( encode.xyz - encode.yzw / 256.0, encode.w ) + 1.0/512.0;\n\
-}\n\
-\n\
-void main()\n\
-{     \n\
-    gl_FragData[0] = PackDepth32(vAltitude);\n\
-	//gl_FragData[0] = packDepth(-depth);\n\
-}";
-ShaderSource.TinTerrainAltitudesVS = "attribute vec3 position;\n\
-uniform mat4 ModelViewProjectionMatrix;\n\
-\n\
-varying float vAltitude;\n\
-  \n\
-void main()\n\
-{	\n\
-    vec4 pos4 = vec4(position.xyz, 1.0);\n\
-	gl_Position = ModelViewProjectionMatrix * pos4;\n\
-	vAltitude = position.z;\n\
-}\n\
-";
-ShaderSource.TinTerrainFS = "#ifdef GL_ES\n\
-    precision highp float;\n\
-#endif\n\
-  \n\
-uniform sampler2D shadowMapTex;// 0\n\
-uniform sampler2D shadowMapTex2;// 1\n\
-//uniform sampler2D depthTex;//2\n\
-//uniform sampler2D noiseTex;//3\n\
-uniform sampler2D diffuseTex;  // 4\n\
-uniform sampler2D diffuseTex_1;// 5\n\
-uniform sampler2D diffuseTex_2;// 6\n\
-uniform sampler2D diffuseTex_3;// 7\n\
-uniform sampler2D diffuseTex_4;// 8\n\
-uniform sampler2D diffuseTex_5;// 9\n\
-uniform bool textureFlipYAxis;\n\
-uniform bool bIsMakingDepth;\n\
-uniform bool bExistAltitudes;\n\
-uniform mat4 projectionMatrix;\n\
-uniform vec2 noiseScale;\n\
-uniform float near;\n\
-uniform float far;            \n\
-uniform float fov;\n\
-uniform float aspectRatio;    \n\
-uniform float screenWidth;    \n\
-uniform float screenHeight;    \n\
-uniform float shininessValue;\n\
-uniform vec3 kernel[16];   \n\
-uniform int uActiveTextures[8];\n\
-uniform float externalAlphasArray[8];\n\
-uniform vec2 uMinMaxAltitudes;\n\
-uniform int uTileDepth;\n\
-uniform int uSeaOrTerrainType;\n\
-uniform int uRenderType;\n\
-\n\
-uniform vec4 oneColor4;\n\
-uniform highp int colorType; // 0= oneColor, 1= attribColor, 2= texture.\n\
-\n\
-varying vec2 vTexCoord;   \n\
-varying vec3 vLightWeighting;\n\
-\n\
-varying vec3 diffuseColor;\n\
-uniform vec3 specularColor;\n\
-varying float depthValue;\n\
-\n\
-const int kernelSize = 16;  \n\
-uniform float radius;      \n\
-uniform float uTime;  \n\
-\n\
-uniform float ambientReflectionCoef;\n\
-uniform float diffuseReflectionCoef;  \n\
-uniform float specularReflectionCoef; \n\
-uniform float externalAlpha;\n\
-uniform bool bApplyShadow;\n\
-uniform bool bApplySsao;\n\
-uniform float shadowMapWidth;    \n\
-uniform float shadowMapHeight;\n\
-varying vec3 v3Pos;\n\
-varying float vFogAmount;\n\
-\n\
-varying float applySpecLighting;\n\
-varying vec4 vPosRelToLight; \n\
-varying vec3 vLightDir; \n\
-varying vec3 vNormal;\n\
-varying vec3 vNormalWC;\n\
-varying float currSunIdx;\n\
-varying float vAltitude;\n\
-\n\
-const float equatorialRadius = 6378137.0;\n\
-const float polarRadius = 6356752.3142;\n\
-\n\
-// water caustics: https://catlikecoding.com/unity/tutorials/flow/texture-distortion/\n\
-\n\
-float unpackDepth(const in vec4 rgba_depth)\n\
-{\n\
-    const vec4 bit_shift = vec4(0.000000059605, 0.000015258789, 0.00390625, 1.0);\n\
-    float depth = dot(rgba_depth, bit_shift);\n\
-    return depth;\n\
-} \n\
-\n\
-float unpackDepthOcean(const in vec4 rgba_depth)\n\
-{\n\
-    const vec4 bit_shift = vec4(1.0, 0.00390625, 0.000015258789, 0.000000059605);\n\
-    float depth = dot(rgba_depth, bit_shift);\n\
-    return depth;\n\
-} \n\
-\n\
-float UnpackDepth32( in vec4 pack )\n\
-{\n\
-    float depth = dot( pack, 1.0 / vec4(1.0, 256.0, 256.0*256.0, 16777216.0) );// 256.0*256.0*256.0 = 16777216.0\n\
-    return depth * (16777216.0) / (16777216.0 - 1.0);\n\
-}\n\
-\n\
-vec4 packDepth(const in float depth)\n\
-{\n\
-    const vec4 bit_shift = vec4(16777216.0, 65536.0, 256.0, 1.0);\n\
-    const vec4 bit_mask  = vec4(0.0, 0.00390625, 0.00390625, 0.00390625); \n\
-    //vec4 res = fract(depth * bit_shift); // Is not precise.\n\
-	vec4 res = mod(depth * bit_shift * vec4(255), vec4(256) ) / vec4(255); // Is better.\n\
-    res -= res.xxyz * bit_mask;\n\
-    return res;  \n\
-}               \n\
-\n\
-vec3 getViewRay(vec2 tc)\n\
-{\n\
-    float hfar = 2.0 * tan(fov/2.0) * far;\n\
-    float wfar = hfar * aspectRatio;    \n\
-    vec3 ray = vec3(wfar * (tc.x - 0.5), hfar * (tc.y - 0.5), -far);    \n\
-    return ray;                      \n\
-}\n\
-\n\
-//linear view space depth\n\
-float getDepth(vec2 coord)\n\
-{\n\
-	// in this shader the depthTex is \"diffuseTex\"\n\
-	return unpackDepth(texture2D(diffuseTex, coord.xy));\n\
-}\n\
-\n\
-//linear view space depth\n\
-//float getDepth(vec2 coord)\n\
-//{\n\
-//    return unpackDepth(texture2D(depthTex, coord.xy));\n\
-//}  \n\
-\n\
-vec3 getRainbowColor_byHeight(float height)\n\
-{\n\
-	float minHeight_rainbow = -200.0;\n\
-	float maxHeight_rainbow = 0.0;\n\
-	\n\
-	float gray = (height - minHeight_rainbow)/(maxHeight_rainbow - minHeight_rainbow);\n\
-	if (gray > 1.0){ gray = 1.0; }\n\
-	else if (gray<0.0){ gray = 0.0; }\n\
-	\n\
-	float r, g, b;\n\
-	\n\
-	if(gray < 0.16666)\n\
-	{\n\
-		b = 0.0;\n\
-		g = gray*6.0;\n\
-		r = 1.0;\n\
-	}\n\
-	else if(gray >= 0.16666 && gray < 0.33333)\n\
-	{\n\
-		b = 0.0;\n\
-		g = 1.0;\n\
-		r = 2.0 - gray*6.0;\n\
-	}\n\
-	else if(gray >= 0.33333 && gray < 0.5)\n\
-	{\n\
-		b = -2.0 + gray*6.0;\n\
-		g = 1.0;\n\
-		r = 0.0;\n\
-	}\n\
-	else if(gray >= 0.5 && gray < 0.66666)\n\
-	{\n\
-		b = 1.0;\n\
-		g = 4.0 - gray*6.0;\n\
-		r = 0.0;\n\
-	}\n\
-	else if(gray >= 0.66666 && gray < 0.83333)\n\
-	{\n\
-		b = 1.0;\n\
-		g = 0.0;\n\
-		r = -4.0 + gray*6.0;\n\
-	}\n\
-	else if(gray >= 0.83333)\n\
-	{\n\
-		b = 6.0 - gray*6.0;\n\
-		g = 0.0;\n\
-		r = 1.0;\n\
-	}\n\
-	\n\
-	float aux = r;\n\
-	r = b;\n\
-	b = aux;\n\
-	\n\
-	//b = -gray + 1.0;\n\
-	//if (gray > 0.5)\n\
-	//{\n\
-	//	g = -gray*2.0 + 2.0; \n\
-	//}\n\
-	//else \n\
-	//{\n\
-	//	g = gray*2.0;\n\
-	//}\n\
-	//r = gray;\n\
-	vec3 resultColor = vec3(r, g, b);\n\
-    return resultColor;\n\
-} \n\
-\n\
-float getDepthShadowMap(vec2 coord)\n\
-{\n\
-	// currSunIdx\n\
-	if(currSunIdx > 0.0 && currSunIdx < 1.0)\n\
-	{\n\
-		return UnpackDepth32(texture2D(shadowMapTex, coord.xy));\n\
-	}\n\
-    else if(currSunIdx > 1.0 && currSunIdx < 2.0)\n\
-	{\n\
-		return UnpackDepth32(texture2D(shadowMapTex2, coord.xy));\n\
-	}\n\
-	else\n\
-		return 1000.0;\n\
-} \n\
-\n\
-float getGridLineWidth(int depth)\n\
-{\n\
-	float gridLineWidth = 0.025;\n\
-	\n\
-	if(depth == 17)\n\
-	{\n\
-		gridLineWidth = 0.025;\n\
-	}\n\
-	else{\n\
-		int dif = 18 - depth;\n\
-		if(dif < 1)\n\
-		dif = 1;\n\
-		gridLineWidth = (0.04/17.0) * float(depth/dif);\n\
-	}\n\
-	\n\
-	return gridLineWidth;\n\
-}\n\
-\n\
-//#define SHOW_TILING\n\
-#define TAU 6.28318530718 // https://www.shadertoy.com/view/4sXfDj\n\
-#define MAX_ITER 5 // https://www.shadertoy.com/view/4sXfDj\n\
-\n\
-// Water Caustics with BCC-Noise :https://www.shadertoy.com/view/wlc3zr\n\
-\n\
-vec3 causticColor(vec2 texCoord)\n\
-{\n\
-	// To avoid mosaic repetitions.******************\n\
-	float uPlus = texCoord.x - 1.0;\n\
-	float vPlus = texCoord.y - 1.0;\n\
-	//float timePlus = max(uPlus, vPlus);\n\
-	float timePlus = uPlus + vPlus;\n\
-	if(timePlus < 0.0)\n\
-	timePlus = 0.0;\n\
-	// End avoid mosaic repetitions.-------------------------\n\
-	\n\
-	// Water turbulence effect by joltz0r 2013-07-04, improved 2013-07-07\n\
-	float time = (uTime+timePlus) * .5+23.0;\n\
-    // uv should be the 0-1 uv of texture...\n\
-\n\
-	\n\
-\n\
-	vec2 uv = texCoord;\n\
-    \n\
-#ifdef SHOW_TILING\n\
-	vec2 p = mod(uv*TAU*2.0, TAU)-250.0;\n\
-#else\n\
-    vec2 p = mod(uv*TAU, TAU)-250.0;\n\
-#endif\n\
-	vec2 i = vec2(p);\n\
-	float c = 1.0;\n\
-	float inten = .005;\n\
-\n\
-	for (int n = 0; n < MAX_ITER; n++) \n\
-	{\n\
-		float t = time * (1.0 - (3.5 / float(n+1)));\n\
-		i = p + vec2(cos(t - i.x) + sin(t + i.y), sin(t - i.y) + cos(t + i.x));\n\
-		c += 1.0/length(vec2(p.x / (sin(i.x+t)/inten),p.y / (cos(i.y+t)/inten)));\n\
-	}\n\
-	c /= float(MAX_ITER);\n\
-	c = 1.17-pow(c, 1.4);\n\
-	vec3 colour = vec3(pow(abs(c), 8.0));\n\
-    colour = clamp(colour + vec3(0.0, 0.35, 0.5), 0.0, 1.0);\n\
-\n\
-	#ifdef SHOW_TILING\n\
-	// Flash tile borders...\n\
-	vec2 pixel = 2.0 / vec2(screenWidth, screenHeight);//iResolution.xy;\n\
-	uv *= 2.0;\n\
-\n\
-	float f = floor(mod(time*.5, 2.0)); 	// Flash value.\n\
-	vec2 first = step(pixel, uv) * f;		   	// Rule out first screen pixels and flash.\n\
-	uv  = step(fract(uv), pixel);				// Add one line of pixels per tile.\n\
-	colour = mix(colour, vec3(1.0, 1.0, 0.0), (uv.x + uv.y) * first.x * first.y); // Yellow line\n\
-	\n\
-	#endif\n\
-\n\
-	return colour;\n\
-}\n\
-\n\
-void main()\n\
-{           \n\
-	if(bIsMakingDepth)\n\
-	{\n\
-		gl_FragColor = packDepth(-depthValue);\n\
-	}\n\
-	else\n\
-	{\n\
-		if(uRenderType == 2)\n\
-		{\n\
-			gl_FragColor = oneColor4; \n\
-			return;\n\
-		}\n\
-\n\
-		if(uSeaOrTerrainType == 1)\n\
-		{\n\
-			//gl_FragColor = vec4(oneColor4.xyz * shadow_occlusion * lambertian, 0.5); // original.***\n\
-			// Render a dot matrix in the sea surface.***\n\
-			\n\
-\n\
-			return;\n\
-		}\n\
-\n\
-		\n\
-\n\
-		float shadow_occlusion = 1.0;\n\
-		if(bApplyShadow)\n\
-		{\n\
-			if(currSunIdx > 0.0)\n\
-			{\n\
-				vec3 fragCoord = gl_FragCoord.xyz;\n\
-				vec3 fragWC;\n\
-				\n\
-				//float ligthAngle = dot(vLightDir, vNormalWC);\n\
-				//if(ligthAngle > 0.0)\n\
-				//{\n\
-				//	// The angle between the light direction & face normal is less than 90 degree, so, the face is in shadow.***\n\
-				//	shadow_occlusion = 0.5;\n\
-				//}\n\
-				//else\n\
-				{\n\
-\n\
-					vec3 posRelToLight = vPosRelToLight.xyz / vPosRelToLight.w;\n\
-					float tolerance = 0.9963;\n\
-					//tolerance = 0.9962;\n\
-					//tolerance = 1.0;\n\
-					posRelToLight = posRelToLight * 0.5 + 0.5; // transform to [0,1] range\n\
-					if(posRelToLight.x >= 0.0 && posRelToLight.x <= 1.0)\n\
-					{\n\
-						if(posRelToLight.y >= 0.0 && posRelToLight.y <= 1.0)\n\
-						{\n\
-							float depthRelToLight = getDepthShadowMap(posRelToLight.xy);\n\
-							if(posRelToLight.z > depthRelToLight*tolerance )\n\
-							{\n\
-								shadow_occlusion = 0.5;\n\
-							}\n\
-						}\n\
-					}\n\
-				}\n\
-			}\n\
-		}\n\
-		\n\
-		// Do specular lighting.***\n\
-		vec3 normal2 = vNormal;	\n\
-		float lambertian = 1.0;\n\
-		float specular;\n\
-		vec2 texCoord;\n\
-		if(applySpecLighting> 0.0)\n\
-		{\n\
-			vec3 L;\n\
-			if(bApplyShadow)\n\
-			{\n\
-				L = vLightDir;// test.***\n\
-				lambertian = max(dot(normal2, L), 0.0); // original.***\n\
-			}\n\
-			else\n\
-			{\n\
-				vec3 lightPos = vec3(0.0, 0.0, 0.0);\n\
-				L = normalize(lightPos - v3Pos);\n\
-				lambertian = max(dot(normal2, L), 0.0);\n\
-			}\n\
-			/*\n\
-			specular = 0.0;\n\
-			if(lambertian > 0.0)\n\
-			{\n\
-				vec3 R = reflect(-L, normal2);      // Reflected light vector\n\
-				vec3 V = normalize(-v3Pos); // Vector to viewer\n\
-				\n\
-				// Compute the specular term\n\
-				float specAngle = max(dot(R, V), 0.0);\n\
-				specular = pow(specAngle, shininessValue);\n\
-				\n\
-				if(specular > 1.0)\n\
-				{\n\
-					specular = 1.0;\n\
-				}\n\
-			}\n\
-			*/\n\
-			// test.\n\
-			lambertian += 0.3;\n\
-\n\
-			if(lambertian < 0.8)\n\
-			{\n\
-				lambertian = 0.8;\n\
-			}\n\
-			else if(lambertian > 1.1)\n\
-			{\n\
-				lambertian = 1.1;\n\
-			}\n\
-		}\n\
-		\n\
-		// check if apply ssao.\n\
-		float occlusion = 1.0;\n\
-		//vec3 normal2 = vNormal;	\n\
-		\n\
-	\n\
-		vec4 textureColor = vec4(0.0);\n\
-		if(colorType == 0) // one color.\n\
-		{\n\
-			textureColor = oneColor4;\n\
-			\n\
-			if(textureColor.w == 0.0)\n\
-			{\n\
-				discard;\n\
-			}\n\
-		}\n\
-		else if(colorType == 2) // texture color.\n\
-		{\n\
-			\n\
-			if(textureFlipYAxis)\n\
-			{\n\
-				texCoord = vec2(vTexCoord.s, 1.0 - vTexCoord.t);\n\
-			}\n\
-			else{\n\
-				texCoord = vec2(vTexCoord.s, vTexCoord.t);\n\
-			}\n\
-			\n\
-			bool firstColorSetted = false;\n\
-			float externalAlpha = 0.0;\n\
-			\n\
-			\n\
-			\n\
-			\n\
-			\n\
-			\n\
-			\n\
-			\n\
-			\n\
-			\n\
-			if(uActiveTextures[2] == 1)\n\
-			{\n\
-				vec4 layersTextureColor = texture2D(diffuseTex, texCoord);\n\
-				externalAlpha = externalAlphasArray[2];\n\
-				if(layersTextureColor.w > 0.0 && externalAlpha > 0.0)\n\
-				{\n\
-					if(firstColorSetted)\n\
-					{\n\
- 						textureColor = mix(textureColor, layersTextureColor, layersTextureColor.w*externalAlpha);\n\
-					}\n\
-					else{\n\
-						textureColor = layersTextureColor;\n\
-						textureColor.w *= externalAlpha;\n\
-					}\n\
-					\n\
-					firstColorSetted = true;\n\
-				}\n\
-			}\n\
-\n\
-			if(uActiveTextures[3] == 1)\n\
-			{\n\
-				vec4 layersTextureColor = texture2D(diffuseTex_1, texCoord);\n\
-				externalAlpha = externalAlphasArray[3];\n\
-				if(layersTextureColor.w > 0.0 && externalAlpha > 0.0)\n\
-				{\n\
-					if(firstColorSetted)\n\
-					{\n\
- 						textureColor = mix(textureColor, layersTextureColor, layersTextureColor.w*externalAlpha);\n\
-					}\n\
-					else{\n\
-						textureColor = layersTextureColor;\n\
-						textureColor.w *= externalAlpha;\n\
-					}\n\
-					\n\
-					firstColorSetted = true;\n\
-				}\n\
-			}\n\
-\n\
-			if(uActiveTextures[4] == 1)\n\
-			{\n\
-				vec4 layersTextureColor = texture2D(diffuseTex_2, texCoord);\n\
-				externalAlpha = externalAlphasArray[4];\n\
-				if(layersTextureColor.w > 0.0 && externalAlpha > 0.0)\n\
-				{\n\
-					if(firstColorSetted)\n\
-					{\n\
- 						textureColor = mix(textureColor, layersTextureColor, layersTextureColor.w*externalAlpha);\n\
-					}\n\
-					else{\n\
-						textureColor = layersTextureColor;\n\
-						textureColor.w *= externalAlpha;\n\
-					}\n\
-					\n\
-					firstColorSetted = true;\n\
-				}\n\
-			}\n\
-\n\
-			if(uActiveTextures[5] == 1)\n\
-			{\n\
-				vec4 layersTextureColor = texture2D(diffuseTex_3, texCoord);\n\
-				externalAlpha = externalAlphasArray[5];\n\
-				if(layersTextureColor.w > 0.0 && externalAlpha > 0.0)\n\
-				{\n\
-					if(firstColorSetted)\n\
-					{\n\
- 						textureColor = mix(textureColor, layersTextureColor, layersTextureColor.w*externalAlpha);\n\
-					}\n\
-					else{\n\
-						textureColor = layersTextureColor;\n\
-						textureColor.w *= externalAlpha;\n\
-					}\n\
-					\n\
-					firstColorSetted = true;\n\
-				}\n\
-			}\n\
-\n\
-			if(uActiveTextures[6] == 1)\n\
-			{\n\
-				vec4 layersTextureColor = texture2D(diffuseTex_4, texCoord);\n\
-				externalAlpha = externalAlphasArray[6];\n\
-				if(layersTextureColor.w > 0.0 && externalAlpha > 0.0)\n\
-				{\n\
-					if(firstColorSetted)\n\
-					{\n\
- 						textureColor = mix(textureColor, layersTextureColor, layersTextureColor.w*externalAlpha);\n\
-					}\n\
-					else{\n\
-						textureColor = layersTextureColor;\n\
-						textureColor.w *= externalAlpha;\n\
-					}\n\
-					\n\
-					firstColorSetted = true;\n\
-				}\n\
-			}\n\
-\n\
-			if(uActiveTextures[7] == 1)\n\
-			{\n\
-				vec4 layersTextureColor = texture2D(diffuseTex_5, texCoord);\n\
-				externalAlpha = externalAlphasArray[7];\n\
-				if(layersTextureColor.w > 0.0 && externalAlpha > 0.0)\n\
-				{\n\
-					if(firstColorSetted)\n\
-					{\n\
- 						textureColor = mix(textureColor, layersTextureColor, layersTextureColor.w*externalAlpha);\n\
-					}\n\
-					else{\n\
-						textureColor = layersTextureColor;\n\
-						textureColor.w *= externalAlpha;\n\
-					}\n\
-					\n\
-					firstColorSetted = true;\n\
-				}\n\
-			}\n\
-			\n\
-			if(textureColor.w == 0.0)\n\
-			{\n\
-				discard;\n\
-			}\n\
-		}\n\
-		else{\n\
-			textureColor = oneColor4;\n\
-		}\n\
-\n\
-		textureColor.w = externalAlpha;\n\
-		vec4 fogColor = vec4(0.9, 0.9, 0.9, 1.0);\n\
-		\n\
-		\n\
-		// Test dem image.***************************************************************************************************************\n\
-		float altitude = 1000000.0;\n\
-		if(uActiveTextures[5] == 10)\n\
-		{\n\
-			vec4 layersTextureColor = texture2D(diffuseTex_3, texCoord);\n\
-			if(layersTextureColor.w > 0.0)\n\
-			{\n\
-				// decode the grayScale.***\n\
-				altitude = uMinMaxAltitudes.x + layersTextureColor.r * (uMinMaxAltitudes.y - uMinMaxAltitudes.x);\n\
-			}\n\
-\n\
-			//if(layersTextureColor.w > 0.0)\n\
-			//{\n\
-			//	// decode the grayScale.***\n\
-			//	float depth = unpackDepthOcean(layersTextureColor);\n\
-			//	altitude = uMinMaxAltitudes.x + depth * (uMinMaxAltitudes.y - uMinMaxAltitudes.x);\n\
-			//}\n\
-		}\n\
-		// End test dem image.------------------------------------------------------------------------------------------------------------\n\
-		if(bApplySsao && altitude<0.0)\n\
-		{\n\
-			// must find depthTex & noiseTex.***\n\
-			////float farForDepth = 30000.0;\n\
-			vec2 screenPos = vec2(gl_FragCoord.x / screenWidth, gl_FragCoord.y / screenHeight);\n\
-			float linearDepth = getDepth(screenPos);  \n\
-			vec3 ray = getViewRay(screenPos); // The \"far\" for depthTextures if fixed in \"RenderShowDepthVS\" shader.\n\
-			vec3 origin = ray * linearDepth;  \n\
-			float ssaoRadius = radius*20.0;\n\
-			float tolerance = ssaoRadius/far; // original.***\n\
-			////float tolerance = radius/(far-near);// test.***\n\
-			////float tolerance = radius/farForDepth;\n\
-\n\
-			// in this shader noiseTex is \"diffusse_1\".\n\
-			vec3 rvec = texture2D(diffuseTex_1, screenPos.xy * noiseScale).xyz * 2.0 - 1.0;\n\
-			vec3 tangent = normalize(rvec - normal2 * dot(rvec, normal2));\n\
-			vec3 bitangent = cross(normal2, tangent);\n\
-			mat3 tbn = mat3(tangent, bitangent, normal2);   \n\
-			float minDepthBuffer;\n\
-			float maxDepthBuffer;\n\
-			for(int i = 0; i < kernelSize; ++i)\n\
-			{    	 \n\
-				vec3 sample = origin + (tbn * vec3(kernel[i].x*3.0, kernel[i].y*3.0, kernel[i].z)) * ssaoRadius*2.0; // original.***\n\
-				vec4 offset = projectionMatrix * vec4(sample, 1.0);					\n\
-				offset.xy /= offset.w;\n\
-				offset.xy = offset.xy * 0.5 + 0.5;  				\n\
-				float sampleDepth = -sample.z/far;// original.***\n\
-\n\
-				float depthBufferValue = getDepth(offset.xy);\n\
-				/*\n\
-				if(depthBufferValue > 0.00391 && depthBufferValue < 0.00393)\n\
-				{\n\
-					if (depthBufferValue < sampleDepth-tolerance*1000.0)\n\
-					{\n\
-						occlusion +=  0.5;\n\
-					}\n\
-					\n\
-					continue;\n\
-				}			\n\
-				*/\n\
-				if (depthBufferValue < sampleDepth)//-tolerance)\n\
-				{\n\
-					occlusion +=  1.0;\n\
-				}\n\
-			} \n\
-\n\
-			occlusion = 1.0 - occlusion / float(kernelSize);\n\
-			\n\
-			shadow_occlusion *= occlusion;\n\
-		}\n\
-		\n\
-		if(altitude < 0.0)\n\
-		{\n\
-			//if(uSeaOrTerrainType == 1)\n\
-			//{\n\
-			//	gl_FragColor = vec4(oneColor4.xyz * shadow_occlusion * lambertian, 0.5); // original.***\n\
-			//	return;\n\
-			//}\n\
-			\n\
-			\n\
-\n\
-			float minHeight_rainbow = -100.0;\n\
-			float maxHeight_rainbow = 0.0;\n\
-			float gray = (altitude - minHeight_rainbow)/(maxHeight_rainbow - minHeight_rainbow);\n\
-			//float gray = (vAltitude - minHeight_rainbow)/(maxHeight_rainbow - minHeight_rainbow);\n\
-			//vec3 rainbowColor = getRainbowColor_byHeight(altitude);\n\
-\n\
-			// caustics.*********************\n\
-			if(uTime > 0.0 && uTileDepth > 6 && altitude > -120.0)\n\
-			{\n\
-				// Active this code if want same size caustic effects for different tileDepths.***\n\
-				// Take tileDepth 14 as the unitary tile depth.\n\
-				//float tileDethDiff = float(16 - uTileDepth);\n\
-				//vec2 cauticsTexCoord = texCoord*pow(2.0, tileDethDiff);\n\
-				//-----------------------------------------------------------------------\n\
-				vec2 cauticsTexCoord = texCoord;\n\
-				vec3 causticColor = causticColor(cauticsTexCoord);\n\
-				textureColor = vec4(mix(textureColor.rgb, causticColor, gray), externalAlpha);\n\
-			}\n\
-			// End caustics.--------------------------\n\
-\n\
-			\n\
-			if(gray < 0.05)\n\
-			gray = 0.05;\n\
-			float red = gray + 0.2;\n\
-			float green = gray + 0.6;\n\
-			float blue = gray*2.0 + 2.0;\n\
-			//fogColor = vec4(gray*1.3, gray*2.1, gray*2.7, 1.0);\n\
-			fogColor = vec4(red, green, blue, 1.0);\n\
-			\n\
-			// Test drawing grid.***\n\
-			/*\n\
-			if(uTileDepth > 7)\n\
-			{\n\
-				float numSegs = 5.0;\n\
-				float fX = fract(texCoord.x * numSegs);\n\
-\n\
-				float gridLineWidth = getGridLineWidth(uTileDepth);\n\
-				if( fX < gridLineWidth || fX > 1.0-gridLineWidth)\n\
-				{\n\
-					vec3 color = vec3(0.99, 0.5, 0.5);\n\
-					gl_FragColor = vec4(color.rgb* shadow_occlusion * lambertian, 1.0);\n\
-					return;\n\
-				}\n\
-				\n\
-				float fY = fract(texCoord.y * numSegs);\n\
-				if( fY < gridLineWidth|| fY > 1.0-gridLineWidth)\n\
-				{\n\
-					vec3 color = vec3(0.3, 0.5, 0.99);\n\
-					gl_FragColor = vec4(color.rgb* shadow_occlusion * lambertian, 1.0);\n\
-					return;\n\
-				}\n\
-			}\n\
-			*/\n\
-			// End test drawing grid.---\n\
-			float specularReflectionCoef = 0.6;\n\
-			vec3 specularColor = vec3(0.8, 0.8, 0.8);\n\
-			vec4 finalColor = mix(textureColor, fogColor, 0.7); \n\
-			//gl_FragColor = vec4(finalColor.xyz * shadow_occlusion * lambertian + specularReflectionCoef * specular * specularColor * shadow_occlusion, 1.0); // with specular.***\n\
-			gl_FragColor = vec4(finalColor.xyz * shadow_occlusion * lambertian, 1.0); // original.***\n\
-\n\
-			return;\n\
-		}\n\
-		else{\n\
-			if(uSeaOrTerrainType == 1)\n\
-			discard;\n\
-		\n\
-		}\n\
-		\n\
-		\n\
-		vec4 finalColor = mix(textureColor, fogColor, vFogAmount); \n\
-		gl_FragColor = vec4(finalColor.xyz * shadow_occlusion * lambertian, 1.0); // original.***\n\
-		//gl_FragColor = textureColor; // test.***\n\
-		//gl_FragColor = vec4(vNormal.xyz, 1.0); // test.***\n\
-		\n\
-		//if(currSunIdx > 0.0 && currSunIdx < 1.0 && shadow_occlusion<0.9)gl_FragColor = vec4(1.0, 0.0, 0.0, 1.0);\n\
-	}\n\
-}";
-ShaderSource.TinTerrainVS = "\n\
-attribute vec3 position;\n\
-attribute vec3 normal;\n\
-attribute vec4 color4;\n\
-attribute vec2 texCoord;\n\
-attribute float altitude;\n\
-\n\
-uniform mat4 projectionMatrix;  \n\
-uniform mat4 modelViewMatrix;\n\
-uniform mat4 modelViewMatrixInv;\n\
-uniform mat4 modelViewMatrixRelToEye; \n\
-uniform mat4 ModelViewProjectionMatrixRelToEye;\n\
-uniform mat4 ModelViewProjectionMatrix;\n\
-uniform mat4 normalMatrix4;\n\
-uniform mat4 sunMatrix[2]; \n\
-uniform mat4 buildingRotMatrix;  \n\
-uniform vec3 buildingPosHIGH;\n\
-uniform vec3 buildingPosLOW;\n\
-uniform vec3 sunPosHIGH[2];\n\
-uniform vec3 sunPosLOW[2];\n\
-uniform vec3 sunDirWC;\n\
-uniform vec3 encodedCameraPositionMCHigh;\n\
-uniform vec3 encodedCameraPositionMCLow;\n\
-uniform vec3 aditionalPosition;\n\
-uniform vec4 oneColor4;\n\
-uniform bool bUse1Color;\n\
-uniform bool hasTexture;\n\
-uniform bool bIsMakingDepth;\n\
-uniform bool bExistAltitudes;\n\
-uniform float near;\n\
-uniform float far;\n\
-uniform bool bApplyShadow;\n\
-uniform int sunIdx;\n\
-uniform bool bApplySpecularLighting;\n\
-uniform bool bUseLogarithmicDepth;\n\
-\n\
-varying float applySpecLighting;\n\
-varying vec3 vNormal;\n\
-varying vec2 vTexCoord;   \n\
-varying vec3 uAmbientColor;\n\
-varying vec3 vLightWeighting;\n\
-varying vec4 vcolor4;\n\
-varying vec3 v3Pos;\n\
-varying float depthValue;\n\
-varying float vFogAmount;\n\
-\n\
-varying vec4 vPosRelToLight; \n\
-varying vec3 vLightDir; \n\
-varying vec3 vNormalWC;\n\
-varying float currSunIdx;\n\
-varying float vAltitude;\n\
-\n\
-void main()\n\
-{	\n\
-    vec3 objPosHigh = buildingPosHIGH;\n\
-    vec3 objPosLow = buildingPosLOW.xyz + position.xyz;\n\
-    vec3 highDifference = objPosHigh.xyz - encodedCameraPositionMCHigh.xyz;\n\
-    vec3 lowDifference = objPosLow.xyz - encodedCameraPositionMCLow.xyz;\n\
-    vec4 pos4 = vec4(highDifference.xyz + lowDifference.xyz, 1.0);\n\
-	\n\
-	vNormal = normalize((normalMatrix4 * vec4(normal.x, normal.y, normal.z, 1.0)).xyz); // original.***\n\
-	vLightDir = vec3(normalMatrix4*vec4(sunDirWC.xyz, 1.0)).xyz;\n\
-	vAltitude = altitude;\n\
-	\n\
-	currSunIdx = -1.0; // initially no apply shadow.\n\
-	if(bApplyShadow && !bIsMakingDepth)\n\
-	{\n\
-		vec3 rotatedNormal = vec3(0.0, 0.0, 1.0); // provisional.***\n\
-		vNormalWC = rotatedNormal;\n\
-					\n\
-		// the sun lights count are 2.\n\
-		vec3 currSunPosLOW;\n\
-		vec3 currSunPosHIGH;\n\
-		mat4 currSunMatrix;\n\
-		if(sunIdx == 0)\n\
-		{\n\
-			currSunPosLOW = sunPosLOW[0];\n\
-			currSunPosHIGH = sunPosHIGH[0];\n\
-			currSunMatrix = sunMatrix[0];\n\
-			currSunIdx = 0.5;\n\
-		}\n\
-		else if(sunIdx == 1)\n\
-		{\n\
-			currSunPosLOW = sunPosLOW[1];\n\
-			currSunPosHIGH = sunPosHIGH[1];\n\
-			currSunMatrix = sunMatrix[1];\n\
-			currSunIdx = 1.5;\n\
-		}\n\
-		\n\
-		// Calculate the vertex relative to light.***\n\
-		vec3 highDifferenceSun = objPosHigh.xyz - currSunPosHIGH.xyz;\n\
-		vec3 lowDifferenceSun = objPosLow.xyz - currSunPosLOW.xyz;\n\
-		vec4 pos4Sun = vec4(highDifferenceSun.xyz + lowDifferenceSun.xyz, 1.0);\n\
-		vec4 posRelToLightAux = currSunMatrix * pos4Sun;\n\
-		\n\
-		// now, check if \"posRelToLightAux\" is inside of the lightVolume (inside of the depthTexture of the light).\n\
-		vec3 posRelToLightNDC = posRelToLightAux.xyz / posRelToLightAux.w;\n\
-		vPosRelToLight = posRelToLightAux;\n\
-	}\n\
-	\n\
-	if(bApplySpecularLighting)\n\
-	{\n\
-		applySpecLighting = 1.0;\n\
-	}\n\
-	else{\n\
-		applySpecLighting = -1.0;\n\
-	}\n\
-	\n\
-	if(bIsMakingDepth)\n\
-	{\n\
-		\n\
-		depthValue = (modelViewMatrixRelToEye * pos4).z/far;\n\
-	}\n\
-	else\n\
-	{\n\
-		\n\
-		vTexCoord = texCoord;\n\
-	}\n\
-    gl_Position = ModelViewProjectionMatrixRelToEye * pos4;\n\
-\n\
-	if(bUseLogarithmicDepth)\n\
-	{\n\
-		\n\
-		// logarithmic zBuffer:\n\
-		// https://www.gamasutra.com/blogs/BranoKemen/20090812/85207/Logarithmic_Depth_Buffer.php\n\
-		// z = log(C*z + 1) / log(C*Far + 1) * w\n\
-		float z = gl_Position.z;\n\
-		float C = 0.001;\n\
-		float w = gl_Position.w;\n\
-		//gl_Position.z = log(C*z + 1.0) / log(C*far + 1.0) * w; // https://outerra.blogspot.com/2009/08/logarithmic-z-buffer.html\n\
-		//gl_Position.z = log(C*z + 1.0) / log(C*far + 1.0) * w + 1000.0/z; // son\n\
-		//if(gl_Position.z/gl_Position.w < -1.0 && gl_Position.z/gl_Position.w > -20000.0)\n\
-		//{\n\
-		//	gl_Position.z = -0.99;\n\
-		//	gl_Position.w = 1.0;\n\
-		//}\n\
-		////gl_Position.z = (2.0*log(C*w + 1.0) / log(C*far + 1.0) - 1.0) * w; // for openGL with depthRange(-1, 1);// https://outerra.blogspot.com/2009/08/logarithmic-z-buffer.html\n\
-		gl_Position.z = log(z/near) / log(far/near)*w; // another way.\n\
-\n\
-		//**************************************************************\n\
-		// https://android.developreference.com/article/21119961/Logarithmic+Depth+Buffer+OpenGL\n\
-		// https://outerra.blogspot.com/2013/07/logarithmic-depth-buffer-optimizations.html\n\
-		//float Fcoef = 2.0 / log2(far + 1.0);\n\
-		//float Fcoef_half = 0.5 * Fcoef;\n\
-		//float flogz = 1.0 + w;\n\
-		//float fragDepth = log2(flogz) * Fcoef_half;\n\
-		//gl_Position.z = log2(max(1e-6, 1.0 + w)) * Fcoef - 1.0;\n\
-		//gl_Position.z = fragDepth;\n\
-		\n\
-		// Reverse depth buffer\n\
-		// https://outerra.blogspot.com/2012/11/maximizing-depth-buffer-range-and.html\n\
-		// https://forum.babylonjs.com/t/reverse-depth-buffer-z-buffer/6905\n\
-	}\n\
-\n\
-	v3Pos = (modelViewMatrixRelToEye * pos4).xyz;\n\
-\n\
-	// calculate fog amount.\n\
-	float fogParam = 1.15 * v3Pos.z/(far - 10000.0);\n\
-	float fogParam2 = fogParam*fogParam;\n\
-	vFogAmount = fogParam2*fogParam2;\n\
-}";
-ShaderSource.update_frag = "precision highp float;\n\
-\n\
-uniform sampler2D u_particles;\n\
-uniform sampler2D u_wind;\n\
-uniform vec2 u_wind_res;\n\
-uniform vec2 u_wind_min;\n\
-uniform vec2 u_wind_max;\n\
-uniform vec3 u_geoCoordRadiansMax;\n\
-uniform vec3 u_geoCoordRadiansMin;\n\
-uniform float u_rand_seed;\n\
-uniform float u_speed_factor;\n\
-uniform float u_interpolation;\n\
-uniform float u_drop_rate;\n\
-uniform float u_drop_rate_bump;\n\
-uniform bool u_flipTexCoordY_windMap;\n\
-uniform vec4 u_visibleTilesRanges[16];\n\
-uniform int u_visibleTilesRangesCount;\n\
-\n\
-varying vec2 v_tex_pos;\n\
-\n\
-// pseudo-random generator\n\
-const vec3 rand_constants = vec3(12.9898, 78.233, 4375.85453);\n\
-// https://community.khronos.org/t/random-values/75728\n\
-float rand(const vec2 co) {\n\
-    float t = dot(rand_constants.xy, co);\n\
-    return fract(sin(t) * (rand_constants.z + t));\n\
-}\n\
-\n\
-// wind speed lookup; use manual bilinear filtering based on 4 adjacent pixels for smooth interpolation\n\
-vec2 lookup_wind(const vec2 uv) {\n\
-    //return texture2D(u_wind, uv).rg; // lower-res hardware filtering\n\
-	\n\
-    vec2 px = 1.0 / u_wind_res;\n\
-    vec2 vc = (floor(uv * u_wind_res)) * px;\n\
-    vec2 f = fract(uv * u_wind_res);\n\
-    vec2 tl = texture2D(u_wind, vc).rg;\n\
-    vec2 tr = texture2D(u_wind, vc + vec2(px.x, 0)).rg;\n\
-    vec2 bl = texture2D(u_wind, vc + vec2(0, px.y)).rg;\n\
-    vec2 br = texture2D(u_wind, vc + px).rg;\n\
-    return mix(mix(tl, tr, f.x), mix(bl, br, f.x), f.y);\n\
-	\n\
-}\n\
-\n\
-bool checkFrustumCulling(vec2 pos)\n\
-{\n\
-	for(int i=0; i<16; i++)\n\
-	{\n\
-		if(i >= u_visibleTilesRangesCount)\n\
-		return false;\n\
-		\n\
-		vec4 range = u_visibleTilesRanges[i]; // range = minX(x), minY(y), maxX(z), maxY(w)\n\
-\n\
-		float minX = range.x;\n\
-		float minY = range.y;\n\
-		float maxX = range.z;\n\
-		float maxY = range.w;\n\
-		\n\
-		if(pos.x > minX && pos.x < maxX)\n\
-		{\n\
-			if(pos.y > minY && pos.y < maxY)\n\
-			{\n\
-				return true;\n\
-			}\n\
-		}\n\
-	}\n\
-	return false;\n\
-}\n\
-\n\
-void main() {\n\
-    vec4 color = texture2D(u_particles, v_tex_pos);\n\
-    vec2 pos = vec2(\n\
-        color.r / 255.0 + color.b,\n\
-        color.g / 255.0 + color.a); // decode particle position from pixel RGBA\n\
-	vec2 windMapTexCoord = pos;\n\
-	if(u_flipTexCoordY_windMap)\n\
-	{\n\
-		windMapTexCoord.y = 1.0 - windMapTexCoord.y;\n\
-	}\n\
-    vec2 velocity = mix(u_wind_min, u_wind_max, lookup_wind(windMapTexCoord));\n\
-    float speed_t = length(velocity) / length(u_wind_max);\n\
-\n\
-    // take EPSG:4236 distortion into account for calculating where the particle moved\n\
-	float minLat = u_geoCoordRadiansMin.y;\n\
-	float maxLat = u_geoCoordRadiansMax.y;\n\
-	float latRange = maxLat - minLat;\n\
-	float distortion = cos((minLat + pos.y * latRange ));\n\
-    vec2 offset = vec2(velocity.x / distortion, -velocity.y) * 0.0001 * u_speed_factor * u_interpolation;\n\
-\n\
-    // update particle position, wrapping around the date line\n\
-    pos = fract(1.0 + pos + offset);\n\
-\n\
-\n\
-    // drop rate is a chance a particle will restart at random position, to avoid degeneration\n\
-	float drop = 0.0;\n\
-\n\
-	if(u_interpolation < 0.99) // 0.9\n\
-	{\n\
-		drop = 0.0;\n\
-	}\n\
-	else\n\
-	{\n\
-		// a random seed to use for the particle drop\n\
-		vec2 seed = (pos + v_tex_pos) * u_rand_seed;\n\
-		float drop_rate = u_drop_rate + speed_t * u_drop_rate_bump;\n\
-		drop = step(1.0 - drop_rate, rand(seed));\n\
-	}\n\
-	/*\n\
-	if(drop > 0.5) // 0.01\n\
-	{\n\
-		vec2 random_pos = vec2( rand(pos), rand(v_tex_pos) );\n\
-		float randomValue = (u_rand_seed);\n\
-		int index = int(floor(float(u_visibleTilesRangesCount+1)*(randomValue)));\n\
-		for(int i=0; i<32; i++)\n\
-		{\n\
-			if(i >= u_visibleTilesRangesCount)\n\
-			break;\n\
-		\n\
-			if(i == index)\n\
-			{\n\
-				vec4 posAux4 = u_visibleTilesRanges[i];\n\
-				float width = (posAux4.z-posAux4.x);\n\
-				float height = (posAux4.w-posAux4.y);\n\
-				float scaledX = posAux4.x + random_pos.x*width;\n\
-				float scaledY = posAux4.y + random_pos.y*height;\n\
-				random_pos = vec2(scaledX, 1.0-scaledY);\n\
-				pos = random_pos;\n\
-				break;\n\
-			}\n\
-		}\n\
-	}\n\
-	*/\n\
-	\n\
-	\n\
-	if(drop > 0.01)\n\
-	{\n\
-		vec2 random_pos = vec2( rand(pos), rand(v_tex_pos) );\n\
-		pos = random_pos;\n\
-	}\n\
-	\n\
-\n\
-    // encode the new particle position back into RGBA\n\
-    gl_FragColor = vec4(\n\
-        fract(pos * 255.0),\n\
-        floor(pos * 255.0) / 255.0);\n\
-}";
-ShaderSource.vol_fs = "#ifdef GL_ES\n\
-precision highp float;\n\
-#endif\n\
-\n\
-//---------------------------------------------------------\n\
-// MACROS\n\
-//---------------------------------------------------------\n\
-\n\
-#define EPS       0.0001\n\
-#define PI        3.14159265\n\
-#define HALFPI    1.57079633\n\
-#define ROOTTHREE 1.73205081\n\
-\n\
-#define EQUALS(A,B) ( abs((A)-(B)) < EPS )\n\
-#define EQUALSZERO(A) ( ((A)<EPS) && ((A)>-EPS) )\n\
-\n\
-\n\
-//---------------------------------------------------------\n\
-// CONSTANTS\n\
-//---------------------------------------------------------\n\
-\n\
-// 32 48 64 96 128\n\
-#define MAX_STEPS 64\n\
-\n\
-#define LIGHT_NUM 2\n\
-//#define uTMK 20.0\n\
-#define TM_MIN 0.05\n\
-\n\
-\n\
-//---------------------------------------------------------\n\
-// SHADER VARS\n\
-//---------------------------------------------------------\n\
-\n\
-varying vec2 vUv;\n\
-varying vec3 vPos0; // position in world coords\n\
-varying vec3 vPos1; // position in object coords\n\
-varying vec3 vPos1n; // normalized 0 to 1, for texture lookup\n\
-\n\
-uniform vec3 uOffset; // TESTDEBUG\n\
-\n\
-uniform vec3 uCamPos;\n\
-\n\
-uniform vec3 uLightP[LIGHT_NUM];  // point lights\n\
-uniform vec3 uLightC[LIGHT_NUM];\n\
-\n\
-uniform vec3 uColor;      // color of volume\n\
-uniform sampler2D uTex;   // 3D(2D) volume texture\n\
-uniform vec3 uTexDim;     // dimensions of texture\n\
-\n\
-uniform float uTMK;\n\
-\n\
-float gStepSize;\n\
-float gStepFactor;\n\
-\n\
-\n\
-//---------------------------------------------------------\n\
-// PROGRAM\n\
-//---------------------------------------------------------\n\
-\n\
-// TODO: convert world to local volume space\n\
-vec3 toLocal(vec3 p) {\n\
-  return p + vec3(0.5);\n\
-}\n\
-\n\
-float sampleVolTex(vec3 pos) {\n\
-  pos = pos + uOffset; // TESTDEBUG\n\
-  \n\
-  // note: z is up in 3D tex coords, pos.z is tex.y, pos.y is zSlice\n\
-  float zSlice = (1.0-pos.y)*(uTexDim.z-1.0);   // float value of slice number, slice 0th to 63rd\n\
-  \n\
-  // calc pixels from top of texture\n\
-  float fromTopPixels =\n\
-    floor(zSlice)*uTexDim.y +   // offset pix from top of tex, from upper slice  \n\
-    pos.z*(uTexDim.y-1.0) +     // y pos in pixels, range 0th to 63rd pix\n\
-    0.5;  // offset to center of cell\n\
-    \n\
-  // calc y tex coords of two slices\n\
-  float y0 = min( (fromTopPixels)/(uTexDim.y*uTexDim.z), 1.0);\n\
-  float y1 = min( (fromTopPixels+uTexDim.y)/(uTexDim.y*uTexDim.z), 1.0);\n\
-    \n\
-  // get (bi)linear interped texture reads at two slices\n\
-  float z0 = texture2D(uTex, vec2(pos.x, y0)).g;\n\
-  float z1 = texture2D(uTex, vec2(pos.x, y1)).g;\n\
-  \n\
-  // lerp them again (thus trilinear), using remaining fraction of zSlice\n\
-  return mix(z0, z1, fract(zSlice));\n\
-}\n\
-\n\
-// accumulate density by ray marching\n\
-float getDensity(vec3 ro, vec3 rd) {\n\
-  vec3 step = rd*gStepSize;\n\
-  vec3 pos = ro;\n\
-  \n\
-  float density = 0.0;\n\
-  \n\
-  for (int i=0; i<MAX_STEPS; ++i) {\n\
-    density += (1.0-density) * sampleVolTex(pos) * gStepFactor;\n\
-    //density += sampleVolTex(pos);\n\
-    \n\
-    pos += step;\n\
-    \n\
-    if (density > 0.95 ||\n\
-      pos.x > 1.0 || pos.x < 0.0 ||\n\
-      pos.y > 1.0 || pos.y < 0.0 ||\n\
-      pos.z > 1.0 || pos.z < 0.0)\n\
-      break;\n\
-  }\n\
-  \n\
-  return density;\n\
-}\n\
-\n\
-// calc transmittance\n\
-float getTransmittance(vec3 ro, vec3 rd) {\n\
-  vec3 step = rd*gStepSize;\n\
-  vec3 pos = ro;\n\
-  \n\
-  float tm = 1.0;\n\
-  \n\
-  for (int i=0; i<MAX_STEPS; ++i) {\n\
-    tm *= exp( -uTMK*gStepSize*sampleVolTex(pos) );\n\
-    \n\
-    pos += step;\n\
-    \n\
-    if (tm < TM_MIN ||\n\
-      pos.x > 1.0 || pos.x < 0.0 ||\n\
-      pos.y > 1.0 || pos.y < 0.0 ||\n\
-      pos.z > 1.0 || pos.z < 0.0)\n\
-      break;\n\
-  }\n\
-  \n\
-  return tm;\n\
-}\n\
-\n\
-vec4 raymarchNoLight(vec3 ro, vec3 rd) {\n\
-  vec3 step = rd*gStepSize;\n\
-  vec3 pos = ro;\n\
-  \n\
-  vec3 col = vec3(0.0);\n\
-  float tm = 1.0;\n\
-  \n\
-  for (int i=0; i<MAX_STEPS; ++i) {\n\
-    float dtm = exp( -uTMK*gStepSize*sampleVolTex(pos) );\n\
-    tm *= dtm;\n\
-    \n\
-    col += (1.0-dtm) * uColor * tm;\n\
-    \n\
-    pos += step;\n\
-    \n\
-    if (tm < TM_MIN ||\n\
-      pos.x > 1.0 || pos.x < 0.0 ||\n\
-      pos.y > 1.0 || pos.y < 0.0 ||\n\
-      pos.z > 1.0 || pos.z < 0.0)\n\
-      break;\n\
-  }\n\
-  \n\
-  float alpha = 1.0-tm;\n\
-  return vec4(col/alpha, alpha);\n\
-}\n\
-\n\
-vec4 raymarchLight(vec3 ro, vec3 rd) {\n\
-  vec3 step = rd*gStepSize;\n\
-  vec3 pos = ro;\n\
-  \n\
-  \n\
-  vec3 col = vec3(0.0);   // accumulated color\n\
-  float tm = 1.0;         // accumulated transmittance\n\
-  \n\
-  for (int i=0; i<MAX_STEPS; ++i) {\n\
-    // delta transmittance \n\
-    float dtm = exp( -uTMK*gStepSize*sampleVolTex(pos) );\n\
-    tm *= dtm;\n\
-    \n\
-    // get contribution per light\n\
-    for (int k=0; k<LIGHT_NUM; ++k) {\n\
-      vec3 ld = normalize( toLocal(uLightP[k])-pos );\n\
-      float ltm = getTransmittance(pos,ld);\n\
-      \n\
-      col += (1.0-dtm) * uColor*uLightC[k] * tm * ltm;\n\
-    }\n\
-    \n\
-    pos += step;\n\
-    \n\
-    if (tm < TM_MIN ||\n\
-      pos.x > 1.0 || pos.x < 0.0 ||\n\
-      pos.y > 1.0 || pos.y < 0.0 ||\n\
-      pos.z > 1.0 || pos.z < 0.0)\n\
-      break;\n\
-  }\n\
-  \n\
-  float alpha = 1.0-tm;\n\
-  return vec4(col/alpha, alpha);\n\
-}\n\
-\n\
-void main() {\n\
-  // in world coords, just for now\n\
-  vec3 ro = vPos1n;\n\
-  vec3 rd = normalize( ro - toLocal(uCamPos) );\n\
-  //vec3 rd = normalize(ro-uCamPos);\n\
-  \n\
-  // step_size = root_three / max_steps ; to get through diagonal  \n\
-  gStepSize = ROOTTHREE / float(MAX_STEPS);\n\
-  gStepFactor = 32.0 * gStepSize;\n\
-  \n\
-  gl_FragColor = raymarchLight(ro, rd);\n\
-  //gl_FragColor = vec4(uColor, getDensity(ro,rd));\n\
-  //gl_FragColor = vec4(vec3(sampleVolTex(pos)), 1.0);\n\
-  //gl_FragColor = vec4(vPos1n, 1.0);\n\
-  //gl_FragColor = vec4(uLightP[0], 1.0);\n\
-}";
-ShaderSource.vol_vs = "attribute vec3 aPosition;\n\
-\n\
-uniform sampler2D diffuseTex;\n\
-uniform mat4 projectionMatrix;  \n\
-uniform mat4 modelViewMatrix;\n\
-uniform mat4 modelViewMatrixRelToEye; \n\
-uniform mat4 ModelViewProjectionMatrixRelToEye;\n\
-uniform vec3 encodedCameraPositionMCHigh;\n\
-uniform vec3 encodedCameraPositionMCLow;\n\
-\n\
-varying vec3 vNormal;\n\
-varying vec3 vPosObjectCoord;\n\
-varying vec3 vPosCameraCoord;\n\
-varying vec3 vPosWorldCoord;\n\
-\n\
-// Render a fullScreen quad (2 triangles).***\n\
-void main()\n\
-{\n\
-	vec4 rotatedPos = buildingRotMatrix * vec4(position.xyz + aditionalPosition.xyz, 1.0);\n\
-    vec3 objPosHigh = buildingPosHIGH;\n\
-    vec3 objPosLow = buildingPosLOW.xyz + rotatedPos.xyz;\n\
-    vec3 highDifference = objPosHigh.xyz - encodedCameraPositionMCHigh.xyz;\n\
-    vec3 lowDifference = objPosLow.xyz - encodedCameraPositionMCLow.xyz;\n\
-    vec4 pos4 = vec4(highDifference.xyz + lowDifference.xyz, 1.0);\n\
-	\n\
-    gl_Position = ModelViewProjectionMatrixRelToEye * pos4;\n\
-}";
-ShaderSource.wgs84_volumFS = "precision mediump float;\n\
-\n\
-#define M_PI 3.1415926535897932384626433832795\n\
-\n\
-uniform sampler2D volumeTex;\n\
-uniform mat4 projectionMatrix;  \n\
-uniform mat4 modelViewMatrix;\n\
-uniform mat4 modelViewMatrixInv;\n\
-uniform mat4 modelViewMatrixRelToEye; \n\
-uniform mat4 ModelViewProjectionMatrixRelToEye;\n\
-uniform vec3 encodedCameraPositionMCHigh;\n\
-uniform vec3 encodedCameraPositionMCLow;\n\
-\n\
-uniform float screenWidth;    \n\
-uniform float screenHeight;\n\
-uniform float aspectRatio;\n\
-uniform float far;\n\
-uniform float fovyRad;\n\
-uniform float tanHalfFovy;\n\
-\n\
-// volume tex definition.***\n\
-uniform int texNumCols;\n\
-uniform int texNumRows;\n\
-uniform int texNumSlices;\n\
-uniform int numSlicesPerStacks;\n\
-uniform int slicesNumCols;\n\
-uniform int slicesNumRows;\n\
-uniform float maxLon;\n\
-uniform float minLon;\n\
-uniform float maxLat;\n\
-uniform float minLat;\n\
-uniform float maxAlt;\n\
-uniform float minAlt;\n\
-uniform vec4 cuttingPlanes[6];   \n\
-uniform int cuttingPlanesCount;\n\
-\n\
-uniform float maxValue;\n\
-uniform float minValue;\n\
-\n\
-vec3 getViewRay(vec2 tc)\n\
-{\n\
-	float hfar = 2.0 * tanHalfFovy * far;\n\
-    float wfar = hfar * aspectRatio;    \n\
-    vec3 ray = vec3(wfar * (tc.x - 0.5), hfar * (tc.y - 0.5), -far);    \n\
-    return ray;                      \n\
-} \n\
-\n\
-float squaredLength(vec3 point1, vec3 point2)\n\
-{\n\
-	float a = point1.x - point2.x;\n\
-	float b = point1.y - point2.y;\n\
-	float c = point1.z - point2.z;\n\
-	\n\
-	float sqDist = a*a + b*b + c*c;\n\
-	return sqDist;\n\
-}\n\
-\n\
-void intersectionLineSphere(float radius, vec3 rayPos, vec3 rayDir, out int intersectType, out vec3 nearIntersectPos, out vec3 farIntersectPos)\n\
-{\n\
-	// line: (x, y, z) = x1 + t(x2 - x1), y1 + t(y2 - y1), z1 + t(z2 - z1)\n\
-	// sphere: (x - x3)^2 + (y - y3)^2 + (z - z3)^2 = r^2, where x3, y3, z3 is the center of the sphere.\n\
-	\n\
-	// line:\n\
-	vec3 p1 = rayPos;\n\
-	vec3 lineDir = rayDir;\n\
-	float dist = 1000.0;// any value is ok.***\n\
-	vec3 p2 = vec3(p1.x + lineDir.x * dist, p1.y + lineDir.y * dist, p1.z + lineDir.z * dist);\n\
-	float x1 = p1.x;\n\
-	float y1 = p1.y;\n\
-	float z1 = p1.z;\n\
-	float x2 = p2.x;\n\
-	float y2 = p2.y;\n\
-	float z2 = p2.z;\n\
-\n\
-	// sphere:\n\
-	float x3 = 0.0;\n\
-	float y3 = 0.0;\n\
-	float z3 = 0.0;\n\
-	float r = radius;\n\
-	\n\
-	// resolve:\n\
-	float x21 = (x2-x1);\n\
-	float y21 = (y2-y1);\n\
-	float z21 = (z2-z1);\n\
-	\n\
-	float a = x21*x21 + y21*y21 + z21*z21;\n\
-	\n\
-	float x13 = (x1-x3);\n\
-	float y13 = (y1-y3);\n\
-	float z13 = (z1-z3);\n\
-	\n\
-	float b = 2.0*(x21 * x13 + y21 * y13 + z21 * z13);\n\
-	\n\
-	float c = x3*x3 + y3*y3 + z3*z3 + x1*x1 + y1*y1 + z1*z1 - 2.0*(x3*x1 + y3*y1+ z3*z1) - r*r;\n\
-	\n\
-	float discriminant = b*b - 4.0*a*c;\n\
-	\n\
-	if (discriminant < 0.0)\n\
-	{\n\
-		// no intersection.***\n\
-		intersectType = 0;\n\
-	}\n\
-	else if (discriminant == 0.0)\n\
-	{\n\
-		// this is tangent.***\n\
-		intersectType = 1;\n\
-		\n\
-		float t1 = (-b)/(2.0*a);\n\
-		nearIntersectPos = vec3(x1 + (x2 - x1)*t1, y1 + (y2 - y1)*t1, z1 + (z2 - z1)*t1);\n\
-	}\n\
-	else\n\
-	{\n\
-		intersectType = 2;\n\
-		\n\
-		// find the nearest to p1.***\n\
-		float sqrtDiscriminant = sqrt(discriminant);\n\
-		float t1 = (-b + sqrtDiscriminant)/(2.0*a);\n\
-		float t2 = (-b - sqrtDiscriminant)/(2.0*a);\n\
-		\n\
-		// solution 1.***\n\
-		vec3 intersectPoint1 = vec3(x1 + (x2 - x1)*t1, y1 + (y2 - y1)*t1, z1 + (z2 - z1)*t1);\n\
-		vec3 intersectPoint2 = vec3(x1 + (x2 - x1)*t2, y1 + (y2 - y1)*t2, z1 + (z2 - z1)*t2);\n\
-		\n\
-		float dist1 = squaredLength(p1,intersectPoint1);\n\
-		float dist2 = squaredLength(p1,intersectPoint2);\n\
-		\n\
-		// nearIntersectPos, out vec3 farIntersectPos\n\
-		if (dist1 < dist2)\n\
-		{\n\
-			nearIntersectPos = intersectPoint1;\n\
-			farIntersectPos = intersectPoint2;\n\
-		}\n\
-		else\n\
-		{\n\
-			nearIntersectPos = intersectPoint2;\n\
-			farIntersectPos = intersectPoint1;\n\
-		}\n\
-	}\n\
-}\n\
-\n\
-float atan2(float y, float x) \n\
-{\n\
-	if(x > 0.0)\n\
-	{\n\
-		return atan(y/x);\n\
-	}\n\
-	else if(x < 0.0)\n\
-	{\n\
-		if(y >= 0.0)\n\
-		{\n\
-			return atan(y/x) + M_PI;\n\
-		}\n\
-		else{\n\
-			return atan(y/x) - M_PI;\n\
-		}\n\
-	}\n\
-	else if(x == 0.0)\n\
-	{\n\
-		if(y>0.0)\n\
-		{\n\
-			return M_PI/2.0;\n\
-		}\n\
-		else if(y<0.0)\n\
-		{\n\
-			return -M_PI/2.0;\n\
-		}\n\
-		else{\n\
-			return 0.0; // return undefined.***\n\
-		}\n\
-	}\n\
-}\n\
-\n\
-void cartesianToGeographicWgs84(vec3 point, out vec3 result) \n\
-{\n\
-	// From WebWorldWind.***\n\
-	// According to H. Vermeille, An analytical method to transform geocentric into geodetic coordinates\n\
-	// http://www.springerlink.com/content/3t6837t27t351227/fulltext.pdf\n\
-	\n\
-	float firstEccentricitySquared = 6.69437999014E-3;\n\
-	float equatorialRadius = 6378137.0;\n\
-\n\
-	// wwwind coord type.***\n\
-	// X = point.z;\n\
-	// Y = point.x;\n\
-	// Z = point.y;\n\
-\n\
-	// magoWorld coord type.***\n\
-	float X = point.x;\n\
-	float Y = point.y;\n\
-	float Z = point.z;\n\
-	float XXpYY = X * X + Y * Y;\n\
-	float sqrtXXpYY = sqrt(XXpYY);\n\
-	float a = equatorialRadius;\n\
-	float ra2 = 1.0 / (a * a);\n\
-	float e2 = firstEccentricitySquared;\n\
-	float e4 = e2 * e2;\n\
-	float p = XXpYY * ra2;\n\
-	float q = Z * Z * (1.0 - e2) * ra2;\n\
-	float r = (p + q - e4) / 6.0;\n\
-	float h;\n\
-	float phi;\n\
-	float u;\n\
-	float evoluteBorderTest = 8.0 * r * r * r + e4 * p * q;\n\
-	float rad1;\n\
-	float rad2;\n\
-	float rad3;\n\
-	float atanAux;\n\
-	float v;\n\
-	float w;\n\
-	float k;\n\
-	float D;\n\
-	float sqrtDDpZZ;\n\
-	float e;\n\
-	float lambda;\n\
-	float s2;\n\
-	float cbrtFac = 1.0/3.0;\n\
-\n\
-	if (evoluteBorderTest > 0.0 || q != 0.0) \n\
-	{\n\
-		if (evoluteBorderTest > 0.0) \n\
-		{\n\
-			// Step 2: general case\n\
-			rad1 = sqrt(evoluteBorderTest);\n\
-			rad2 = sqrt(e4 * p * q);\n\
-\n\
-			// 10*e2 is my arbitrary decision of what Vermeille means by near... the cusps of the evolute.\n\
-			if (evoluteBorderTest > 10.0 * e2) \n\
-			{\n\
-				rad3 = pow((rad1 + rad2) * (rad1 + rad2), cbrtFac);\n\
-				u = r + 0.5 * rad3 + 2.0 * r * r / rad3;\n\
-			}\n\
-			else \n\
-			{\n\
-				u = r + 0.5 * pow((rad1 + rad2) * (rad1 + rad2), cbrtFac)\n\
-					+ 0.5 * pow((rad1 - rad2) * (rad1 - rad2), cbrtFac);\n\
-			}\n\
-		}\n\
-		else \n\
-		{\n\
-			// Step 3: near evolute\n\
-			rad1 = sqrt(-evoluteBorderTest);\n\
-			rad2 = sqrt(-8.0 * r * r * r);\n\
-			rad3 = sqrt(e4 * p * q);\n\
-			atanAux = 2.0 * atan2(rad3, rad1 + rad2) / 3.0;\n\
-\n\
-			u = -4.0 * r * sin(atanAux) * cos(M_PI / 6.0 + atanAux);\n\
-		}\n\
-\n\
-		v = sqrt(u * u + e4 * q);\n\
-		w = e2 * (u + v - q) / (2.0 * v);\n\
-		k = (u + v) / (sqrt(w * w + u + v) + w);\n\
-		D = k * sqrtXXpYY / (k + e2);\n\
-		sqrtDDpZZ = sqrt(D * D + Z * Z);\n\
-\n\
-		h = (k + e2 - 1.0) * sqrtDDpZZ / k;\n\
-		phi = 2.0 * atan2(Z, sqrtDDpZZ + D);\n\
-	}\n\
-	else \n\
-	{\n\
-		// Step 4: singular disk\n\
-		rad1 = sqrt(1.0 - e2);\n\
-		rad2 = sqrt(e2 - p);\n\
-		e = sqrt(e2);\n\
-\n\
-		h = -a * rad1 * rad2 / e;\n\
-		phi = rad2 / (e * rad2 + rad1 * sqrt(p));\n\
-	}\n\
-\n\
-	// Compute lambda\n\
-	s2 = sqrt(2.0);\n\
-	if ((s2 - 1.0) * Y < sqrtXXpYY + X) \n\
-	{\n\
-		// case 1 - -135deg < lambda < 135deg\n\
-		lambda = 2.0 * atan2(Y, sqrtXXpYY + X);\n\
-	}\n\
-	else if (sqrtXXpYY + Y < (s2 + 1.0) * X) \n\
-	{\n\
-		// case 2 - -225deg < lambda < 45deg\n\
-		lambda = -M_PI * 0.5 + 2.0 * atan2(X, sqrtXXpYY - Y);\n\
-	}\n\
-	else \n\
-	{\n\
-		// if (sqrtXXpYY-Y<(s2=1)*X) {  // is the test, if needed, but it's not\n\
-		// case 3: - -45deg < lambda < 225deg\n\
-		lambda = M_PI * 0.5 - 2.0 * atan2(X, sqrtXXpYY + Y);\n\
-	}\n\
-\n\
-	float factor = 180.0 / M_PI;\n\
-	result = vec3(factor * lambda, factor * phi, h); // (longitude, latitude, altitude).***\n\
-}\n\
-\n\
-bool isPointRearCamera(vec3 point, vec3 camPos, vec3 camDir)\n\
-{\n\
-	bool isRear = false;\n\
-	float lambdaX = 10.0;\n\
-	float lambdaY = 10.0;\n\
-	float lambdaZ = 10.0;\n\
-	if(abs(camDir.x) > 0.0000001)\n\
-	{\n\
-		float lambdaX = (point.x - camPos.x)/camDir.x;\n\
-	}\n\
-	else if(abs(camDir.y) > 0.0000001)\n\
-	{\n\
-		float lambdaY = (point.y - camPos.y)/camDir.y;\n\
-	}\n\
-	else if(abs(camDir.z) > 0.0000001)\n\
-	{\n\
-		float lambdaZ = (point.z - camPos.z)/camDir.z;\n\
-	}\n\
-	\n\
-	if(lambdaZ < 0.0 || lambdaY < 0.0 || lambdaX < 0.0)\n\
-			isRear = true;\n\
-		else\n\
-			isRear = false;\n\
-	return isRear;\n\
-}\n\
-\n\
-float distPointToPlane(vec3 point, vec4 plane)\n\
-{\n\
-	return (point.x*plane.x + point.y*plane.y + point.z*plane.z + plane.w);\n\
-}\n\
-\n\
-bool getValue(vec3 geoLoc, out vec4 value)\n\
-{\n\
-	// geoLoc = (longitude, latitude, altitude).***\n\
-	float lon = geoLoc.x;\n\
-	float lat = geoLoc.y;\n\
-	float alt = geoLoc.z;\n\
-	\n\
-	// 1rst, check if geoLoc intersects the volume.***\n\
-	// Note: minLon, maxLon, minLat, maxLat, minAlt & maxAlt are uniforms.***\n\
-	if(lon < minLon || lon > maxLon)\n\
-		return false;\n\
-	else if(lat < minLat || lat > maxLat)\n\
-		return false;\n\
-	else if(alt < minAlt || alt > maxAlt)\n\
-		return false;\n\
-		\n\
-	float lonRange = maxLon - minLon;\n\
-	float latRange = maxLat - minLat;\n\
-	float altRange = maxAlt - minAlt;\n\
-	float col = (lon - minLon)/lonRange * float(slicesNumCols); \n\
-	float row = (lat - minLat)/latRange * float(slicesNumRows); \n\
-	float slice = (alt - minAlt)/altRange * float(texNumSlices); // slice if texture has only one stack.***\n\
-	float sliceDown = floor(slice);\n\
-	float sliceUp = ceil(slice);\n\
-	float sliceDownDist = slice - sliceDown;\n\
-	//slice = 18.0; // test. force slice to nearest to ground.***\n\
-	\n\
-	float stackDown = floor(sliceDown/float(numSlicesPerStacks));\n\
-	float realSliceDown = sliceDown - stackDown * float(numSlicesPerStacks);\n\
-	float tx = stackDown * float(slicesNumCols) + col;\n\
-	float ty = realSliceDown * float(slicesNumRows) + row;\n\
-	vec2 texCoord = vec2(tx/float(texNumCols), ty/float(texNumRows));\n\
-	vec4 valueDown = texture2D(volumeTex, texCoord);\n\
-	\n\
-	if(sliceDown < float(texNumSlices-1))\n\
-	{\n\
-		float stackUp = floor(sliceUp/float(numSlicesPerStacks));\n\
-		float realSliceUp = sliceUp - stackUp * float(numSlicesPerStacks);\n\
-		float tx2 = stackUp * float(slicesNumCols) + col;\n\
-		float ty2 = realSliceUp * float(slicesNumRows) + row;\n\
-		vec2 texCoord2 = vec2(tx2/float(texNumCols), ty2/float(texNumRows));\n\
-		vec4 valueUp = texture2D(volumeTex, texCoord2);\n\
-		value = valueDown*(1.0-sliceDownDist)+valueUp*(sliceDownDist);\n\
-	}\n\
-	else{\n\
-		value = valueDown;\n\
-	}\n\
-	//if((value.r * (maxValue - minValue)) > maxValue * 0.3)\n\
-	//	return true;\n\
-	//else return false;\n\
-	return true;\n\
-}\n\
-\n\
-void main() {\n\
-	vec2 screenPos = vec2(gl_FragCoord.x / screenWidth, gl_FragCoord.y / screenHeight);\n\
-	float linearDepth = 1.0; // the quad is 1m of dist of the camera.***          \n\
-    vec3 rayCamCoord = getViewRay(screenPos) * linearDepth;  \n\
-	rayCamCoord = normalize(rayCamCoord);\n\
-	\n\
-	vec3 camTarget = rayCamCoord * 10000.0;\n\
-	vec4 camPosWorld = vec4(encodedCameraPositionMCHigh + encodedCameraPositionMCLow, 1.0);\n\
-	vec4 camTargetWorld = modelViewMatrixInv * vec4(camTarget.xyz, 1.0);\n\
-	vec3 camDirWorld = camTargetWorld.xyz - camPosWorld.xyz;\n\
-	camDirWorld = normalize(camDirWorld);\n\
-\n\
-	// now, must find sampling points.***\n\
-	int intersectType = 0;\n\
-	vec3 nearP;\n\
-	vec3 farP;\n\
-	float radius = 6378137.0 + maxAlt; // equatorial radius.***\n\
-	//radius = 6250000.0 + maxAlt; // test radius.***\n\
-	\n\
-	intersectionLineSphere(radius, camPosWorld.xyz, camDirWorld, intersectType, nearP, farP);\n\
-	\n\
-	if(intersectType == 0)\n\
-	{\n\
-		discard;\n\
-	}\n\
-		\n\
-	if(intersectType == 1)\n\
-	{\n\
-		// provisionally discard.***\n\
-		discard;	\n\
-	}\n\
-	\n\
-	// check if nearP is rear of the camera.***\n\
-	if(isPointRearCamera(nearP, camPosWorld.xyz, camDirWorld.xyz))\n\
-	{\n\
-		nearP = vec3(camPosWorld.xyz);\n\
-	}\n\
-	float dist = distance(nearP, farP);\n\
-	float testDist = dist;\n\
-	if(dist > 1500000.0)\n\
-		testDist = 1500000.0;\n\
-	\n\
-	// now calculate the geographicCoords of 2 points.***\n\
-	// now, depending the dist(nearP, endPoint), determine numSmples.***\n\
-	// provisionally take 16 samples.***\n\
-	float numSamples = 512.0;\n\
-	vec4 color = vec4(0.0, 0.0, 0.0, 0.0);\n\
-	float alpha = 0.8/numSamples;\n\
-	float tempRange = maxValue - minValue;\n\
-	vec4 value;\n\
-	float totalValue = 0.0;\n\
-	int sampledsCount = 0;\n\
-	int intAux = 0;\n\
-	float increDist = testDist / numSamples;\n\
-	int c = 0;\n\
-	bool isPointRearPlane = true;\n\
-	for(int i=0; i<512; i++)\n\
-	{\n\
-		vec3 currGeoLoc;\n\
-		vec3 currPosWorld = vec3(nearP.x + camDirWorld.x * increDist*float(c), nearP.y + camDirWorld.y * increDist*float(c), nearP.z + camDirWorld.z * increDist*float(c));\n\
-		// Check if the currPosWorld is in front or rear of planes (if exist planes).***\n\
-		int planesCounter = 0;\n\
-		for(int j=0; j<6; j++)\n\
-		{\n\
-			if(planesCounter == cuttingPlanesCount)\n\
-				break;\n\
-			\n\
-			vec4 plane = cuttingPlanes[j];\n\
-			float dist = distPointToPlane(currPosWorld, plane);\n\
-			if(dist > 0.0)\n\
-			{\n\
-				isPointRearPlane = false;\n\
-				break;\n\
-			}\n\
-			else{\n\
-				isPointRearPlane = true;\n\
-			}\n\
-			planesCounter++;\n\
-		}\n\
-		\n\
-		\n\
-		if(isPointRearPlane)\n\
-		{\n\
-			cartesianToGeographicWgs84(currPosWorld, currGeoLoc);\n\
-			if(getValue(currGeoLoc, value))\n\
-			{\n\
-				float realValue = value.r * tempRange + minValue*255.0;\n\
-				totalValue += (value.r);\n\
-				sampledsCount += 1;\n\
-			}\n\
-		}\n\
-		if(sampledsCount >= 1)\n\
-		{\n\
-			break;\n\
-		}\n\
-		c++;\n\
-	}\n\
-	if(sampledsCount == 0)\n\
-	{\n\
-		discard;\n\
-	}\n\
-	float fValue = totalValue/numSamples;\n\
-	fValue = totalValue;\n\
-	if(fValue > 1.0)\n\
-	{\n\
-		gl_FragColor = vec4(1.0, 0.0, 0.0, 1.0);\n\
-		return;\n\
-	}\n\
-	float b = 1.0 - fValue;\n\
-	float g;\n\
-	if(fValue > 0.5)\n\
-	{\n\
-		g = 2.0-2.0*fValue;\n\
-	}\n\
-	else{\n\
-		g = 2.0*fValue;\n\
-	}\n\
-	float r = fValue;\n\
-	color += vec4(r,g,b,0.8);\n\
-	gl_FragColor = color;\n\
-}";
-ShaderSource.wgs84_volumVS = "precision mediump float;\n\
-\n\
-attribute vec3 position;\n\
-uniform mat4 projectionMatrix;\n\
-\n\
-void main()\n\
-{	\n\
-	vec4 pos = projectionMatrix * vec4(position.xyz, 1.0);\n\
-    gl_Position = pos;\n\
-}";
-
-'use strict';
-
-/**
- * 어떤 일을 하고 있습니까?
- * @class Uniform1fDataPair
- * @param gl 변수
- */
-var Uniform1fDataPair = function(gl, uniformName) 
-{
-	if (!(this instanceof Uniform1fDataPair)) 
-	{
-		throw new Error(Messages.CONSTRUCT_ERROR);
-	}
-	this.gl = gl;
-	this.name = uniformName;
-	this.uniformLocation;
-	this.floatValue; 
-};
-
-/**
- * 어떤 일을 하고 있습니까?
- * @param gl 변수
- */
-Uniform1fDataPair.prototype.bindUniform = function() 
-{
-	this.gl.uniform1f(this.uniformLocation, this.floatValue[0]);
-};
-'use strict';
-
-/**
- * 어떤 일을 하고 있습니까?
- * @class Uniform1iDataPair
- * @param gl 변수
- */
-var Uniform1iDataPair = function(gl, uniformName) 
-{
-	if (!(this instanceof Uniform1iDataPair)) 
-	{
-		throw new Error(Messages.CONSTRUCT_ERROR);
-	}
-	this.gl = gl;
-	this.name = uniformName;
-	this.uniformLocation;
-	this.intValue; 
-};
-
-/**
- * 어떤 일을 하고 있습니까?
- * @param gl 변수
- */
-Uniform1iDataPair.prototype.bindUniform = function() 
-{
-	this.gl.uniform1i(this.uniformLocation, this.intValue);
-};
-'use strict';
-
-
-/**
- * 어떤 일을 하고 있습니까?
- * @class UniformMatrix4fvDataPair
- * @param gl 변수
- */
-var UniformMatrix4fvDataPair = function(gl, uniformName) 
-{
-	if (!(this instanceof UniformMatrix4fvDataPair)) 
-	{
-		throw new Error(Messages.CONSTRUCT_ERROR);
-	}
-	this.gl = gl;
-	this.name = uniformName;
-	this.uniformLocation;
-	this.matrix4fv; 
-};
-
-/**
- * 어떤 일을 하고 있습니까?
- * @param gl 변수
- */
-UniformMatrix4fvDataPair.prototype.bindUniform = function() 
-{
-	this.gl.uniformMatrix4fv(this.uniformLocation, false, this.matrix4fv);
-};
-'use strict';
-
-/**
- * 어떤 일을 하고 있습니까?
- * @class UniformVec2fvDataPair
- * @param gl 변수
- */
-var UniformVec2fvDataPair = function(gl, uniformName) 
-{
-	if (!(this instanceof UniformVec2fvDataPair)) 
-	{
-		throw new Error(Messages.CONSTRUCT_ERROR);
-	}
-	this.gl = gl;
-	this.name = uniformName;
-	this.uniformLocation;
-	this.vec2fv; 
-};
-
-/**
- * 어떤 일을 하고 있습니까?
- * @param gl 변수
- */
-UniformVec2fvDataPair.prototype.bindUniform = function() 
-{
-	this.gl.uniform2fv(this.uniformLocation, this.vec2fv);
-};
-'use strict';
-
-/**
- * 어떤 일을 하고 있습니까?
- * @class UniformVec3fvDataPair
- * @param gl 변수
- */
-var UniformVec3fvDataPair = function(gl, uniformName) 
-{
-	if (!(this instanceof UniformVec3fvDataPair)) 
-	{
-		throw new Error(Messages.CONSTRUCT_ERROR);
-	}
-	this.gl = gl;
-	this.name = uniformName;
-	this.uniformLocation;
-	this.vec3fv; 
-};
-
-/**
- * 어떤 일을 하고 있습니까?
- * @param gl 변수
- */
-UniformVec3fvDataPair.prototype.bindUniform = function() 
-{
-	this.gl.uniform3fv(this.uniformLocation, this.vec3fv);
-};
-'use strict';
-
-/**
- * 어떤 일을 하고 있습니까?
- * @class UniformVec4fvDataPair
- * @param gl 변수
- */
-var UniformVec4fvDataPair = function(gl, uniformName) 
-{
-	if (!(this instanceof UniformVec4fvDataPair)) 
-	{
-		throw new Error(Messages.CONSTRUCT_ERROR);
-	}
-	this.gl = gl;
-	this.name = uniformName;
-	this.uniformLocation;
-	this.vec4fv; 
-};
-
-/**
- * 어떤 일을 하고 있습니까?
- * @param gl 변수
- */
-UniformVec4fvDataPair.prototype.bindUniform = function() 
-{
-	this.gl.uniform4fv(this.uniformLocation, this.vec4fv);
-};
-
-'use strict';
-
-/**
- * Network.
- * IndoorGML의 네트워크를 파싱하고 그리는 데 사용합니다.
- * @alias Network
- * @class Network
- */
-var Network = function(owner) 
-{
-	if (!(this instanceof Network)) 
-	{
-		throw new Error(Messages.CONSTRUCT_ERROR);
-	}
-	
-	this.nodeOwner;
-	if (owner)
-	{ this.nodeOwner = owner; }
-	
-	this.id; // network id.
-	this.nodesArray;
-	this.edgesArray;
-	this.spacesArray;
-	
-	this.attributes;
-	this.edgesVboKeysContainer; // to draw edges with an unique vbo.
-	this.nodesVboKeysContainer; // to draw nodes with an unique vbo.
-	
-	this.renderSpaces = true;
-	this.spacesAlpha = 0.2;
-};
-
-/**
- * 
- */
-Network.prototype.newNode = function()
-{
-	if (this.nodesArray === undefined)
-	{ this.nodesArray = []; }
-	
-	var networkNode = new NetworkNode(this);
-	this.nodesArray.push(networkNode);
-	return networkNode;
-};
-
-/**
- * 
- */
-Network.prototype.newEdge = function()
-{
-	if (this.edgesArray === undefined)
-	{ this.edgesArray = []; }
-	
-	var networkEdge = new NetworkEdge(this);
-	this.edgesArray.push(networkEdge);
-	return networkEdge;
-};
-
-/**
- * 
- */
-Network.prototype.newSpace = function()
-{
-	if (this.spacesArray === undefined)
-	{ this.spacesArray = []; }
-	
-	var networkSpace = new NetworkSpace(this);
-	this.spacesArray.push(networkSpace);
-	return networkSpace;
-};
-
-/**
- * 
- */
-Network.prototype.test__makeVbos = function(magoManager)
-{
-	// Here makes meshes and vbos.
-	// For edges, make an unique vbo for faster rendering.
-	var edgesCount = 0;
-	if (this.edgesArray)
-	{ edgesCount = this.edgesArray.length; }
-	
-	var pointsArray = [];
-	
-	for (var i=0; i<edgesCount; i++)
-	{
-		var edge = this.edgesArray[i];
-		var vtxSegment = edge.vtxSegment;
-		var point1 = vtxSegment.startVertex.point3d;
-		var point2 = vtxSegment.endVertex.point3d;
-		pointsArray.push(point1.x);
-		pointsArray.push(point1.y);
-		pointsArray.push(point1.z);
-		
-		pointsArray.push(point2.x);
-		pointsArray.push(point2.y);
-		pointsArray.push(point2.z);
-	}
-	
-	if (this.edgesVboKeysContainer === undefined)
-	{
-		this.edgesVboKeysContainer = new VBOVertexIdxCacheKeysContainer();
-	}
-	
-	var vboKey = this.edgesVboKeysContainer.newVBOVertexIdxCacheKey();
-	
-	var vboMemManager = magoManager.vboMemoryManager;
-	var pointsCount = edgesCount * 2;
-	var posByteSize = pointsCount * 3;
-	var classifiedPosByteSize = vboMemManager.getClassifiedBufferSize(posByteSize);
-	vboKey.posVboDataArray = new Float32Array(classifiedPosByteSize);
-	vboKey.posVboDataArray.set(pointsArray);
-	vboKey.posArrayByteSize = pointsArray.length;
-	vboKey.segmentsCount = edgesCount;
-	
-};
-
-/**
- * Make triangle from IndoorGML data
- * @param magoManager
- * @param gmlDataContainer 
- * 
- */
-Network.prototype.parseTopologyData = function(magoManager, gmlDataContainer) 
-{
-	// gmlDataContainer.cellSpaceMembers
-	// gmlDataContainer.edges
-	// gmlDataContainer.nodes
-	// cityGML Lower point (78.02094, -82.801873, 18).
-	// cityGML Upper point (152.17466, 19.03087, 39).
-	// cityGML Center point {x=115.09780549999999 y=-31.885501999999999 z=28.500000000000000 ...}
-	
-	var bbox = new BoundingBox();
-	bbox.minX = gmlDataContainer.min_X;
-	bbox.minY = gmlDataContainer.min_Y;
-	bbox.minZ = gmlDataContainer.min_Z;
-	bbox.maxX = gmlDataContainer.max_X;
-	bbox.maxY = gmlDataContainer.max_Y;
-	bbox.maxZ = gmlDataContainer.max_Z;
-	
-	//bbox.maxX = 56.19070816040039;
-	//bbox.maxY = 71.51078033447266;
-	//bbox.maxZ = 10.5;
-	//bbox.minX = -379.18280029296875;
-	//bbox.minY = -142.4878387451172;
-	//bbox.minZ = -46.5;
-	
-	var offsetVector = new Point3D();
-	var zOffset = 0.1;
-	offsetVector.set(-115.0978055, 31.885502, -28.5); // cityGML ORIGINAL Center point inversed.
-	
-	var nodesMap = {};
-	var nodesCount = gmlDataContainer.nodes.length;
-	for (var i=0; i<nodesCount; i++)
-	{
-		var node = gmlDataContainer.nodes[i];
-		var networkNode = this.newNode();
-		networkNode.id = "#" + node.id;
-		
-		networkNode.position = new Point3D(node.coordinates[0], node.coordinates[1], node.coordinates[2]);
-		networkNode.position.addPoint(offsetVector); // rest bbox centerPoint.
-		networkNode.position.add(0.0, 0.0, zOffset); // aditional pos.
-		networkNode.box = new Box(0.6, 0.6, 0.6);
-		
-		nodesMap[networkNode.id] = networkNode;
-	}
-	
-	
-	var cellSpaceMap = {};
-	var cellSpacesCount = gmlDataContainer.cellSpaceMembers.length;
-	for (var i=0; i<cellSpacesCount; i++)
-	{
-		var cellSpace = gmlDataContainer.cellSpaceMembers[i];
-		var id = cellSpace.href;
-		var networkSpace = this.newSpace();
-		var mesh = new Mesh();
-		networkSpace.mesh = mesh; // assign mesh to networkSpace provisionally.
-		var vertexList = mesh.getVertexList();
-		
-		var surfacesMembersCount = cellSpace.surfaceMember.length;
-		for (var j=0; j<surfacesMembersCount; j++)
-		{
-			var surface = mesh.newSurface();
-			var face = surface.newFace();
-			
-			var coordinates = cellSpace.surfaceMember[j].coordinates;
-			var coordinatedCount = coordinates.length;
-			var pointsCount = coordinatedCount/3;
-			
-			for (var k=0; k<pointsCount; k++)
-			{
-				var x = coordinates[k * 3];
-				var y = coordinates[k * 3 + 1];
-				var z = coordinates[k * 3 + 2];
-				
-				var vertex = vertexList.newVertex();
-				vertex.setPosition(x, y, z);
-				vertex.point3d.addPoint(offsetVector); // rest bbox centerPoint.
-				face.addVertex(vertex);
-				
-			}
-			face.solveUroborus(); // Check & solve if the last point is coincident with the 1rst point.
-			face.calculateVerticesNormals();
-		}
-		
-		cellSpaceMap[cellSpace.href] = cellSpace;
-	}
-	
-	var edgesCount = gmlDataContainer.edges.length;
-	for (var i=0; i<edgesCount; i++)
-	{
-		var edge = gmlDataContainer.edges[i];
-		var networkEdge = this.newEdge();
-		
-		var point1 = edge.stateMembers[0].coordinates;
-		var point2 = edge.stateMembers[1].coordinates;
-		var vertex1 = new Vertex();
-		var vertex2 = new Vertex();
-		vertex1.setPosition(point1[0], point1[1], point1[2]);
-		vertex2.setPosition(point2[0], point2[1], point2[2]);
-		vertex1.point3d.addPoint(offsetVector); // rest bbox centerPoint.
-		vertex1.point3d.add(0.0, 0.0, zOffset); // aditional pos.
-		vertex2.point3d.addPoint(offsetVector); // rest bbox centerPoint.
-		vertex2.point3d.add(0.0, 0.0, zOffset); // aditional pos.
-		var vtxSegment = new VtxSegment(vertex1, vertex2);
-		networkEdge.vtxSegment = vtxSegment; // assign vtxSegment to networkEdge provisionally.
-		
-		var connect_1_id = edge.connects[0];
-		var connect_2_id = edge.connects[1];
-		
-		networkEdge.strNodeId = connect_1_id;
-		networkEdge.endNodeId = connect_2_id;
-	}
-	
-	this.test__makeVbos(magoManager);
-};
-
-/**
- * 
- */
-Network.prototype.renderColorCoding = function(magoManager, shader, renderType)
-{
-	// Provisional function.
-	// render nodes & edges.
-	var selectionColor = magoManager.selectionColor;
-	//selectionColor.init(); 
-	
-	// Check if exist selectionFamilies.
-	var selFamilyNameNodes = "networkNodes";
-	var selManager = magoManager.selectionManager;
-	var selCandidateNodes = selManager.getSelectionCandidatesFamily(selFamilyNameNodes);
-	if (selCandidateNodes === undefined)
-	{
-		selCandidateNodes = selManager.newCandidatesFamily(selFamilyNameNodes);
-	}
-	
-	var selFamilyNameEdges = "networkEdges";
-	var selManager = magoManager.selectionManager;
-	var selCandidateEdges = selManager.getSelectionCandidatesFamily(selFamilyNameEdges);
-	if (selCandidateEdges === undefined)
-	{
-		selCandidateEdges = selManager.newCandidatesFamily(selFamilyNameEdges);
-	}
-	
-	var vboMemManager = magoManager.vboMemoryManager;
-	var gl = magoManager.sceneState.gl;
-	var vboKey;
-	
-	shader.disableVertexAttribArray(shader.texCoord2_loc); 
-	shader.enableVertexAttribArray(shader.normal3_loc); 
-	gl.uniform1i(shader.hasTexture_loc, false); //.
-	gl.uniform4fv(shader.oneColor4_loc, [0.8, 0.8, 0.8, 1.0]);
-	
-	if (!shader.last_isAditionalMovedZero)
-	{
-		gl.uniform1i(shader.hasAditionalMov_loc, false);
-		gl.uniform3fv(shader.aditionalMov_loc, [0.0, 0.0, 0.0]); //.
-		shader.last_isAditionalMovedZero = true;
-	}
-	
-	// Nodes.**
-	var nodesCount = 0;
-	if (this.nodesArray)
-	{ nodesCount = this.nodesArray.length; }
-	
-	if (nodesCount > 0 )//&& !magoManager.isCameraMoving)
-	{
-		var refMatrixType = 1; // translation-type.
-		gl.uniform1i(shader.refMatrixType_loc, refMatrixType);
-		//gl.uniform4fv(shader.oneColor4_loc, [0.3, 0.3, 0.9, 1.0]);
-		var nodeMaster = this.nodesArray[0]; // render all with an unique box.
-		for (var i=0; i<nodesCount; i++)
-		{
-			var node = this.nodesArray[i];
-			
-			// nodes has a position, so render a point or a box.
-			gl.uniform3fv(shader.refTranslationVec_loc, [node.position.x, node.position.y, node.position.z]); 
-			
-			var selColor4 = selectionColor.getAvailableColor(undefined); // new.
-			var idxKey = selectionColor.decodeColor3(selColor4.r, selColor4.g, selColor4.b);
-			selManager.setCandidateCustom(idxKey, selFamilyNameNodes, node);
-			gl.uniform4fv(shader.oneColor4_loc, [selColor4.r/255.0, selColor4.g/255.0, selColor4.b/255.0, 1.0]);
-
-			nodeMaster.box.render(magoManager, shader, renderType);
-			
-		}
-	}
-	
-	// Edges.**
-	// Render with a unique vbo.
-	if (this.edgesVboKeysContainer)
-	{
-		var vboKey = this.edgesVboKeysContainer.vboCacheKeysArray[0];
-		if (vboKey.isReadyPositions(gl, vboMemManager))
-		{ 
-			shader.disableVertexAttribArray(shader.texCoord2_loc); 
-			shader.disableVertexAttribArray(shader.normal3_loc); 
-			refMatrixType = 0;
-			gl.uniform1i(shader.refMatrixType_loc, refMatrixType);
-			
-			// Positions.
-			if (vboKey.meshVertexCacheKey !== shader.lastVboKeyBindedMap[shader.position3_loc])
-			{
-				gl.bindBuffer(gl.ARRAY_BUFFER, vboKey.meshVertexCacheKey);
-				gl.vertexAttribPointer(shader.position3_loc, 3, gl.FLOAT, false, 0, 0);
-				shader.lastVboKeyBindedMap[shader.position3_loc] = vboKey.meshVertexCacheKey;
-			}
-				
-			var edgesCount = this.edgesArray.length;
-			for (var i=0; i<edgesCount; i++)
-			{
-				var edge = this.edgesArray[i];
-				var selColor4 = selectionColor.getAvailableColor(undefined); // new.
-				var idxKey = selectionColor.decodeColor3(selColor4.r, selColor4.g, selColor4.b);
-				selManager.setCandidateCustom(idxKey, selFamilyNameEdges, edge);
-				gl.uniform4fv(shader.oneColor4_loc, [selColor4.r/255.0, selColor4.g/255.0, selColor4.b/255.0, 1.0]);
-				gl.drawArrays(gl.LINES, i*2, 2);
-			}
-		}
-	}
-	
-};
-
-/**
- * 
- */
-Network.prototype.render = function(magoManager, shader, renderType)
-{
-	if (renderType === 2)
-	{
-		this.renderColorCoding(magoManager, shader, renderType);
-		return;
-	}
-	
-	// Check if ready smallBox and bigBox.
-	var selectionColor = magoManager.selectionColor;
-	selectionColor.init(); 
-	
-	// Check if exist selectionFamilies.
-	var selFamilyNameNodes = "networkNodes";
-	var selManager = magoManager.selectionManager;
-	var selCandidateNodes = selManager.getSelectionCandidatesFamily(selFamilyNameNodes);
-	if (selCandidateNodes === undefined)
-	{
-		selCandidateNodes = selManager.newCandidatesFamily(selFamilyNameNodes);
-	}
-	
-	var selFamilyNameEdges = "networkEdges";
-	var selManager = magoManager.selectionManager;
-	var selCandidateEdges = selManager.getSelectionCandidatesFamily(selFamilyNameEdges);
-	if (selCandidateEdges === undefined)
-	{
-		selCandidateEdges = selManager.newCandidatesFamily(selFamilyNameEdges);
-	}
-	
-	// Provisional function.
-	// render nodes & edges.
-	var vboMemManager = magoManager.vboMemoryManager;
-	var gl = magoManager.sceneState.gl;
-	var vboKey;
-	
-	shader.disableVertexAttribArray(shader.texCoord2_loc); 
-	shader.enableVertexAttribArray(shader.normal3_loc); 
-	
-	gl.uniform1i(shader.colorType_loc, 0); // 0= oneColor, 1= attribColor, 2= texture.
-	gl.uniform4fv(shader.oneColor4_loc, [0.8, 0.8, 0.8, 1.0]);
-	
-	if (!shader.last_isAditionalMovedZero)
-	{
-		gl.uniform1i(shader.hasAditionalMov_loc, false);
-		gl.uniform3fv(shader.aditionalMov_loc, [0.0, 0.0, 0.0]); //.
-		shader.last_isAditionalMovedZero = true;
-	}
-	
-	// Nodes.**
-	var nodesCount = 0;
-	if (this.nodesArray)
-	{ nodesCount = this.nodesArray.length; }
-	
-	if (nodesCount > 0 )//&& !magoManager.isCameraMoving)
-	{
-		gl.uniform1i(shader.colorType_loc, 0); // 0= oneColor, 1= attribColor, 2= texture.
-		var refMatrixType = 1; // translation-type.
-		gl.uniform1i(shader.refMatrixType_loc, refMatrixType);
-		gl.uniform4fv(shader.oneColor4_loc, [0.3, 0.3, 0.9, 1.0]);
-		var nodeMaster = this.nodesArray[0]; // render all with an unique box.
-		for (var i=0; i<nodesCount; i++)
-		{
-			var node = this.nodesArray[i];
-			
-			// check if is selected.
-			if (node === selCandidateNodes.currentSelected)
-			{
-				gl.uniform4fv(shader.oneColor4_loc, [0.9, 0.5, 0.1, 1.0]);
-			}
-			
-			// nodes has a position, so render a point or a box.
-			gl.uniform3fv(shader.refTranslationVec_loc, [node.position.x, node.position.y, node.position.z]); 
-			nodeMaster.box.render(magoManager, shader, renderType);
-			
-			// restore defaultColor.
-			if (node === selCandidateNodes.currentSelected)
-			{
-				gl.uniform4fv(shader.oneColor4_loc, [0.3, 0.3, 0.9, 1.0]);
-			}
-		}
-	}
-	
-	// Edges.**
-	// Render with a unique vbo.
-	if (this.edgesVboKeysContainer)
-	{
-		var vboKey = this.edgesVboKeysContainer.vboCacheKeysArray[0];
-		if (vboKey.isReadyPositions(gl, vboMemManager))
-		{ 
-			shader.disableVertexAttribArray(shader.texCoord2_loc); 
-			shader.disableVertexAttribArray(shader.normal3_loc); 
-			gl.uniform1i(shader.colorType_loc, 0); // 0= oneColor, 1= attribColor, 2= texture.
-			refMatrixType = 0;
-			gl.uniform1i(shader.refMatrixType_loc, refMatrixType);
-			gl.uniform4fv(shader.oneColor4_loc, [0.1, 0.1, 0.6, 1.0]);
-	
-			// Positions.
-			if (vboKey.meshVertexCacheKey !== shader.lastVboKeyBindedMap[shader.position3_loc])
-			{
-				gl.bindBuffer(gl.ARRAY_BUFFER, vboKey.meshVertexCacheKey);
-				gl.vertexAttribPointer(shader.position3_loc, 3, gl.FLOAT, false, 0, 0);
-				shader.lastVboKeyBindedMap[shader.position3_loc] = vboKey.meshVertexCacheKey;
-			}
-			
-			//gl.drawArrays(gl.LINES, 0, vboKey.segmentsCount*2);
-			
-			var edgesCount = this.edgesArray.length;
-			for (var i=0; i<edgesCount; i++)
-			{
-				var edge = this.edgesArray[i];
-				if (edge === selCandidateEdges.currentSelected)
-				{
-					gl.uniform4fv(shader.oneColor4_loc, [0.0, 1.0, 0.0, 1.0]);
-				}
-				gl.drawArrays(gl.LINES, i*2, 2);
-				
-				// restore default color.
-				if (edge === selCandidateEdges.currentSelected)
-				{
-					gl.uniform4fv(shader.oneColor4_loc, [0.1, 0.1, 0.6, 1.0]);
-				}
-			}
-		}
-	}
-	
-	// Spaces.
-	this.renderSpaces = magoManager.tempSettings.renderSpaces;
-	this.spacesAlpha = magoManager.tempSettings.spacesAlpha;
-	
-	if (renderType === 1)
-	{ shader.enableVertexAttribArray(shader.normal3_loc); } 
-	
-	if (this.renderSpaces)
-	{
-		gl.uniform1i(shader.colorType_loc, 0); // 0= oneColor, 1= attribColor, 2= texture.
-		refMatrixType = 0;
-		gl.uniform1i(shader.refMatrixType_loc, refMatrixType);
-		gl.uniform4fv(shader.oneColor4_loc, [0.8, 0.8, 0.8, this.spacesAlpha]);
-		gl.enable(gl.BLEND);
-		var spacesCount = 0;
-		if (this.spacesArray)
-		{ spacesCount = this.spacesArray.length; }
-		
-		for (var i=0; i<spacesCount; i++)
-		{
-			var space = this.spacesArray[i];
-			space.mesh.render(magoManager, shader);
-		}
-		
-		gl.disable(gl.BLEND);
-	}
-};
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-'use strict';
-
-/**
- * NetworkEdge.
- * 
- * @alias NetworkEdge
- * @class NetworkEdge
- */
-var NetworkEdge = function(owner) 
-{
-	if (!(this instanceof NetworkEdge)) 
-	{
-		throw new Error(Messages.CONSTRUCT_ERROR);
-	}
-	this.networkOwner = owner;
-	this.id;
-	this.strNode;
-	this.endNode;
-	this.sense;
-	this.attributes;
-	
-	// provisionally:
-	this.strNodeId;
-	this.endNodeId;
-};
-'use strict';
-
-/**
- * NetworkNode.
- * 
- * @alias NetworkNode
- * @class NetworkNode
- */
-var NetworkNode = function(owner) 
-{
-	if (!(this instanceof NetworkNode)) 
-	{
-		throw new Error(Messages.CONSTRUCT_ERROR);
-	}
-	this.networkOwner = owner;
-	this.id;
-	this.edgesArray;
-	this.attributes;
-	this.box;
-	//this.mesh; // if display as a box, cilinder, etc.
-};
-'use strict';
-
-/**
- * NetworkSpace.
- * 
- * @alias NetworkSpace
- * @class NetworkSpace
- */
-var NetworkSpace = function(owner) 
-{
-	if (!(this instanceof NetworkSpace)) 
-	{
-		throw new Error(Messages.CONSTRUCT_ERROR);
-	}
-	this.networkOwner = owner;
-	this.id;
-	this.mesh;
-	this.attributes;
-	
-};
-'use strict';
-
-/**
  * This class contains the current objects that are rendering. 
  * @class CurrentObjectsRendering
  * @constructor
@@ -95566,6 +95683,7 @@ Renderer.prototype.renderGeometryDepth = function(gl, renderType, visibleObjCont
 		magoManager.effectsManager.setCurrentShader(currentShader);
 		currentShader.disableVertexAttribArrayAll();
 		currentShader.enableVertexAttribArray(currentShader.position3_loc);
+		gl.uniform1i(currentShader.bUseLogarithmicDepth_loc, magoManager.postFxShadersManager.bUseLogarithmicDepth);
 
 		currentShader.bindUniformGenerals();
 		gl.uniform3fv(currentShader.scaleLC_loc, [1.0, 1.0, 1.0]); // init referencesMatrix.
@@ -98503,6 +98621,2271 @@ SelectionManager.prototype.TEST__CurrGeneralObjSel = function()
 	{ return false; }
 };
 
+'use strict';
+
+/**
+ * Network.
+ * IndoorGML의 네트워크를 파싱하고 그리는 데 사용합니다.
+ * @alias Network
+ * @class Network
+ */
+var Network = function(owner) 
+{
+	if (!(this instanceof Network)) 
+	{
+		throw new Error(Messages.CONSTRUCT_ERROR);
+	}
+	
+	this.nodeOwner;
+	if (owner)
+	{ this.nodeOwner = owner; }
+	
+	this.id; // network id.
+	this.nodesArray;
+	this.edgesArray;
+	this.spacesArray;
+	
+	this.attributes;
+	this.edgesVboKeysContainer; // to draw edges with an unique vbo.
+	this.nodesVboKeysContainer; // to draw nodes with an unique vbo.
+	
+	this.renderSpaces = true;
+	this.spacesAlpha = 0.2;
+};
+
+/**
+ * 
+ */
+Network.prototype.newNode = function()
+{
+	if (this.nodesArray === undefined)
+	{ this.nodesArray = []; }
+	
+	var networkNode = new NetworkNode(this);
+	this.nodesArray.push(networkNode);
+	return networkNode;
+};
+
+/**
+ * 
+ */
+Network.prototype.newEdge = function()
+{
+	if (this.edgesArray === undefined)
+	{ this.edgesArray = []; }
+	
+	var networkEdge = new NetworkEdge(this);
+	this.edgesArray.push(networkEdge);
+	return networkEdge;
+};
+
+/**
+ * 
+ */
+Network.prototype.newSpace = function()
+{
+	if (this.spacesArray === undefined)
+	{ this.spacesArray = []; }
+	
+	var networkSpace = new NetworkSpace(this);
+	this.spacesArray.push(networkSpace);
+	return networkSpace;
+};
+
+/**
+ * 
+ */
+Network.prototype.test__makeVbos = function(magoManager)
+{
+	// Here makes meshes and vbos.
+	// For edges, make an unique vbo for faster rendering.
+	var edgesCount = 0;
+	if (this.edgesArray)
+	{ edgesCount = this.edgesArray.length; }
+	
+	var pointsArray = [];
+	
+	for (var i=0; i<edgesCount; i++)
+	{
+		var edge = this.edgesArray[i];
+		var vtxSegment = edge.vtxSegment;
+		var point1 = vtxSegment.startVertex.point3d;
+		var point2 = vtxSegment.endVertex.point3d;
+		pointsArray.push(point1.x);
+		pointsArray.push(point1.y);
+		pointsArray.push(point1.z);
+		
+		pointsArray.push(point2.x);
+		pointsArray.push(point2.y);
+		pointsArray.push(point2.z);
+	}
+	
+	if (this.edgesVboKeysContainer === undefined)
+	{
+		this.edgesVboKeysContainer = new VBOVertexIdxCacheKeysContainer();
+	}
+	
+	var vboKey = this.edgesVboKeysContainer.newVBOVertexIdxCacheKey();
+	
+	var vboMemManager = magoManager.vboMemoryManager;
+	var pointsCount = edgesCount * 2;
+	var posByteSize = pointsCount * 3;
+	var classifiedPosByteSize = vboMemManager.getClassifiedBufferSize(posByteSize);
+	vboKey.posVboDataArray = new Float32Array(classifiedPosByteSize);
+	vboKey.posVboDataArray.set(pointsArray);
+	vboKey.posArrayByteSize = pointsArray.length;
+	vboKey.segmentsCount = edgesCount;
+	
+};
+
+/**
+ * Make triangle from IndoorGML data
+ * @param magoManager
+ * @param gmlDataContainer 
+ * 
+ */
+Network.prototype.parseTopologyData = function(magoManager, gmlDataContainer) 
+{
+	// gmlDataContainer.cellSpaceMembers
+	// gmlDataContainer.edges
+	// gmlDataContainer.nodes
+	// cityGML Lower point (78.02094, -82.801873, 18).
+	// cityGML Upper point (152.17466, 19.03087, 39).
+	// cityGML Center point {x=115.09780549999999 y=-31.885501999999999 z=28.500000000000000 ...}
+	
+	var bbox = new BoundingBox();
+	bbox.minX = gmlDataContainer.min_X;
+	bbox.minY = gmlDataContainer.min_Y;
+	bbox.minZ = gmlDataContainer.min_Z;
+	bbox.maxX = gmlDataContainer.max_X;
+	bbox.maxY = gmlDataContainer.max_Y;
+	bbox.maxZ = gmlDataContainer.max_Z;
+	
+	//bbox.maxX = 56.19070816040039;
+	//bbox.maxY = 71.51078033447266;
+	//bbox.maxZ = 10.5;
+	//bbox.minX = -379.18280029296875;
+	//bbox.minY = -142.4878387451172;
+	//bbox.minZ = -46.5;
+	
+	var offsetVector = new Point3D();
+	var zOffset = 0.1;
+	offsetVector.set(-115.0978055, 31.885502, -28.5); // cityGML ORIGINAL Center point inversed.
+	
+	var nodesMap = {};
+	var nodesCount = gmlDataContainer.nodes.length;
+	for (var i=0; i<nodesCount; i++)
+	{
+		var node = gmlDataContainer.nodes[i];
+		var networkNode = this.newNode();
+		networkNode.id = "#" + node.id;
+		
+		networkNode.position = new Point3D(node.coordinates[0], node.coordinates[1], node.coordinates[2]);
+		networkNode.position.addPoint(offsetVector); // rest bbox centerPoint.
+		networkNode.position.add(0.0, 0.0, zOffset); // aditional pos.
+		networkNode.box = new Box(0.6, 0.6, 0.6);
+		
+		nodesMap[networkNode.id] = networkNode;
+	}
+	
+	
+	var cellSpaceMap = {};
+	var cellSpacesCount = gmlDataContainer.cellSpaceMembers.length;
+	for (var i=0; i<cellSpacesCount; i++)
+	{
+		var cellSpace = gmlDataContainer.cellSpaceMembers[i];
+		var id = cellSpace.href;
+		var networkSpace = this.newSpace();
+		var mesh = new Mesh();
+		networkSpace.mesh = mesh; // assign mesh to networkSpace provisionally.
+		var vertexList = mesh.getVertexList();
+		
+		var surfacesMembersCount = cellSpace.surfaceMember.length;
+		for (var j=0; j<surfacesMembersCount; j++)
+		{
+			var surface = mesh.newSurface();
+			var face = surface.newFace();
+			
+			var coordinates = cellSpace.surfaceMember[j].coordinates;
+			var coordinatedCount = coordinates.length;
+			var pointsCount = coordinatedCount/3;
+			
+			for (var k=0; k<pointsCount; k++)
+			{
+				var x = coordinates[k * 3];
+				var y = coordinates[k * 3 + 1];
+				var z = coordinates[k * 3 + 2];
+				
+				var vertex = vertexList.newVertex();
+				vertex.setPosition(x, y, z);
+				vertex.point3d.addPoint(offsetVector); // rest bbox centerPoint.
+				face.addVertex(vertex);
+				
+			}
+			face.solveUroborus(); // Check & solve if the last point is coincident with the 1rst point.
+			face.calculateVerticesNormals();
+		}
+		
+		cellSpaceMap[cellSpace.href] = cellSpace;
+	}
+	
+	var edgesCount = gmlDataContainer.edges.length;
+	for (var i=0; i<edgesCount; i++)
+	{
+		var edge = gmlDataContainer.edges[i];
+		var networkEdge = this.newEdge();
+		
+		var point1 = edge.stateMembers[0].coordinates;
+		var point2 = edge.stateMembers[1].coordinates;
+		var vertex1 = new Vertex();
+		var vertex2 = new Vertex();
+		vertex1.setPosition(point1[0], point1[1], point1[2]);
+		vertex2.setPosition(point2[0], point2[1], point2[2]);
+		vertex1.point3d.addPoint(offsetVector); // rest bbox centerPoint.
+		vertex1.point3d.add(0.0, 0.0, zOffset); // aditional pos.
+		vertex2.point3d.addPoint(offsetVector); // rest bbox centerPoint.
+		vertex2.point3d.add(0.0, 0.0, zOffset); // aditional pos.
+		var vtxSegment = new VtxSegment(vertex1, vertex2);
+		networkEdge.vtxSegment = vtxSegment; // assign vtxSegment to networkEdge provisionally.
+		
+		var connect_1_id = edge.connects[0];
+		var connect_2_id = edge.connects[1];
+		
+		networkEdge.strNodeId = connect_1_id;
+		networkEdge.endNodeId = connect_2_id;
+	}
+	
+	this.test__makeVbos(magoManager);
+};
+
+/**
+ * 
+ */
+Network.prototype.renderColorCoding = function(magoManager, shader, renderType)
+{
+	// Provisional function.
+	// render nodes & edges.
+	var selectionColor = magoManager.selectionColor;
+	//selectionColor.init(); 
+	
+	// Check if exist selectionFamilies.
+	var selFamilyNameNodes = "networkNodes";
+	var selManager = magoManager.selectionManager;
+	var selCandidateNodes = selManager.getSelectionCandidatesFamily(selFamilyNameNodes);
+	if (selCandidateNodes === undefined)
+	{
+		selCandidateNodes = selManager.newCandidatesFamily(selFamilyNameNodes);
+	}
+	
+	var selFamilyNameEdges = "networkEdges";
+	var selManager = magoManager.selectionManager;
+	var selCandidateEdges = selManager.getSelectionCandidatesFamily(selFamilyNameEdges);
+	if (selCandidateEdges === undefined)
+	{
+		selCandidateEdges = selManager.newCandidatesFamily(selFamilyNameEdges);
+	}
+	
+	var vboMemManager = magoManager.vboMemoryManager;
+	var gl = magoManager.sceneState.gl;
+	var vboKey;
+	
+	shader.disableVertexAttribArray(shader.texCoord2_loc); 
+	shader.enableVertexAttribArray(shader.normal3_loc); 
+	gl.uniform1i(shader.hasTexture_loc, false); //.
+	gl.uniform4fv(shader.oneColor4_loc, [0.8, 0.8, 0.8, 1.0]);
+	
+	if (!shader.last_isAditionalMovedZero)
+	{
+		gl.uniform1i(shader.hasAditionalMov_loc, false);
+		gl.uniform3fv(shader.aditionalMov_loc, [0.0, 0.0, 0.0]); //.
+		shader.last_isAditionalMovedZero = true;
+	}
+	
+	// Nodes.**
+	var nodesCount = 0;
+	if (this.nodesArray)
+	{ nodesCount = this.nodesArray.length; }
+	
+	if (nodesCount > 0 )//&& !magoManager.isCameraMoving)
+	{
+		var refMatrixType = 1; // translation-type.
+		gl.uniform1i(shader.refMatrixType_loc, refMatrixType);
+		//gl.uniform4fv(shader.oneColor4_loc, [0.3, 0.3, 0.9, 1.0]);
+		var nodeMaster = this.nodesArray[0]; // render all with an unique box.
+		for (var i=0; i<nodesCount; i++)
+		{
+			var node = this.nodesArray[i];
+			
+			// nodes has a position, so render a point or a box.
+			gl.uniform3fv(shader.refTranslationVec_loc, [node.position.x, node.position.y, node.position.z]); 
+			
+			var selColor4 = selectionColor.getAvailableColor(undefined); // new.
+			var idxKey = selectionColor.decodeColor3(selColor4.r, selColor4.g, selColor4.b);
+			selManager.setCandidateCustom(idxKey, selFamilyNameNodes, node);
+			gl.uniform4fv(shader.oneColor4_loc, [selColor4.r/255.0, selColor4.g/255.0, selColor4.b/255.0, 1.0]);
+
+			nodeMaster.box.render(magoManager, shader, renderType);
+			
+		}
+	}
+	
+	// Edges.**
+	// Render with a unique vbo.
+	if (this.edgesVboKeysContainer)
+	{
+		var vboKey = this.edgesVboKeysContainer.vboCacheKeysArray[0];
+		if (vboKey.isReadyPositions(gl, vboMemManager))
+		{ 
+			shader.disableVertexAttribArray(shader.texCoord2_loc); 
+			shader.disableVertexAttribArray(shader.normal3_loc); 
+			refMatrixType = 0;
+			gl.uniform1i(shader.refMatrixType_loc, refMatrixType);
+			
+			// Positions.
+			if (vboKey.meshVertexCacheKey !== shader.lastVboKeyBindedMap[shader.position3_loc])
+			{
+				gl.bindBuffer(gl.ARRAY_BUFFER, vboKey.meshVertexCacheKey);
+				gl.vertexAttribPointer(shader.position3_loc, 3, gl.FLOAT, false, 0, 0);
+				shader.lastVboKeyBindedMap[shader.position3_loc] = vboKey.meshVertexCacheKey;
+			}
+				
+			var edgesCount = this.edgesArray.length;
+			for (var i=0; i<edgesCount; i++)
+			{
+				var edge = this.edgesArray[i];
+				var selColor4 = selectionColor.getAvailableColor(undefined); // new.
+				var idxKey = selectionColor.decodeColor3(selColor4.r, selColor4.g, selColor4.b);
+				selManager.setCandidateCustom(idxKey, selFamilyNameEdges, edge);
+				gl.uniform4fv(shader.oneColor4_loc, [selColor4.r/255.0, selColor4.g/255.0, selColor4.b/255.0, 1.0]);
+				gl.drawArrays(gl.LINES, i*2, 2);
+			}
+		}
+	}
+	
+};
+
+/**
+ * 
+ */
+Network.prototype.render = function(magoManager, shader, renderType)
+{
+	if (renderType === 2)
+	{
+		this.renderColorCoding(magoManager, shader, renderType);
+		return;
+	}
+	
+	// Check if ready smallBox and bigBox.
+	var selectionColor = magoManager.selectionColor;
+	selectionColor.init(); 
+	
+	// Check if exist selectionFamilies.
+	var selFamilyNameNodes = "networkNodes";
+	var selManager = magoManager.selectionManager;
+	var selCandidateNodes = selManager.getSelectionCandidatesFamily(selFamilyNameNodes);
+	if (selCandidateNodes === undefined)
+	{
+		selCandidateNodes = selManager.newCandidatesFamily(selFamilyNameNodes);
+	}
+	
+	var selFamilyNameEdges = "networkEdges";
+	var selManager = magoManager.selectionManager;
+	var selCandidateEdges = selManager.getSelectionCandidatesFamily(selFamilyNameEdges);
+	if (selCandidateEdges === undefined)
+	{
+		selCandidateEdges = selManager.newCandidatesFamily(selFamilyNameEdges);
+	}
+	
+	// Provisional function.
+	// render nodes & edges.
+	var vboMemManager = magoManager.vboMemoryManager;
+	var gl = magoManager.sceneState.gl;
+	var vboKey;
+	
+	shader.disableVertexAttribArray(shader.texCoord2_loc); 
+	shader.enableVertexAttribArray(shader.normal3_loc); 
+	
+	gl.uniform1i(shader.colorType_loc, 0); // 0= oneColor, 1= attribColor, 2= texture.
+	gl.uniform4fv(shader.oneColor4_loc, [0.8, 0.8, 0.8, 1.0]);
+	
+	if (!shader.last_isAditionalMovedZero)
+	{
+		gl.uniform1i(shader.hasAditionalMov_loc, false);
+		gl.uniform3fv(shader.aditionalMov_loc, [0.0, 0.0, 0.0]); //.
+		shader.last_isAditionalMovedZero = true;
+	}
+	
+	// Nodes.**
+	var nodesCount = 0;
+	if (this.nodesArray)
+	{ nodesCount = this.nodesArray.length; }
+	
+	if (nodesCount > 0 )//&& !magoManager.isCameraMoving)
+	{
+		gl.uniform1i(shader.colorType_loc, 0); // 0= oneColor, 1= attribColor, 2= texture.
+		var refMatrixType = 1; // translation-type.
+		gl.uniform1i(shader.refMatrixType_loc, refMatrixType);
+		gl.uniform4fv(shader.oneColor4_loc, [0.3, 0.3, 0.9, 1.0]);
+		var nodeMaster = this.nodesArray[0]; // render all with an unique box.
+		for (var i=0; i<nodesCount; i++)
+		{
+			var node = this.nodesArray[i];
+			
+			// check if is selected.
+			if (node === selCandidateNodes.currentSelected)
+			{
+				gl.uniform4fv(shader.oneColor4_loc, [0.9, 0.5, 0.1, 1.0]);
+			}
+			
+			// nodes has a position, so render a point or a box.
+			gl.uniform3fv(shader.refTranslationVec_loc, [node.position.x, node.position.y, node.position.z]); 
+			nodeMaster.box.render(magoManager, shader, renderType);
+			
+			// restore defaultColor.
+			if (node === selCandidateNodes.currentSelected)
+			{
+				gl.uniform4fv(shader.oneColor4_loc, [0.3, 0.3, 0.9, 1.0]);
+			}
+		}
+	}
+	
+	// Edges.**
+	// Render with a unique vbo.
+	if (this.edgesVboKeysContainer)
+	{
+		var vboKey = this.edgesVboKeysContainer.vboCacheKeysArray[0];
+		if (vboKey.isReadyPositions(gl, vboMemManager))
+		{ 
+			shader.disableVertexAttribArray(shader.texCoord2_loc); 
+			shader.disableVertexAttribArray(shader.normal3_loc); 
+			gl.uniform1i(shader.colorType_loc, 0); // 0= oneColor, 1= attribColor, 2= texture.
+			refMatrixType = 0;
+			gl.uniform1i(shader.refMatrixType_loc, refMatrixType);
+			gl.uniform4fv(shader.oneColor4_loc, [0.1, 0.1, 0.6, 1.0]);
+	
+			// Positions.
+			if (vboKey.meshVertexCacheKey !== shader.lastVboKeyBindedMap[shader.position3_loc])
+			{
+				gl.bindBuffer(gl.ARRAY_BUFFER, vboKey.meshVertexCacheKey);
+				gl.vertexAttribPointer(shader.position3_loc, 3, gl.FLOAT, false, 0, 0);
+				shader.lastVboKeyBindedMap[shader.position3_loc] = vboKey.meshVertexCacheKey;
+			}
+			
+			//gl.drawArrays(gl.LINES, 0, vboKey.segmentsCount*2);
+			
+			var edgesCount = this.edgesArray.length;
+			for (var i=0; i<edgesCount; i++)
+			{
+				var edge = this.edgesArray[i];
+				if (edge === selCandidateEdges.currentSelected)
+				{
+					gl.uniform4fv(shader.oneColor4_loc, [0.0, 1.0, 0.0, 1.0]);
+				}
+				gl.drawArrays(gl.LINES, i*2, 2);
+				
+				// restore default color.
+				if (edge === selCandidateEdges.currentSelected)
+				{
+					gl.uniform4fv(shader.oneColor4_loc, [0.1, 0.1, 0.6, 1.0]);
+				}
+			}
+		}
+	}
+	
+	// Spaces.
+	this.renderSpaces = magoManager.tempSettings.renderSpaces;
+	this.spacesAlpha = magoManager.tempSettings.spacesAlpha;
+	
+	if (renderType === 1)
+	{ shader.enableVertexAttribArray(shader.normal3_loc); } 
+	
+	if (this.renderSpaces)
+	{
+		gl.uniform1i(shader.colorType_loc, 0); // 0= oneColor, 1= attribColor, 2= texture.
+		refMatrixType = 0;
+		gl.uniform1i(shader.refMatrixType_loc, refMatrixType);
+		gl.uniform4fv(shader.oneColor4_loc, [0.8, 0.8, 0.8, this.spacesAlpha]);
+		gl.enable(gl.BLEND);
+		var spacesCount = 0;
+		if (this.spacesArray)
+		{ spacesCount = this.spacesArray.length; }
+		
+		for (var i=0; i<spacesCount; i++)
+		{
+			var space = this.spacesArray[i];
+			space.mesh.render(magoManager, shader);
+		}
+		
+		gl.disable(gl.BLEND);
+	}
+};
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+'use strict';
+
+/**
+ * NetworkEdge.
+ * 
+ * @alias NetworkEdge
+ * @class NetworkEdge
+ */
+var NetworkEdge = function(owner) 
+{
+	if (!(this instanceof NetworkEdge)) 
+	{
+		throw new Error(Messages.CONSTRUCT_ERROR);
+	}
+	this.networkOwner = owner;
+	this.id;
+	this.strNode;
+	this.endNode;
+	this.sense;
+	this.attributes;
+	
+	// provisionally:
+	this.strNodeId;
+	this.endNodeId;
+};
+'use strict';
+
+/**
+ * NetworkNode.
+ * 
+ * @alias NetworkNode
+ * @class NetworkNode
+ */
+var NetworkNode = function(owner) 
+{
+	if (!(this instanceof NetworkNode)) 
+	{
+		throw new Error(Messages.CONSTRUCT_ERROR);
+	}
+	this.networkOwner = owner;
+	this.id;
+	this.edgesArray;
+	this.attributes;
+	this.box;
+	//this.mesh; // if display as a box, cilinder, etc.
+};
+'use strict';
+
+/**
+ * NetworkSpace.
+ * 
+ * @alias NetworkSpace
+ * @class NetworkSpace
+ */
+var NetworkSpace = function(owner) 
+{
+	if (!(this instanceof NetworkSpace)) 
+	{
+		throw new Error(Messages.CONSTRUCT_ERROR);
+	}
+	this.networkOwner = owner;
+	this.id;
+	this.mesh;
+	this.attributes;
+	
+};
+'use strict';
+
+function abstract() 
+{
+	return  ((function() 
+	{
+		throw new Error('Unimplemented abstract method.');
+	})());
+}
+'use strict';
+
+/**
+ * 어떤 일을 하고 있습니까?
+ * @class ByteColor
+ */
+var ByteColor = function() 
+{
+	if (!(this instanceof ByteColor)) 
+	{
+		throw new Error(Messages.CONSTRUCT_ERROR);
+	}
+
+	this.ByteR = 0;
+	this.ByteG = 0;
+	this.ByteB = 0;
+	this.ByteAlfa = 255;
+};
+
+/**
+ * 어떤 일을 하고 있습니까?
+ */
+ByteColor.prototype.destroy = function() 
+{
+	this.ByteR = null;
+	this.ByteG = null;
+	this.ByteB = null;
+	this.ByteAlfa = null;
+};
+
+/**
+ * 어떤 일을 하고 있습니까?
+ * @param byteRed 변수
+ * @param byteGreen 변수
+ * @param byteBlue 변수
+ */
+ByteColor.prototype.set = function(byteRed, byteGreen, byteBlue) 
+{
+	this.ByteR = byteRed;
+	this.ByteG = byteGreen;
+	this.ByteB = byteBlue;
+};
+
+'use strict';
+
+/**
+ * This class is used to control the movement of objects.
+ * @class CameraController
+ */
+var CameraController = function() 
+{
+	if (!(this instanceof CameraController)) 
+	{
+		throw new Error(Messages.CONSTRUCT_ERROR);
+	}
+	
+	this.startGeoCoord;
+	this.targetGeoCoord;
+	this.travelDurationInSeconds;
+	
+	this.acceleration; // m/s2.***
+	this.velocity; // m/s.***
+	
+	
+};
+'use strict';
+
+/**
+ * Returns guid
+ */
+function createGuid() 
+{
+	return 'xxxxxxxx-xxxx-xxxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) 
+	{
+		var r = Math.random() * 16 | 0, v = c === 'x' ? r : (r & 0x3 | 0x8);
+		return v.toString(16);
+	});
+}
+'use strict';
+
+/**
+ * Returns the first parameter if not undefined, otherwise the second parameter.
+ * Useful for setting a default value for a parameter.
+ *
+ * @param {*} a
+ * @param {*} b
+ * @returns {*} Returns the first parameter if not undefined, otherwise the second parameter. 
+ */
+function defaultValue(a, b) 
+{
+	if (a !== undefined && a !== null) 
+	{
+		return a;
+	}
+	return b;
+}
+'use strict';
+
+/**
+ * Returns the first parameter if not undefined, otherwise the second parameter.
+ * Useful for setting a default value for a parameter.
+ *
+ * @param {*} a
+ * @param {*} b
+ * @returns {*} Returns the first parameter if not undefined, otherwise the second parameter. 
+ */
+function defaultValueCheckLength(a, b) 
+{
+	if (a !== undefined && a !== null && a.toString().trim().length > 0) 
+	{
+		return a;
+	}
+	return b;
+}
+'use strict';
+
+/**
+ *
+ * @param {*} value The object.
+ * @returns {Boolean} Returns true if the object is defined, returns false otherwise.
+ */
+function defined(value) 
+{
+	return value !== undefined && value !== null;
+}
+'use strict';
+/**
+* Utils for geometry.
+* @class GeometryUtils
+*/
+var GeometryUtils = function() 
+{
+	if (!(this instanceof GeometryUtils)) 
+	{
+		throw new Error(Messages.CONSTRUCT_ERROR);
+	}
+	
+};
+
+/**
+ * Given an idx, this function returns the next idx of an array.
+ * @param {Number} currIdx 
+ * @param {Number} pointsCount The points count of the array.
+ * @Return {Number} The next idx.
+ */
+GeometryUtils.projectPoint3DInToBestPlaneToProject = function(point3d, bestPlaneToProject, resultPoint2d)
+{
+	// This function returns projected point2d.
+	if (resultPoint2d === undefined)
+	{ resultPoint2d = new Point2D(); }
+	
+	if (bestPlaneToProject === 0)
+	{
+		//"xy";
+		resultPoint2d.set(point3d.x, point3d.y);
+	}
+	else if (bestPlaneToProject === 1)
+	{
+		//"yz";
+		resultPoint2d.set(point3d.y, point3d.z);
+	}
+	else if (bestPlaneToProject === 2)
+	{
+		//"xz";
+		resultPoint2d.set(point3d.x, point3d.z);
+	}
+	
+	return resultPoint2d;
+};
+
+/**
+ * Given an idx, this function returns the next idx of an array.
+ * @param {Number} currIdx 
+ * @param {Number} pointsCount The points count of the array.
+ * @Return {Number} The next idx.
+ */
+GeometryUtils.projectTriangle3DInToBestPlaneToProject = function(triangle3d, bestPlaneToProject, resultTriangle2d)
+{
+	// This function returns projected triangle2d.
+	if (resultTriangle2d === undefined)
+	{ resultTriangle2d = new Triangle2D(); }
+	
+	var point3d0 = triangle3d.vertex0.getPosition();
+	var point2d0 = GeometryUtils.projectPoint3DInToBestPlaneToProject(point3d0, bestPlaneToProject, undefined);
+	
+	var point3d1 = triangle3d.vertex1.getPosition();
+	var point2d1 = GeometryUtils.projectPoint3DInToBestPlaneToProject(point3d1, bestPlaneToProject, undefined);
+	
+	var point3d2 = triangle3d.vertex2.getPosition();
+	var point2d2 = GeometryUtils.projectPoint3DInToBestPlaneToProject(point3d2, bestPlaneToProject, undefined);
+	
+	resultTriangle2d.setPoints(point2d0, point2d1, point2d2);
+	
+	return resultTriangle2d;
+};
+
+/**
+ * Given an idx, this function returns the next idx of an array.
+ * @param {Number} currIdx 
+ * @param {Number} pointsCount The points count of the array.
+ * @Return {Number} The next idx.
+ */
+GeometryUtils.getNextIdx = function(currIdx, pointsCount)
+{
+	if (currIdx === pointsCount - 1)
+	{ return 0; }
+	else
+	{ return currIdx + 1; }
+};
+
+/**
+ * Given an idx, this function returns the previous idx of an array.
+ * @param {Number} currIdx 
+ * @param {Number} pointsCount The points count of the array.
+ * @Return {Number} The previous idx.
+ */
+GeometryUtils.getPrevIdx = function(currIdx, pointsCount)
+{
+	if (currIdx === 0)
+	{ return pointsCount - 1; }
+	else
+	{ return currIdx - 1; }
+};
+
+/**
+ * This function makes the triangles vertices indices for a regular grid.
+ * @param {Number} numCols Grid columns count.
+ * @param {Number} numRows Grid rows count.
+ * @param {Uint16Array/undefined} resultIndicesArray
+ * @param {Object} options 
+ * @Return {Uint16Array} resultIndicesArray
+ */
+GeometryUtils.getIndicesTrianglesRegularNet = function(numCols, numRows, resultIndicesArray, resultSouthIndices, resultEastIndices, resultNorthIndices, resultWestIndices, options)
+{
+	// given a regular net this function returns triangles vertices indices of the net.
+	var verticesCount = numCols * numRows;
+	var trianglesCount = (numCols-1) * (numRows-1) * 2;
+	if (resultIndicesArray === undefined)
+	{ resultIndicesArray = new Uint16Array(trianglesCount * 3); }
+	
+	var idx_1, idx_2, idx_3;
+	var idxCounter = 0;
+	
+	var resultObject = {};
+	
+	// bLoopColumns : if want object like a cilinder or sphere where the 1rstCol touch with the last col.
+	var bLoopColumns = false; // Default.***
+	var bTrianglesSenseCCW = true;
+	if (options !== undefined)
+	{
+		if (options.bLoopColumns !== undefined)
+		{ bLoopColumns = options.bLoopColumns; }
+	
+		if (options.bTrianglesSenseCCW !== undefined)
+		{ bTrianglesSenseCCW = options.bTrianglesSenseCCW; }
+	}
+	
+	for (var row = 0; row<numRows-1; row++)
+	{
+		for (var col=0; col<numCols-1; col++)
+		{
+			// there are 2 triangles: triA, triB.
+			idx_1 = VertexMatrix.getIndexOfArray(numCols, numRows, col, row);
+			idx_2 = VertexMatrix.getIndexOfArray(numCols, numRows, col+1, row);
+			idx_3 = VertexMatrix.getIndexOfArray(numCols, numRows, col, row+1);
+			
+			if (bTrianglesSenseCCW)
+			{
+				resultIndicesArray[idxCounter] = idx_1; idxCounter++;
+				resultIndicesArray[idxCounter] = idx_2; idxCounter++;
+				resultIndicesArray[idxCounter] = idx_3; idxCounter++;
+			}
+			else
+			{
+				resultIndicesArray[idxCounter] = idx_1; idxCounter++;
+				resultIndicesArray[idxCounter] = idx_3; idxCounter++;
+				resultIndicesArray[idxCounter] = idx_2; idxCounter++;
+			}
+			
+			idx_1 = VertexMatrix.getIndexOfArray(numCols, numRows, col+1, row);
+			idx_2 = VertexMatrix.getIndexOfArray(numCols, numRows, col+1, row+1);
+			idx_3 = VertexMatrix.getIndexOfArray(numCols, numRows, col, row+1);
+			
+			if (bTrianglesSenseCCW)
+			{
+				resultIndicesArray[idxCounter] = idx_1; idxCounter++;
+				resultIndicesArray[idxCounter] = idx_2; idxCounter++;
+				resultIndicesArray[idxCounter] = idx_3; idxCounter++;
+			}
+			else 
+			{
+				resultIndicesArray[idxCounter] = idx_1; idxCounter++;
+				resultIndicesArray[idxCounter] = idx_3; idxCounter++;
+				resultIndicesArray[idxCounter] = idx_2; idxCounter++;
+			}
+		}
+	}
+	
+	resultObject.indicesArray = resultIndicesArray;
+	
+	var bCalculateBorderIndices = false;
+	if (options)
+	{
+		if (options.bCalculateBorderIndices !== undefined && options.bCalculateBorderIndices === true)
+		{ bCalculateBorderIndices = true; }
+	}
+	
+	// Border indices.***
+	if (bCalculateBorderIndices)
+	{
+		// South.
+		if (!resultSouthIndices)
+		{ resultSouthIndices = new Uint16Array(numCols); }
+		
+		for (var col=0; col<numCols; col++)
+		{
+			var idx = VertexMatrix.getIndexOfArray(numCols, numRows, col, 0);
+			resultSouthIndices[col] = idx;
+		}
+		
+		resultObject.southIndicesArray = resultSouthIndices;
+		
+		// East.
+		if (!resultEastIndices)
+		{ resultEastIndices = new Uint16Array(numRows); }
+		
+		for (var row = 0; row<numRows; row++)
+		{
+			var idx = VertexMatrix.getIndexOfArray(numCols, numRows, numCols-1, row);
+			resultEastIndices[row] = idx;
+		}
+		
+		resultObject.eastIndicesArray = resultEastIndices;
+		
+		// North.
+		if (!resultNorthIndices)
+		{ resultNorthIndices = new Uint16Array(numCols); }
+		
+		var counter = 0;
+		for (var col=numCols-1; col>=0; col--)
+		{
+			var idx = VertexMatrix.getIndexOfArray(numCols, numRows, col, numRows-1);
+			resultNorthIndices[counter] = idx;
+			counter ++;
+		}
+		
+		resultObject.northIndicesArray = resultNorthIndices;
+		
+		// West.
+		if (!resultWestIndices)
+		{ resultWestIndices = new Uint16Array(numRows); }
+		
+		counter = 0;
+		for (var row = numRows-1; row>=0; row--)
+		{
+			var idx = VertexMatrix.getIndexOfArray(numCols, numRows, 0, row);
+			resultWestIndices[counter] = idx;
+			counter ++;
+		}
+		
+		resultObject.westIndicesArray = resultWestIndices;
+	}
+	
+	if (bLoopColumns)
+	{
+		var firstCol = 0;
+		var endCol = numCols;
+		for (var row = 0; row<numRows-1; row++)
+		{
+			// there are triangles between lastColumn & 1rstColumn.
+			// there are 2 triangles: triA, triB.
+			idx_1 = VertexMatrix.getIndexOfArray(numCols, numRows, endCol, row);
+			idx_2 = VertexMatrix.getIndexOfArray(numCols, numRows, firstCol, row);
+			idx_3 = VertexMatrix.getIndexOfArray(numCols, numRows, endCol, row+1);
+			if (bTrianglesSenseCCW)
+			{
+				resultIndicesArray[idxCounter] = idx_1; idxCounter++;
+				resultIndicesArray[idxCounter] = idx_2; idxCounter++;
+				resultIndicesArray[idxCounter] = idx_3; idxCounter++;
+			}
+			else 
+			{
+				resultIndicesArray[idxCounter] = idx_1; idxCounter++;
+				resultIndicesArray[idxCounter] = idx_3; idxCounter++;
+				resultIndicesArray[idxCounter] = idx_2; idxCounter++;
+			}
+			
+			idx_1 = VertexMatrix.getIndexOfArray(numCols, numRows, firstCol, row);
+			idx_2 = VertexMatrix.getIndexOfArray(numCols, numRows, firstCol, row+1);
+			idx_3 = VertexMatrix.getIndexOfArray(numCols, numRows, endCol, row+1);
+			if (bTrianglesSenseCCW)
+			{
+				resultIndicesArray[idxCounter] = idx_1; idxCounter++;
+				resultIndicesArray[idxCounter] = idx_2; idxCounter++;
+				resultIndicesArray[idxCounter] = idx_3; idxCounter++;
+			}
+			else 
+			{
+				resultIndicesArray[idxCounter] = idx_1; idxCounter++;
+				resultIndicesArray[idxCounter] = idx_3; idxCounter++;
+				resultIndicesArray[idxCounter] = idx_2; idxCounter++;
+			}
+		}
+	}
+	
+	return resultObject;
+};
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+'use strict';
+
+/**
+ *
+ * @param {*} value The object.
+ * @returns {Boolean} Returns true if the object is empty, returns false otherwise.
+ */
+function isEmpty(value)
+{ 
+	if ( value === "" || value === null || value === undefined || ( value !== null && typeof value === "object" && !Object.keys(value).length ) )
+	{ 
+		return true; 
+	}
+	else
+	{ 
+		return false; 
+	} 
+};
+
+
+'use strict';
+
+/**
+ *
+ * @param {String} url Required.
+ * @param {XMLHttpRequest} xhr Optional.
+ * @param {number} timeOut Optional. timeout time. milliseconds
+ * @param {String} responseType Optional. Default is 'arraybuffer'
+ * @param {String} method Optional. Default is 'GET'
+ * 
+ * @returns {Promise} Promise.js object
+ *
+ * @example
+ * loadWithXhr('url', undefined, undefined, 'json', 'GET').done(function(res) {
+ * 	TODO
+ * });
+ */
+function loadWithXhr(url, xhr, timeOut, responseType, method) 
+{
+	if (!defined(url))
+	{
+		throw new Error('url required');
+	}
+
+	return new Promise(
+		function (resolve, reject) 
+		{
+			if (xhr === undefined)
+			{ xhr = new XMLHttpRequest(); }
+
+			method = method ? method : 'GET';
+			xhr.open(method, url, true);
+			xhr.responseType = responseType ? responseType : 'arraybuffer';
+
+			 // time in milliseconds
+			if (timeOut !== undefined)
+			{ xhr.timeout = timeOut; }
+			
+			// 이벤트 핸들러를 등록한다.
+			xhr.onload = function() 
+			{
+				if (xhr.status < 200 || xhr.status >= 300) 
+				{
+					reject(xhr.status);
+				}
+				else 
+				{
+					// 3.1) DEFERRED를 해결한다. (모든 done()...을 동작시킬 것이다.)
+					resolve(xhr.response);
+				} 
+			};
+			
+			xhr.ontimeout = function (e) 
+			{
+				// XMLHttpRequest timed out.***
+				reject(-1);
+			};
+			
+			xhr.onerror = function(e) 
+			{
+				console.log("Invalid XMLHttpRequest response type.");
+				reject(xhr.status);
+			};
+
+			// 작업을 수행한다.
+			xhr.send(null);
+		}
+	);
+};
+'use strict';
+
+/**
+ * ManagerUtils does some calculations about coordinates system of different earth coords.
+ * 
+ * @class ManagerUtils
+ * @constructor 
+ */
+var ManagerUtils = function() 
+{
+	
+	
+};
+
+/**
+ * 어떤 일을 하고 있습니까?
+ * @param octreesArray 변수
+ * @param octree 변수
+ * @returns result_idx
+ */
+ManagerUtils.getIndexToInsertBySquaredDistToEye = function(objectsArray, object, startIdx, endIdx) 
+{
+	// Note: the object must have "distToCamera" variable.
+	// this do a dicotomic search of idx in a ordered table.
+	// 1rst, check the range.
+	if (startIdx === undefined)
+	{ startIdx = 0; }
+	
+	if (endIdx === undefined)
+	{ endIdx = objectsArray.length-1; }
+	
+	var range = endIdx - startIdx;
+	
+	if (range <= 0)
+	{ return 0; }
+	
+	if (range < 6)
+	{
+		// in this case do a lineal search.
+		var finished = false;
+		var i = startIdx;
+		var idx;
+		var octreesCount = objectsArray.length;
+		while (!finished && i<=endIdx)
+		{
+			if (object.distToCamera < objectsArray[i].distToCamera)
+			{
+				idx = i;
+				finished = true;
+			}
+			i++;
+		}
+		
+		if (finished)
+		{
+			return idx;
+		}
+		else 
+		{
+			return endIdx+1;
+		}
+	}
+	else 
+	{
+		// in this case do the dicotomic search.
+		var middleIdx = startIdx + Math.floor(range/2);
+		var newStartIdx;
+		var newEndIdx;
+		if (objectsArray[middleIdx].distToCamera > object.distToCamera)
+		{
+			newStartIdx = startIdx;
+			newEndIdx = middleIdx;
+		}
+		else 
+		{
+			newStartIdx = middleIdx;
+			newEndIdx = endIdx;
+		}
+		return ManagerUtils.getIndexToInsertBySquaredDistToEye(objectsArray, object, newStartIdx, newEndIdx);
+	}
+};
+
+/**
+ * world coordinate to geographic coordinate.
+ * @param {Point3D} point world coordinate.
+ * @param {GeographicCoord|undefined} resultGeographicCoord Optional. result geographicCoord. if undefined, create GeographicCoord instance.
+ * @param {MagoManager} magoManager worldwind mode removed, this args is not need. 
+ * @returns {GeographicCoord} geographic coordinate object.
+ */
+ManagerUtils.pointToGeographicCoord = function(point, resultGeographicCoord) 
+{
+	if (!point) 
+	{
+		throw new Error('point is requred');
+	}
+
+	if (resultGeographicCoord === undefined)
+	{ resultGeographicCoord = new GeographicCoord(); }
+	
+	var cartographic = Globe.CartesianToGeographicWgs84(point.x, point.y, point.z, cartographic);
+	resultGeographicCoord.setLonLatAlt(cartographic.longitude, cartographic.latitude, cartographic.altitude);
+	
+	return resultGeographicCoord;
+};
+
+/**
+ * geographic coordinate to world coordinate.
+ * @param {number} longitude longitude.
+ * @param {number} latitude latitude.
+ * @param {number} altitude altitude.
+ * @param {Point3D|undefined} resultWorldPoint Optional. result worldCoord. if undefined, create Point3D instance.
+ * @returns {Point3D} world coordinate object.
+ */
+ManagerUtils.geographicCoordToWorldPoint = function(longitude, latitude, altitude, resultWorldPoint) 
+{
+	if (resultWorldPoint === undefined)
+	{ resultWorldPoint = new Point3D(); }
+
+	var cartesian = Globe.geographicToCartesianWgs84(longitude, latitude, altitude, undefined);
+	resultWorldPoint.set(cartesian[0], cartesian[1], cartesian[2]);
+	return resultWorldPoint;
+};
+
+/**
+ * when node mapping type is boundingboxcenter, set pivotPointTraslation and create pivotPoint at geoLocationData
+ * this function NO modifies the geographic coords.
+ * "newPivotPoint" is in buildingCoords.
+ * "newPivotPoint" is the desired position of the new origen of coords, for example:
+ * in a building you can desire the center of the bbox as the origin of the coords.
+ * @param {GeoLocationData} geoLocationData. Required.
+ * @param {Point3D} newPivotPoint newPivotPoint.
+ */
+ManagerUtils.translatePivotPointGeoLocationData = function(geoLocationData, newPivotPoint) 
+{
+	if (geoLocationData === undefined)
+	{ return; }
+
+	var rawTranslation = new Point3D();
+	rawTranslation.set(-newPivotPoint.x, -newPivotPoint.y, -newPivotPoint.z);
+
+	geoLocationData.pivotPointTraslationLC = rawTranslation;
+	geoLocationData.doEffectivePivotPointTranslation();
+};
+
+/**
+ * this function calculates the transformation matrix for (x, y, z) coordinate, that has NO heading, pitch or roll rotations.
+ * @param {Point3D} worldPosition worldPosition.
+ * @param {Matrix4|undefined} resultGeoLocMatrix. Optional. result geolocation matrix. if undefined, create Matrix4 instance.
+ * @returns {Matrix4} resultGeoLocMatrix. this matrix has NO heading, pitch or roll rotations.
+ */
+ManagerUtils.calculateGeoLocationMatrixAtWorldPosition = function(worldPosition, resultGeoLocMatrix) 
+{
+	if (resultGeoLocMatrix === undefined)
+	{ resultGeoLocMatrix = new Matrix4(); }
+
+	Globe.transformMatrixAtCartesianPointWgs84(worldPosition.x, worldPosition.y, worldPosition.z, resultGeoLocMatrix._floatArrays);
+	
+	return resultGeoLocMatrix;
+};
+
+/**
+ * this function calculates the transformation matrix for (longitude, latitude, altitude) coordinate, that has NO heading, pitch or roll rotations.
+ * @param {number} longitude longitude.
+ * @param {number} latitude latitude.
+ * @param {number} altitude altitude.
+ * @param {Matrix4|undefined} resultGeoLocMatrix. Optional. result geolocation matrix. if undefined, create Matrix4 instance.
+ * @returns {Matrix4} resultGeoLocMatrix. this matrix has NO heading, pitch or roll rotations.
+ */
+ManagerUtils.calculateGeoLocationMatrixAtLonLatAlt = function(longitude, latitude, altitude, resultGeoLocMatrix) 
+{
+	if (resultGeoLocMatrix === undefined)
+	{ resultGeoLocMatrix = new Matrix4(); }
+	
+	var worldPosition = this.geographicCoordToWorldPoint(longitude, latitude, altitude, worldPosition);
+	resultGeoLocMatrix = ManagerUtils.calculateGeoLocationMatrixAtWorldPosition(worldPosition, resultGeoLocMatrix);
+	
+	return resultGeoLocMatrix;
+};
+
+/**
+ * This function calculates the "resultGeoLocMatrix" & "resultTransformMatrix".
+ * @param {Point3D} worldPosition worldPosition.
+ * @param {number} heading heading.
+ * @param {number} pitch pitch.
+ * @param {number} roll roll.
+ * @param {Matrix4|undefined} resultGeoLocMatrix. Optional. result geolocation matrix. if undefined, create Matrix4 instance. this transformMatrix without the heading, pitch, roll rotations.
+ * @param {Matrix4|undefined} resultTransformMatrix. Optional. result transform matrix. if undefined, create Matrix4 instance. this matrix including the heading, pitch, roll rotations.
+ * @returns {Matrix4} resultTransformMatrix.
+ */
+ManagerUtils.calculateTransformMatrixAtWorldPosition = function(worldPosition, heading, pitch, roll, resultGeoLocMatrix, resultTransformMatrix) 
+{
+	var xRotMatrix = new Matrix4();  // created as identity matrix.
+	var yRotMatrix = new Matrix4();  // created as identity matrix.
+	var zRotMatrix = new Matrix4();  // created as identity matrix.
+	
+	if (heading !== undefined && heading !== 0)
+	{ zRotMatrix.rotationAxisAngDeg(heading, 0.0, 0.0, 1.0); }
+
+	if (pitch !== undefined && pitch !== 0)
+	{ xRotMatrix.rotationAxisAngDeg(pitch, 1.0, 0.0, 0.0); }
+
+	if (roll !== undefined && roll !== 0)
+	{ yRotMatrix.rotationAxisAngDeg(roll, 0.0, 1.0, 0.0); }
+
+	if (resultGeoLocMatrix === undefined)
+	{ resultGeoLocMatrix = new Matrix4(); }  // created as identity matrix.
+	
+	if (resultTransformMatrix === undefined)
+	{ resultTransformMatrix = new Matrix4(); }  // created as identity matrix.
+
+	// 1rst, calculate the transformation matrix for the location.
+	resultGeoLocMatrix = ManagerUtils.calculateGeoLocationMatrixAtWorldPosition(worldPosition, resultGeoLocMatrix);
+	
+	resultTransformMatrix.copyFromMatrix4(resultGeoLocMatrix);
+	var zRotatedTMatrix;
+	var zxRotatedTMatrix;
+	var zxyRotatedTMatrix;
+
+	zRotatedTMatrix = zRotMatrix.getMultipliedByMatrix(resultTransformMatrix, zRotatedTMatrix);
+	zxRotatedTMatrix = xRotMatrix.getMultipliedByMatrix(zRotatedTMatrix, zxRotatedTMatrix);
+	zxyRotatedTMatrix = yRotMatrix.getMultipliedByMatrix(zxRotatedTMatrix, zxyRotatedTMatrix);
+	
+	resultTransformMatrix = zxyRotatedTMatrix;
+	return resultTransformMatrix;
+};
+
+/**
+ * This function calculates all data and matrices for the location(longitude, latitude, altitude) and rotation(heading, pitch, roll).
+ * @param {number} longitude Required. longitude.
+ * @param {number} latitude Required. latitude.
+ * @param {number} altitude altitude.
+ * @param {number} heading heading. Unit is degree.
+ * @param {number} pitch pitch. Unit is degree.
+ * @param {number} roll roll. Unit is degree.
+ * @param {GeoLocationData|undefined} resultGeoLocationData Optional. result geolocation matrix. if undefined, create GeoLocationData instance.
+ * @param {MagoManager} magoManager for magoManager.globe
+ * @returns {GeoLocationData} resultGeoLocationData.
+ */
+ManagerUtils.calculateGeoLocationData = function(longitude, latitude, altitude, heading, pitch, roll, resultGeoLocationData) 
+{
+	if (resultGeoLocationData === undefined)
+	{ resultGeoLocationData = new GeoLocationData(); }
+
+	// 0) Position.**
+	if (resultGeoLocationData.geographicCoord === undefined)
+	{ resultGeoLocationData.geographicCoord = new GeographicCoord(); }
+
+	if (longitude !== undefined)
+	{ resultGeoLocationData.geographicCoord.longitude = longitude; }
+	else 
+	{ longitude = resultGeoLocationData.geographicCoord.longitude; }
+
+	if (latitude !== undefined)
+	{ resultGeoLocationData.geographicCoord.latitude = latitude; }
+	else 
+	{ latitude = resultGeoLocationData.geographicCoord.latitude; }
+
+	if (altitude !== undefined)
+	{ resultGeoLocationData.geographicCoord.altitude = altitude; }
+	else 
+	{ altitude = resultGeoLocationData.geographicCoord.altitude; }
+
+	if (heading !== undefined)
+	{ resultGeoLocationData.heading = heading; }
+
+	if (pitch !== undefined)
+	{ resultGeoLocationData.pitch = pitch; }
+
+	if (roll !== undefined)
+	{ resultGeoLocationData.roll = roll; }
+
+	if (resultGeoLocationData.geographicCoord.longitude === undefined || resultGeoLocationData.geographicCoord.latitude === undefined)
+	{ return; }
+	
+	//if (magoManager.configInformation === undefined)
+	//{ return; }
+
+	resultGeoLocationData.position = ManagerUtils.geographicCoordToWorldPoint(longitude, latitude, altitude, resultGeoLocationData.position);
+
+	// High and Low values of the position.**
+	if (resultGeoLocationData.positionHIGH === undefined)
+	{ resultGeoLocationData.positionHIGH = new Float32Array([0.0, 0.0, 0.0]); }
+	if (resultGeoLocationData.positionLOW === undefined)
+	{ resultGeoLocationData.positionLOW = new Float32Array([0.0, 0.0, 0.0]); }
+	ManagerUtils.calculateSplited3fv([resultGeoLocationData.position.x, resultGeoLocationData.position.y, resultGeoLocationData.position.z], resultGeoLocationData.positionHIGH, resultGeoLocationData.positionLOW);
+
+	// Determine the elevation of the position.**
+	//var cartographic = Cesium.Ellipsoid.WGS84.cartesianToCartographic(position);
+	//var height = cartographic.height;
+	// End Determine the elevation of the position.-------------------------------------------------------
+	if (resultGeoLocationData.tMatrix === undefined)
+	{ resultGeoLocationData.tMatrix = new Matrix4(); }
+	else
+	{ resultGeoLocationData.tMatrix.Identity(); }
+
+	if (resultGeoLocationData.geoLocMatrix === undefined)
+	{ resultGeoLocationData.geoLocMatrix = new Matrix4(); }
+	else
+	{ resultGeoLocationData.geoLocMatrix.Identity(); }
+
+	if (resultGeoLocationData.rotMatrix === undefined)
+	{ resultGeoLocationData.rotMatrix = new Matrix4(); }
+	else
+	{ resultGeoLocationData.rotMatrix.Identity(); }
+
+	// Set inverseMatrices as undefined.
+	resultGeoLocationData.tMatrixInv = undefined; // reset. is calculated when necessary.
+	resultGeoLocationData.rotMatrixInv = undefined; // reset. is calculated when necessary.
+	resultGeoLocationData.geoLocMatrixInv = undefined; // reset. is calculated when necessary.
+
+	// 1rst, calculate the transformation matrix for the location.
+	resultGeoLocationData.tMatrix = ManagerUtils.calculateTransformMatrixAtWorldPosition(resultGeoLocationData.position, resultGeoLocationData.heading, resultGeoLocationData.pitch, resultGeoLocationData.roll, 
+		resultGeoLocationData.geoLocMatrix, resultGeoLocationData.tMatrix);
+	resultGeoLocationData.rotMatrix.copyFromMatrix4(resultGeoLocationData.tMatrix);
+	resultGeoLocationData.rotMatrix._floatArrays[12] = 0;
+	resultGeoLocationData.rotMatrix._floatArrays[13] = 0;
+	resultGeoLocationData.rotMatrix._floatArrays[14] = 0;
+	
+	// finally assing the pivotPoint.
+	if (resultGeoLocationData.pivotPoint === undefined)
+	{ resultGeoLocationData.pivotPoint = new Point3D(); }
+
+	resultGeoLocationData.pivotPoint.set(resultGeoLocationData.position.x, resultGeoLocationData.position.y, resultGeoLocationData.position.z);
+	resultGeoLocationData.doEffectivePivotPointTranslation();
+	
+	return resultGeoLocationData;
+};
+
+/**
+ * This function calculates geolocation data use pixel point(calculated world point). 
+ * When use Object Marker, this function called.
+ * @param {number} absoluteX absoluteX.
+ * @param {number} absoluteY absoluteY.
+ * @param {number} absoluteZ absoluteZ.
+ * @param {GeoLocationData|undefined} resultGeoLocationData Optional. result geolocation matrix. if undefined, create GeoLocationData instance.
+ * @param {MagoManager} magoManager
+ * @returns {GeoLocationData} resultGeoLocationData.
+ */
+ManagerUtils.calculateGeoLocationDataByAbsolutePoint = function(absoluteX, absoluteY, absoluteZ, resultGeoLocationData, magoManager) 
+{
+	if (resultGeoLocationData === undefined)
+	{ resultGeoLocationData = new GeoLocationData(); }
+
+	// 0) Position.**
+	if (resultGeoLocationData.geographicCoord === undefined)
+	{ resultGeoLocationData.geographicCoord = new GeographicCoord(); }
+	
+	if (magoManager.configInformation === undefined)
+	{ return; }
+	
+	if (resultGeoLocationData.position === undefined)
+	{ resultGeoLocationData.position = new Point3D(); }
+		
+	resultGeoLocationData.position.x = absoluteX;
+	resultGeoLocationData.position.y = absoluteY;
+	resultGeoLocationData.position.z = absoluteZ;
+	
+	//추후에 세슘의존성 버리는 코드로 대체 가능해 보임. 손수석님과 검토 필요.
+	/*
+	if (magoManager.isCesiumGlobe())
+	{
+		// *if this in Cesium:
+		//resultGeoLocationData.position = Cesium.Cartesian3.fromDegrees(resultGeoLocationData.geographicCoord.longitude, resultGeoLocationData.geographicCoord.latitude, resultGeoLocationData.geographicCoord.altitude);
+		// must find cartographic data.
+		var cartographic = new Cesium.Cartographic();
+		var cartesian = new Cesium.Cartesian3();
+		cartesian.x = absoluteX;
+		cartesian.y = absoluteY;
+		cartesian.z = absoluteZ;
+		cartographic = Cesium.Cartographic.fromCartesian(cartesian, magoManager.scene._globe._ellipsoid, cartographic);
+		resultGeoLocationData.geographicCoord.longitude = cartographic.longitude * 180.0/Math.PI;
+		resultGeoLocationData.geographicCoord.latitude = cartographic.latitude * 180.0/Math.PI;
+		resultGeoLocationData.geographicCoord.altitude = cartographic.height;
+	}
+	*/
+
+	resultGeoLocationData.geographicCoord = ManagerUtils.pointToGeographicCoord(new Point3D(absoluteX, absoluteY, absoluteZ));
+
+	// High and Low values of the position.**
+	if (resultGeoLocationData.positionHIGH === undefined)
+	{ resultGeoLocationData.positionHIGH = new Float32Array([0.0, 0.0, 0.0]); }
+	if (resultGeoLocationData.positionLOW === undefined)
+	{ resultGeoLocationData.positionLOW = new Float32Array([0.0, 0.0, 0.0]); }
+	this.calculateSplited3fv([resultGeoLocationData.position.x, resultGeoLocationData.position.y, resultGeoLocationData.position.z], resultGeoLocationData.positionHIGH, resultGeoLocationData.positionLOW);
+
+	// Determine the elevation of the position.**
+	//var cartographic = Cesium.Ellipsoid.WGS84.cartesianToCartographic(position);
+	//var height = cartographic.height;
+	// End Determine the elevation of the position.-------------------------------------------------------
+	if (resultGeoLocationData.tMatrix === undefined)
+	{ resultGeoLocationData.tMatrix = new Matrix4(); }
+	else
+	{ resultGeoLocationData.tMatrix.Identity(); }
+
+	if (resultGeoLocationData.geoLocMatrix === undefined)
+	{ resultGeoLocationData.geoLocMatrix = new Matrix4(); }
+	else
+	{ resultGeoLocationData.geoLocMatrix.Identity(); }
+
+	if (resultGeoLocationData.rotMatrix === undefined)
+	{ resultGeoLocationData.rotMatrix = new Matrix4(); }
+	else
+	{ resultGeoLocationData.rotMatrix.Identity(); }
+
+	// Set inverseMatrices as undefined.
+	resultGeoLocationData.tMatrixInv = undefined; // reset. is calculated when necessary.
+	resultGeoLocationData.rotMatrixInv = undefined; // reset. is calculated when necessary.
+	resultGeoLocationData.geoLocMatrixInv = undefined; // reset. is calculated when necessary.
+
+	// 1rst, calculate the transformation matrix for the location.
+	resultGeoLocationData.tMatrix = ManagerUtils.calculateTransformMatrixAtWorldPosition(resultGeoLocationData.position, resultGeoLocationData.heading, resultGeoLocationData.pitch, resultGeoLocationData.roll, 
+		resultGeoLocationData.geoLocMatrix, resultGeoLocationData.tMatrix);
+	resultGeoLocationData.rotMatrix.copyFromMatrix4(resultGeoLocationData.tMatrix);
+	resultGeoLocationData.rotMatrix._floatArrays[12] = 0;
+	resultGeoLocationData.rotMatrix._floatArrays[13] = 0;
+	resultGeoLocationData.rotMatrix._floatArrays[14] = 0;
+	
+	// finally assing the pivotPoint.
+	if (resultGeoLocationData.pivotPoint === undefined)
+	{ resultGeoLocationData.pivotPoint = new Point3D(); }
+
+	resultGeoLocationData.pivotPoint.set(resultGeoLocationData.position.x, resultGeoLocationData.position.y, resultGeoLocationData.position.z);
+	resultGeoLocationData.doEffectivePivotPointTranslation();
+	
+	return resultGeoLocationData;
+};
+
+/**
+ * This function calculates geolocation data use pixel point(calculated world point). 
+ * When use Object Marker, this function called.
+ * @param {number} absoluteX absoluteX.
+ * @param {number} absoluteY absoluteY.
+ * @param {number} absoluteZ absoluteZ.
+ * @param {GeoLocationData|undefined} resultGeoLocationData Optional. result geolocation matrix. if undefined, create GeoLocationData instance.
+ * @param {MagoManager} magoManager
+ * @returns {GeoLocationData} resultGeoLocationData.
+ */
+ManagerUtils.calculateGeoLocationDataByAbsolutePoint__original = function(absoluteX, absoluteY, absoluteZ, resultGeoLocationData, magoManager) 
+{
+	if (resultGeoLocationData === undefined)
+	{ resultGeoLocationData = new GeoLocationData(); }
+
+	// 0) Position.**
+	if (resultGeoLocationData.geographicCoord === undefined)
+	{ resultGeoLocationData.geographicCoord = new GeographicCoord(); }
+	
+	if (magoManager.configInformation === undefined)
+	{ return; }
+	
+	if (resultGeoLocationData.position === undefined)
+	{ resultGeoLocationData.position = new Point3D(); }
+		
+	resultGeoLocationData.position.x = absoluteX;
+	resultGeoLocationData.position.y = absoluteY;
+	resultGeoLocationData.position.z = absoluteZ;
+	
+	//추후에 세슘의존성 버리는 코드로 대체 가능해 보임. 손수석님과 검토 필요.
+	if (magoManager.isCesiumGlobe())
+	{
+		// *if this in Cesium:
+		//resultGeoLocationData.position = Cesium.Cartesian3.fromDegrees(resultGeoLocationData.geographicCoord.longitude, resultGeoLocationData.geographicCoord.latitude, resultGeoLocationData.geographicCoord.altitude);
+		// must find cartographic data.
+		var cartographic = new Cesium.Cartographic();
+		var cartesian = new Cesium.Cartesian3();
+		cartesian.x = absoluteX;
+		cartesian.y = absoluteY;
+		cartesian.z = absoluteZ;
+		cartographic = Cesium.Cartographic.fromCartesian(cartesian, magoManager.scene._globe._ellipsoid, cartographic);
+		resultGeoLocationData.geographicCoord.longitude = cartographic.longitude * 180.0/Math.PI;
+		resultGeoLocationData.geographicCoord.latitude = cartographic.latitude * 180.0/Math.PI;
+		resultGeoLocationData.geographicCoord.altitude = cartographic.height;
+	}
+
+	// High and Low values of the position.**
+	if (resultGeoLocationData.positionHIGH === undefined)
+	{ resultGeoLocationData.positionHIGH = new Float32Array([0.0, 0.0, 0.0]); }
+	if (resultGeoLocationData.positionLOW === undefined)
+	{ resultGeoLocationData.positionLOW = new Float32Array([0.0, 0.0, 0.0]); }
+	this.calculateSplited3fv([resultGeoLocationData.position.x, resultGeoLocationData.position.y, resultGeoLocationData.position.z], resultGeoLocationData.positionHIGH, resultGeoLocationData.positionLOW);
+
+	// Determine the elevation of the position.**
+	//var cartographic = Cesium.Ellipsoid.WGS84.cartesianToCartographic(position);
+	//var height = cartographic.height;
+	// End Determine the elevation of the position.-------------------------------------------------------
+	if (resultGeoLocationData.tMatrix === undefined)
+	{ resultGeoLocationData.tMatrix = new Matrix4(); }
+	else
+	{ resultGeoLocationData.tMatrix.Identity(); }
+
+	if (resultGeoLocationData.geoLocMatrix === undefined)
+	{ resultGeoLocationData.geoLocMatrix = new Matrix4(); }
+	else
+	{ resultGeoLocationData.geoLocMatrix.Identity(); }
+
+	if (resultGeoLocationData.geoLocMatrixInv === undefined)
+	{ resultGeoLocationData.geoLocMatrixInv = new Matrix4(); }
+	else
+	{ resultGeoLocationData.geoLocMatrixInv.Identity(); }
+
+	//---------------------------------------------------------
+
+	if (resultGeoLocationData.tMatrixInv === undefined)
+	{ resultGeoLocationData.tMatrixInv = new Matrix4(); }
+	else
+	{ resultGeoLocationData.tMatrixInv.Identity(); }
+
+	if (resultGeoLocationData.rotMatrix === undefined)
+	{ resultGeoLocationData.rotMatrix = new Matrix4(); }
+	else
+	{ resultGeoLocationData.rotMatrix.Identity(); }
+
+	if (resultGeoLocationData.rotMatrixInv === undefined)
+	{ resultGeoLocationData.rotMatrixInv = new Matrix4(); }
+	else
+	{ resultGeoLocationData.rotMatrixInv.Identity(); }
+
+	var xRotMatrix = new Matrix4();  // created as identity matrix.
+	var yRotMatrix = new Matrix4();  // created as identity matrix.
+	var zRotMatrix = new Matrix4();  // created as identity matrix.
+
+	if (resultGeoLocationData.heading !== undefined && resultGeoLocationData.heading !== 0)
+	{
+		zRotMatrix.rotationAxisAngDeg(resultGeoLocationData.heading, 0.0, 0.0, -1.0);
+	}
+
+	if (resultGeoLocationData.pitch !== undefined && resultGeoLocationData.pitch !== 0)
+	{
+		xRotMatrix.rotationAxisAngDeg(resultGeoLocationData.pitch, -1.0, 0.0, 0.0);
+	}
+
+	if (resultGeoLocationData.roll !== undefined && resultGeoLocationData.roll !== 0)
+	{
+		yRotMatrix.rotationAxisAngDeg(resultGeoLocationData.roll, 0.0, -1.0, 0.0);
+	}
+	
+	if (magoManager.isCesiumGlobe())
+	{
+		// *if this in Cesium:
+		Cesium.Transforms.eastNorthUpToFixedFrame(resultGeoLocationData.position, undefined, resultGeoLocationData.tMatrix._floatArrays);
+		resultGeoLocationData.geoLocMatrix.copyFromMatrix4(resultGeoLocationData.tMatrix);// "geoLocMatrix" is the pure transformation matrix, without heading or pitch or roll.
+
+		var zRotatedTMatrix = zRotMatrix.getMultipliedByMatrix(resultGeoLocationData.tMatrix, zRotatedTMatrix);
+		var zxRotatedTMatrix = xRotMatrix.getMultipliedByMatrix(zRotatedTMatrix, zxRotatedTMatrix);
+		var zxyRotatedTMatrix = yRotMatrix.getMultipliedByMatrix(zxRotatedTMatrix, zxyRotatedTMatrix);
+		resultGeoLocationData.tMatrix = zxyRotatedTMatrix;
+		
+		// test.
+		//var yRotatedTMatrix = yRotMatrix.getMultipliedByMatrix(resultGeoLocationData.tMatrix, yRotatedTMatrix);
+		//var yxRotatedTMatrix = xRotMatrix.getMultipliedByMatrix(yRotatedTMatrix, yxRotatedTMatrix);
+		//var yxzRotatedTMatrix = zRotMatrix.getMultipliedByMatrix(yxRotatedTMatrix, yxzRotatedTMatrix);
+		//resultGeoLocationData.tMatrix = yxzRotatedTMatrix;
+		// end test.---
+
+		resultGeoLocationData.rotMatrix.copyFromMatrix4(resultGeoLocationData.tMatrix);
+		resultGeoLocationData.rotMatrix._floatArrays[12] = 0;
+		resultGeoLocationData.rotMatrix._floatArrays[13] = 0;
+		resultGeoLocationData.rotMatrix._floatArrays[14] = 0;
+
+		// now, calculates the inverses.
+		Cesium.Matrix4.inverse(resultGeoLocationData.tMatrix._floatArrays, resultGeoLocationData.tMatrixInv._floatArrays);
+		Cesium.Matrix4.inverse(resultGeoLocationData.rotMatrix._floatArrays, resultGeoLocationData.rotMatrixInv._floatArrays);
+		Cesium.Matrix4.inverse(resultGeoLocationData.geoLocMatrix._floatArrays, resultGeoLocationData.geoLocMatrixInv._floatArrays);
+	}
+
+	// finally assing the pivotPoint.
+	if (resultGeoLocationData.pivotPoint === undefined)
+	{ resultGeoLocationData.pivotPoint = new Point3D(); }
+
+	resultGeoLocationData.pivotPoint.set(resultGeoLocationData.position.x, resultGeoLocationData.position.y, resultGeoLocationData.position.z);
+
+	return resultGeoLocationData;
+};
+
+/**
+ * 자릿수가 긴 숫자를 나머지와 몫으로 분리. gl에서는 float형밖에 처리 불가.
+ * @example <caption>Example usage of calculateSplitedValues</caption>
+ * ManagerUtils.calculateSplitedValues(4049653.5985745606, new SplitValue());
+ * resultSplitValue.high = 3997696; // Math.floor(4049653.5985745606 / 65536.0) * 65536.0;
+ * resultSplitValue.low = 51957.5985745606 // 4049653.5985745606 - 3997696;
+ * @param {number} value Required. coordinate x or y or z.
+ * @param {SplitValue} resultSplitValue Optional. result split value. if undefined, create SplitValue instance.
+ * @returns {SplitValue} resultSplitValue.
+ */
+ManagerUtils.calculateSplitedValues = function(value, resultSplitValue)
+{
+	if (resultSplitValue === undefined)
+	{ resultSplitValue = new SplitValue(); }
+
+	var doubleHigh;
+	if (value >= 0.0) 
+	{
+		doubleHigh = Math.floor(value / 65536.0) * 65536.0; //unsigned short max
+		resultSplitValue.high = doubleHigh;
+		resultSplitValue.low = value - doubleHigh;
+	}
+	else 
+	{
+		doubleHigh = Math.floor(-value / 65536.0) * 65536.0;
+		resultSplitValue.high = -doubleHigh;
+		resultSplitValue.low = value + doubleHigh;
+	}
+
+	return resultSplitValue;
+};
+
+/**
+ * 자릿수가 긴 숫자를 나머지(low)와 몫(high)으로 분리한 결과를 각각 배열로 생성. gl에서는 float형밖에 처리 불가.
+ * @param {Point3D} point3fv Required.
+ * @param {Float32Array} resultSplitPoint3fvHigh Optional. result split high value array. if undefined, set new Float32Array(3).
+ * @param {Float32Array} resultSplitPoint3fvLow Optional. result split low value array. if undefined, set new Float32Array(3).
+ * 
+ * @see ManagerUtils#calculateSplitedValues
+ */
+ManagerUtils.calculateSplited3fv = function(point3fv, resultSplitPoint3fvHigh, resultSplitPoint3fvLow)
+{
+	if (point3fv === undefined)
+	{ return undefined; }
+
+	if (resultSplitPoint3fvHigh === undefined) // delete unnecesary. agree
+	{ resultSplitPoint3fvHigh = new Float32Array(3); }// delete unnecesary. agree
+
+	if (resultSplitPoint3fvLow === undefined)// delete unnecesary. agree
+	{ resultSplitPoint3fvLow = new Float32Array(3); }// delete unnecesary. agree
+
+	var posSplitX = new SplitValue();
+	posSplitX = this.calculateSplitedValues(point3fv[0], posSplitX);
+	var posSplitY = new SplitValue();
+	posSplitY = this.calculateSplitedValues(point3fv[1], posSplitY);
+	var posSplitZ = new SplitValue();
+	posSplitZ = this.calculateSplitedValues(point3fv[2], posSplitZ);
+
+	resultSplitPoint3fvHigh[0] = posSplitX.high;
+	resultSplitPoint3fvHigh[1] = posSplitY.high;
+	resultSplitPoint3fvHigh[2] = posSplitZ.high;
+
+	resultSplitPoint3fvLow[0] = posSplitX.low;
+	resultSplitPoint3fvLow[1] = posSplitY.low;
+	resultSplitPoint3fvLow[2] = posSplitZ.low;
+};
+
+/**
+ * Calculates the pixel linear depth value.
+ * @param {WebGLRenderingContext} gl WebGL Rendering Context.
+ * @param {Number} pixelX Screen x position of the pixel.
+ * @param {Number} pixelY Screen y position of the pixel.
+ * @param {FBO} depthFbo Depth frameBuffer object.
+ * @param {MagoManager} magoManager Mago3D main manager.
+ * @returns {Number} linearDepth Returns the linear depth [0.0, 1.0] ranged value.
+ */
+ManagerUtils.calculatePixelLinearDepth = function(gl, pixelX, pixelY, depthFbo, magoManager) 
+{
+	if (depthFbo === undefined)
+	{ depthFbo = magoManager.depthFboNeo; }
+
+	if (!depthFbo) 
+	{
+		return;
+	}
+
+	if (depthFbo) 
+	{
+		depthFbo.bind(); 
+	}
+
+	// Now, read the pixel and find the pixel position.
+	var depthPixels = new Uint8Array(4 * 1 * 1); // 4 x 1x1 pixel.
+	gl.readPixels(pixelX, magoManager.sceneState.drawingBufferHeight - pixelY, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, depthPixels);
+	
+	var zDepth = depthPixels[0]/(256.0*256.0*256.0) + depthPixels[1]/(256.0*256.0) + depthPixels[2]/256.0 + depthPixels[3]; // 0 to 256 range depth.
+	var linearDepth = zDepth / 256.0; // LinearDepth. Convert to [0.0, 1.0] range depth.
+
+	return linearDepth;
+};
+
+/**
+ * Calculates the pixel linear depth value.
+ * @param {WebGLRenderingContext} gl WebGL Rendering Context.
+ * @param {Number} pixelX Screen x position of the pixel.
+ * @param {Number} pixelY Screen y position of the pixel.
+ * @param {FBO} depthFbo Depth frameBuffer object.
+ * @param {MagoManager} magoManager Mago3D main manager.
+ * @returns {Number} linearDepth Returns the linear depth [0.0, 1.0] ranged value.
+ */
+ManagerUtils.calculatePixelLinearDepthABGR = function(gl, pixelX, pixelY, depthFbo, magoManager) 
+{
+	// Test function.
+	// Test function.
+	// Test function.
+	// Test function.
+	// Called from MagoWorld.updateMouseStartClick(...).***
+	if (depthFbo === undefined)
+	{ depthFbo = magoManager.depthFboNeo; }
+
+	if (!depthFbo) 
+	{
+		return;
+	}
+	
+	if (depthFbo) 
+	{
+		depthFbo.bind(); 
+	}
+	
+	// Now, read the pixel and find the pixel position.
+	var depthPixels = new Uint8Array(4 * 1 * 1); // 4 x 1x1 pixel.
+	gl.readPixels(pixelX, magoManager.sceneState.drawingBufferHeight - pixelY, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, depthPixels);
+	
+	var zDepth = depthPixels[3]/(255.0*255.0*255.0) + depthPixels[2]/(255.0*255.0) + depthPixels[1]/255.0 + depthPixels[0]; // 0 to 256 range depth.
+	var linearDepth = zDepth / 255.0; // LinearDepth. Convert to [0.0, 1.0] range depth.
+	return linearDepth;
+};
+
+/**
+ * Calculates the pixel position in camera coordinates.
+ * @param {WebGLRenderingContext} gl WebGL Rendering Context.
+ * @param {Number} pixelX Screen x position of the pixel.
+ * @param {Number} pixelY Screen y position of the pixel.
+ * @param {Point3D} resultPixelPos The result of the calculation.
+ * @param {MagoManager} magoManager Mago3D main manager.
+ * @returns {Point3D} resultPixelPos The result of the calculation.
+ */
+ManagerUtils.calculatePixelPositionCamCoord = function(gl, pixelX, pixelY, resultPixelPos, depthFbo, frustumNear, frustumFar, magoManager) 
+{
+	/*
+	vec2 screenPos = vec2(gl_FragCoord.x / screenWidth, gl_FragCoord.y / screenHeight);
+		float z_window  = unpackDepth(texture2D(depthTex, screenPos.xy)); // z_window  is [0.0, 1.0] range depth.
+		if(z_window < 0.001)
+		discard;
+	
+		float depthRange_near = 0.0;
+		float depthRange_far = 1.0;
+		float x_ndc = 2.0 * screenPos.x - 1.0;
+		float y_ndc = 2.0 * screenPos.y - 1.0;
+		float z_ndc = (2.0 * z_window - depthRange_near - depthRange_far) / (depthRange_far - depthRange_near);
+		
+		vec4 viewPosH = projectionMatrixInv * vec4(x_ndc, y_ndc, z_ndc, 1.0);
+		vec3 posCC = viewPosH.xyz/viewPosH.w;
+		vec4 posWC = modelViewMatrixRelToEyeInv * vec4(posCC.xyz, 1.0) + vec4((encodedCameraPositionMCHigh + encodedCameraPositionMCLow).xyz, 1.0);
+		*/
+	// New.*** New.*** New.*** New.*** New.*** New.*** New.*** New.*** New.*** New.*** New.*** New.*** New.*** New.*** New.*** New.*** New.*** New.***
+	/*
+	if (depthFbo) 
+	{
+		depthFbo.bind(); 
+	}
+	
+	var sceneState = magoManager.sceneState;
+	var screenW = sceneState.drawingBufferWidth;
+	var screenH = sceneState.drawingBufferHeight;
+
+	// Now, read the pixel and find the pixel position.
+	var depthPixels = new Uint8Array(4 * 1 * 1); // 4 x 1x1 pixel.
+	gl.readPixels(pixelX, screenH - pixelY, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, depthPixels);
+	
+	// Unpack the depthPixels.
+	//var dot(packedDepth, vec4(1.0, 1.0 / 255.0, 1.0 / 65025.0, 1.0 / 16581375.0));
+
+	var zDepth2 = depthPixels[0]/(256.0*256.0*256.0) + depthPixels[1]/(256.0*256.0) + depthPixels[2]/256.0 + depthPixels[3]; 
+	var zDepth = depthPixels[3]/(256.0*256.0*256.0) + depthPixels[2]/(256.0*256.0) + depthPixels[1]/256.0 + depthPixels[0]; 
+	
+	//zDepth /= 256.0;
+	// Calculate NDC coord.
+	var depthRange_near = 0.0;
+	var depthRange_far = 1.0;
+	var screenPos = new Point2D(pixelX/screenW, pixelY/screenH);
+	var xNdc = 2.0 * screenPos.x - 1.0;
+	var yNdc = 2.0 * screenPos.y - 1.0;
+	var zNdc = (2.0 * zDepth - depthRange_near - depthRange_far) / (depthRange_far - depthRange_near);
+	
+	var projectMatInv = sceneState.getProjectionMatrixInv();
+	var viewPosH = projectMatInv.transformPoint4D__test([xNdc, yNdc, zNdc, 1.0], undefined);
+	var viewPosCC = new Point3D(viewPosH[0]/viewPosH[3], viewPosH[1]/viewPosH[3], viewPosH[2]/viewPosH[3]);
+	
+	//********************************************************************************************************************************************
+	// Old.*** Old.*** Old.*** Old.*** Old.*** Old.*** Old.*** Old.*** Old.*** Old.*** Old.*** Old.*** Old.*** Old.*** Old.*** Old.***
+	*/
+	if (frustumFar === undefined)
+	{ frustumFar = magoManager.sceneState.camera.frustum.far; }
+
+	if (frustumNear === undefined)
+	{ frustumNear = 0.0; }
+	
+	var linearDepth = ManagerUtils.calculatePixelLinearDepth(gl, pixelX, pixelY, depthFbo, magoManager);
+	if (!linearDepth) 
+	{
+		return;
+	}
+	//var realZDepth = frustumNear + linearDepth*frustumFar; // Use this code if the zDepth encoder uses frustum near & frustum far, both.
+	// Note: In our RenderShowDepth shaders, we are encoding zDepth no considering the frustum near.
+	var realZDepth = linearDepth*frustumFar; // original.
+	//var realZDepth = linearDepth*30000.0; // new.
+
+	// now, find the 3d position of the pixel in camCoord.*
+	magoManager.resultRaySC = ManagerUtils.getRayCamSpace(pixelX, pixelY, magoManager.resultRaySC, magoManager);
+	if (resultPixelPos === undefined)
+	{ resultPixelPos = new Point3D(); }
+	
+	resultPixelPos.set(magoManager.resultRaySC[0] * realZDepth, magoManager.resultRaySC[1] * realZDepth, magoManager.resultRaySC[2] * realZDepth);
+	gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+	return resultPixelPos;
+};
+
+/**
+ * Calculates the cameraCoord position in world coordinates.
+ * @param {Point3D} cameraCoord Camera coordinate position.
+ * @param {MagoManager} magoManager Mago3D main manager.
+ * @returns {Point3D} resultPixelPos The result of the calculation.
+ */
+ManagerUtils.cameraCoordPositionToWorldCoord = function(camCoordPos, resultWorldPos, magoManager) 
+{
+	// now, must transform this pixelCamCoord to world coord.
+	var mv_inv = magoManager.sceneState.getModelViewMatrixInv();
+	if (resultWorldPos === undefined)
+	{ var resultWorldPos = new Point3D(); }
+	resultWorldPos = mv_inv.transformPoint3D(camCoordPos, resultWorldPos);
+	return resultWorldPos;
+};
+
+/**
+ * Calculates the pixel position in world coordinates.
+ * @param {WebGLRenderingContext} gl WebGL Rendering Context.
+ * @param {Number} pixelX Screen x position of the pixel.
+ * @param {Number} pixelY Screen y position of the pixel.
+ * @param {Point3D} resultPixelPos The result of the calculation.
+ * @param {MagoManager} magoManager Mago3D main manager.
+ * @returns {Point3D} resultPixelPos The result of the calculation.
+ */
+ManagerUtils.screenCoordToWorldCoord = function(gl, pixelX, pixelY, resultWCPos, depthFbo, frustumNear, frustumFar, magoManager) 
+{
+	if (magoManager.isCesiumGlobe())
+	{
+		// https://cesium.com/docs/cesiumjs-ref-doc/Globe.html
+		
+		var cesiumScene = magoManager.scene; 
+		var cesiumGlobe = cesiumScene.globe;
+		var cesiumCamera = cesiumScene.camera;
+		var windowCoordinates = new Cesium.Cartesian2(pixelX, pixelY);
+		var ray = cesiumCamera.getPickRay(windowCoordinates);
+		var intersection = cesiumGlobe.pick(ray, cesiumScene);
+		return intersection;
+	}
+	else/* if (magoManager.configInformation.basicGlobe === Constant.MAGOWORLD)*/
+	{
+		// todo:
+		var camCoord = MagoWorld.screenToCamCoord(pixelX, pixelY, magoManager);
+		return ManagerUtils.cameraCoordPositionToWorldCoord(camCoord, undefined, magoManager);
+	}
+};
+
+/**
+ * Calculates the pixel position in world coordinates.
+ * @param {WebGLRenderingContext} gl WebGL Rendering Context.
+ * @param {Number} pixelX Screen x position of the pixel.
+ * @param {Number} pixelY Screen y position of the pixel.
+ * @param {Point3D} resultPixelPos The result of the calculation.
+ * @param {MagoManager} magoManager Mago3D main manager.
+ * @returns {Point3D} resultPixelPos The result of the calculation.
+ */
+ManagerUtils.calculatePixelPositionWorldCoord = function(gl, pixelX, pixelY, resultPixelPos, depthFbo, frustumNear, frustumFar, magoManager) 
+{
+	var pixelPosCamCoord = new Point3D();
+	
+	if (frustumFar === undefined)
+	{ frustumFar = magoManager.sceneState.camera.frustum.far; }
+
+	if (frustumNear === undefined)
+	{ frustumNear = 0.0; }
+	
+	if (depthFbo === undefined)
+	{ depthFbo = magoManager.depthFboNeo; }
+	
+	pixelPosCamCoord = ManagerUtils.calculatePixelPositionCamCoord(gl, pixelX, pixelY, pixelPosCamCoord, depthFbo, frustumNear, frustumFar, magoManager);
+
+	if (resultPixelPos === undefined)
+	{ var resultPixelPos = new Point3D(); }
+
+	resultPixelPos = ManagerUtils.cameraCoordPositionToWorldCoord(pixelPosCamCoord, resultPixelPos, magoManager);
+	return resultPixelPos;
+};
+
+/**
+ * Calculates a world coordinate point to screen coordinate.
+ * @param {WebGLRenderingContext} gl WebGL Rendering Context.
+ * @param {Number} worldCoordX x value of the point in world coordinate.
+ * @param {Number} worldCoordY y value of the point in world coordinate.
+ * @param {Number} worldCoordZ z value of the point in world coordinate.
+ * @param {Point3D} resultPixelPos The result of the calculation.
+ * @param {MagoManager} magoManager Mago3D main manager.
+ * @returns {Point3D} resultPixelPos The result of the calculation.
+ */
+ManagerUtils.calculateWorldPositionToScreenCoord = function(gl, worldCoordX, worldCoordY, worldCoordZ, resultScreenCoord, magoManager)
+{
+	if (resultScreenCoord === undefined)
+	{ resultScreenCoord = new Point3D(); }
+	
+	if (magoManager.pointSC === undefined)
+	{ magoManager.pointSC = new Point3D(); }
+	
+	if (magoManager.pointSC2 === undefined)
+	{ magoManager.pointSC2 = new Point3D(); }
+	
+	magoManager.pointSC.set(worldCoordX, worldCoordY, worldCoordZ);
+	
+	// calculate the position in camera coords.
+	var pointSC2 = magoManager.pointSC2;
+	var sceneState = magoManager.sceneState;
+	pointSC2 = sceneState.modelViewMatrix.transformPoint3D(magoManager.pointSC, pointSC2);
+	
+	// now calculate the position in screen coords.
+	var zDist = pointSC2.z;
+	if (zDist > 0)
+	{
+		// the worldPoint is rear the camera.
+		resultScreenCoord.set(-1, -1, 0);
+		return resultScreenCoord;
+	}
+	
+	// now calculate the width and height of the plane in zDist.
+	//var fovyRad = sceneState.camera.frustum.fovyRad;
+	
+	var planeHeight = sceneState.camera.frustum.tangentOfHalfFovy*zDist*2;
+	var planeWidth = planeHeight * sceneState.camera.frustum.aspectRatio; 
+	var pixelX = -pointSC2.x * sceneState.drawingBufferWidth / planeWidth;
+	var pixelY = -(pointSC2.y) * sceneState.drawingBufferHeight / planeHeight;
+
+	pixelX += sceneState.drawingBufferWidth / 2;
+	pixelY += sceneState.drawingBufferHeight / 2;
+	pixelY = sceneState.drawingBufferHeight - pixelY;
+	resultScreenCoord.set(pixelX, pixelY, 0);
+	
+	return resultScreenCoord;
+};
+
+/**
+ * Calculates the direction vector of a ray that starts in the camera position and
+ * continues to the pixel position in camera space.
+ * @param {Number} pixelX Screen x position of the pixel.
+ * @param {Number} pixelY Screen y position of the pixel.
+ * @param {Float32Array(3)} resultRay Result of the calculation.
+ * @returns {Float32Array(3)} resultRay Result of the calculation.
+ */
+ManagerUtils.getRayCamSpace = function(pixelX, pixelY, resultRay, magoManager) 
+{
+	// in this function "ray" is a vector.
+	var sceneState = magoManager.sceneState;
+	var frustum_far = 1.0; // unitary frustum far.
+	var frustum = sceneState.camera.frustum;
+	var aspectRatio = frustum.aspectRatio;
+	var tangentOfHalfFovy = frustum.tangentOfHalfFovy; 
+	
+	var hfar = 2.0 * tangentOfHalfFovy * frustum_far; //var hfar = 2.0 * Math.tan(fovy/2.0) * frustum_far;
+	var wfar = hfar * aspectRatio;
+	var mouseX = pixelX;
+	var mouseY = sceneState.drawingBufferHeight - pixelY;
+	if (resultRay === undefined) 
+	{ resultRay = new Float32Array(3); }
+	resultRay[0] = wfar*((mouseX/sceneState.drawingBufferWidth) - 0.5);
+	resultRay[1] = hfar*((mouseY/sceneState.drawingBufferHeight) - 0.5);
+	resultRay[2] = - frustum_far;
+	return resultRay;
+};
+
+/**
+ * Calculates the direction vector of a ray that starts in the camera position and
+ * continues to the pixel position in world space.
+ * @param {WebGLRenderingContext} gl WebGL Rendering Context.
+ * @param {Number} pixelX Screen x position of the pixel.
+ * @param {Number} pixelY Screen y position of the pixel.
+ * @returns {Line} resultRay
+ */
+ManagerUtils.getRayWorldSpace = function(gl, pixelX, pixelY, resultRay, magoManager) 
+{
+	// in this function the "ray" is a line.
+	if (resultRay === undefined) 
+	{ resultRay = new Line(); }
+	
+	// world ray = camPos + lambda*camDir.
+	var camPos = magoManager.sceneState.camera.position;
+	var rayCamSpace = new Float32Array(3);
+	rayCamSpace = ManagerUtils.getRayCamSpace(pixelX, pixelY, rayCamSpace, magoManager);
+	
+	if (magoManager.pointSC === undefined)
+	{ magoManager.pointSC = new Point3D(); }
+	
+	var pointSC = magoManager.pointSC;
+	var pointSC2 = magoManager.pointSC2;
+	
+	pointSC.set(rayCamSpace[0], rayCamSpace[1], rayCamSpace[2]);
+
+	// now, must transform this posCamCoord to world coord.
+
+	var mvMatInv = magoManager.sceneState.getModelViewMatrixInv();
+	pointSC2 = mvMatInv.rotatePoint3D(pointSC, pointSC2); // rayWorldSpace.
+	pointSC2.unitary(); // rayWorldSpace.
+	resultRay.setPointAndDir(camPos.x, camPos.y, camPos.z,       pointSC2.x, pointSC2.y, pointSC2.z);// original.
+
+	return resultRay;
+};
+
+/**
+ * 두 점을 연결한 선과 정북선 사이의 각도 구하기. 주로 모델이나 데이터의 헤딩을 설정하는데 사용.
+ * @param {GeographicCoord} startGeographic 
+ * @param {GeographicCoord} endGeographic 
+ * @returns {number} heading
+ */
+ManagerUtils.getHeadingToNorthByTwoGeographicCoords = function(startGeographic, endGeographic, magoManager) 
+{
+	var firstGeoLocData = Mago3D.ManagerUtils.calculateGeoLocationData(startGeographic.longitude, startGeographic.latitude, 0, 0, 0, 0, firstGeoLocData, magoManager);
+
+	var lastWorldCoord = Mago3D.ManagerUtils.geographicCoordToWorldPoint(endGeographic.longitude, endGeographic.latitude, 0, lastWorldCoord, magoManager);
+	var lastLocalCoord3D = firstGeoLocData.worldCoordToLocalCoord(lastWorldCoord, lastLocalCoord3D);
+	var lastLocalCoord2D = new Point2D(lastLocalCoord3D.x, lastLocalCoord3D.y);
+	lastLocalCoord2D.unitary();
+	var yAxis = new Point2D(0, 1);
+	var heading = yAxis.angleDegToVector(lastLocalCoord2D);
+	if (lastLocalCoord2D.x > 0) 
+	{
+		heading *= -1;
+	}
+
+	return heading;
+};
+
+/**
+ * Using screen coordinate, return world coord, geographic coord, screen coord.
+ * @param {WebGLRenderingContext} gl WebGL Rendering Context.
+ * @param {Number} pixelX Screen x position of the pixel.
+ * @param {Number} pixelY Screen y position of the pixel.
+ * @param {MagoManager} magoManager Mago3D main manager.
+ * @returns {object} world coord, geographic coord, screen coord.
+ */
+ManagerUtils.getComplexCoordinateByScreenCoord = function(gl, pixelX, pixelY, depthFbo, frustumNear, frustumFar, magoManager) 
+{
+	var worldCoord = ManagerUtils.screenCoordToWorldCoord(magoManager.getGl(), pixelX, pixelY, worldCoord, undefined, undefined, undefined, magoManager);
+	if (!worldCoord) 
+	{
+		return null;
+	}
+	var geographicCoord = ManagerUtils.pointToGeographicCoord(worldCoord, geographicCoord);
+	
+	return {
+		screenCoordinate     : new Point2D(pixelX, pixelY),
+		worldCoordinate      : worldCoord,
+		geographicCoordinate : geographicCoord
+	};
+};
+
+ManagerUtils.geographicToWkt = function(geographic, type) 
+{
+	var wkt = '';
+	
+	switch (type) 
+	{
+	case 'POINT' : {
+		wkt = 'POINT (';
+		wkt += geographic.longitude;
+		wkt += ' ';
+		wkt += geographic.latitude;
+		wkt += ')';
+		break;
+	}
+	case 'LINE' : {
+		wkt = 'LINESTRING (';
+		for (var i=0, len=geographic.length;i<len;i++) 
+		{
+			if (i>0) 
+			{
+				wkt += ',';
+			}
+			wkt += geographic[i].longitude;
+			wkt += ' ';
+			wkt += geographic[i].latitude;
+		}
+		wkt += ')';
+		break;
+	}
+	case 'POLYGON' : {
+		wkt = 'POLYGON ((';
+		for (var i=0, len=geographic.length;i<len;i++) 
+		{
+			if (i>0) 
+			{
+				wkt += ',';
+			}
+			wkt += geographic[i].longitude;
+			wkt += ' ';
+			wkt += geographic[i].latitude;
+		}
+		wkt += ',';
+		wkt += geographic[0].longitude;
+		wkt += ' ';
+		wkt += geographic[0].latitude;
+		wkt += '))';
+		break;
+	}
+	}
+
+	function coordToString(coord, str) 
+	{
+		var text = str ? str : '';
+		if (Array.isArray(coord)) 
+		{
+			for (var j=0, coordLen=coord.length;j<coordLen;j++) 
+			{
+				coordToString(coord[j], text);
+			}
+		}
+		else 
+		{
+			if (text) 
+			{
+				text += ',';
+			}
+			text += coord.longitude;
+			text += ' ';
+			text += coord.latitude;
+		}
+		
+		return text;
+	}
+	
+	return wkt;
+};
 'use strict';
 
 var Slice = function() 
@@ -102145,1668 +104528,6 @@ WindVolume.prototype.renderWindLayerDisplayPlanes = function(magoManager)
 
 
 
-'use strict';
-
-function abstract() 
-{
-	return  ((function() 
-	{
-		throw new Error('Unimplemented abstract method.');
-	})());
-}
-'use strict';
-
-/**
- * 어떤 일을 하고 있습니까?
- * @class ByteColor
- */
-var ByteColor = function() 
-{
-	if (!(this instanceof ByteColor)) 
-	{
-		throw new Error(Messages.CONSTRUCT_ERROR);
-	}
-
-	this.ByteR = 0;
-	this.ByteG = 0;
-	this.ByteB = 0;
-	this.ByteAlfa = 255;
-};
-
-/**
- * 어떤 일을 하고 있습니까?
- */
-ByteColor.prototype.destroy = function() 
-{
-	this.ByteR = null;
-	this.ByteG = null;
-	this.ByteB = null;
-	this.ByteAlfa = null;
-};
-
-/**
- * 어떤 일을 하고 있습니까?
- * @param byteRed 변수
- * @param byteGreen 변수
- * @param byteBlue 변수
- */
-ByteColor.prototype.set = function(byteRed, byteGreen, byteBlue) 
-{
-	this.ByteR = byteRed;
-	this.ByteG = byteGreen;
-	this.ByteB = byteBlue;
-};
-
-'use strict';
-
-/**
- * This class is used to control the movement of objects.
- * @class CameraController
- */
-var CameraController = function() 
-{
-	if (!(this instanceof CameraController)) 
-	{
-		throw new Error(Messages.CONSTRUCT_ERROR);
-	}
-	
-	this.startGeoCoord;
-	this.targetGeoCoord;
-	this.travelDurationInSeconds;
-	
-	this.acceleration; // m/s2.***
-	this.velocity; // m/s.***
-	
-	
-};
-'use strict';
-
-/**
- * Returns guid
- */
-function createGuid() 
-{
-	return 'xxxxxxxx-xxxx-xxxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) 
-	{
-		var r = Math.random() * 16 | 0, v = c === 'x' ? r : (r & 0x3 | 0x8);
-		return v.toString(16);
-	});
-}
-'use strict';
-
-/**
- * Returns the first parameter if not undefined, otherwise the second parameter.
- * Useful for setting a default value for a parameter.
- *
- * @param {*} a
- * @param {*} b
- * @returns {*} Returns the first parameter if not undefined, otherwise the second parameter. 
- */
-function defaultValue(a, b) 
-{
-	if (a !== undefined && a !== null) 
-	{
-		return a;
-	}
-	return b;
-}
-'use strict';
-
-/**
- * Returns the first parameter if not undefined, otherwise the second parameter.
- * Useful for setting a default value for a parameter.
- *
- * @param {*} a
- * @param {*} b
- * @returns {*} Returns the first parameter if not undefined, otherwise the second parameter. 
- */
-function defaultValueCheckLength(a, b) 
-{
-	if (a !== undefined && a !== null && a.toString().trim().length > 0) 
-	{
-		return a;
-	}
-	return b;
-}
-'use strict';
-
-/**
- *
- * @param {*} value The object.
- * @returns {Boolean} Returns true if the object is defined, returns false otherwise.
- */
-function defined(value) 
-{
-	return value !== undefined && value !== null;
-}
-'use strict';
-/**
-* Utils for geometry.
-* @class GeometryUtils
-*/
-var GeometryUtils = function() 
-{
-	if (!(this instanceof GeometryUtils)) 
-	{
-		throw new Error(Messages.CONSTRUCT_ERROR);
-	}
-	
-};
-
-/**
- * Given an idx, this function returns the next idx of an array.
- * @param {Number} currIdx 
- * @param {Number} pointsCount The points count of the array.
- * @Return {Number} The next idx.
- */
-GeometryUtils.projectPoint3DInToBestPlaneToProject = function(point3d, bestPlaneToProject, resultPoint2d)
-{
-	// This function returns projected point2d.
-	if (resultPoint2d === undefined)
-	{ resultPoint2d = new Point2D(); }
-	
-	if (bestPlaneToProject === 0)
-	{
-		//"xy";
-		resultPoint2d.set(point3d.x, point3d.y);
-	}
-	else if (bestPlaneToProject === 1)
-	{
-		//"yz";
-		resultPoint2d.set(point3d.y, point3d.z);
-	}
-	else if (bestPlaneToProject === 2)
-	{
-		//"xz";
-		resultPoint2d.set(point3d.x, point3d.z);
-	}
-	
-	return resultPoint2d;
-};
-
-/**
- * Given an idx, this function returns the next idx of an array.
- * @param {Number} currIdx 
- * @param {Number} pointsCount The points count of the array.
- * @Return {Number} The next idx.
- */
-GeometryUtils.projectTriangle3DInToBestPlaneToProject = function(triangle3d, bestPlaneToProject, resultTriangle2d)
-{
-	// This function returns projected triangle2d.
-	if (resultTriangle2d === undefined)
-	{ resultTriangle2d = new Triangle2D(); }
-	
-	var point3d0 = triangle3d.vertex0.getPosition();
-	var point2d0 = GeometryUtils.projectPoint3DInToBestPlaneToProject(point3d0, bestPlaneToProject, undefined);
-	
-	var point3d1 = triangle3d.vertex1.getPosition();
-	var point2d1 = GeometryUtils.projectPoint3DInToBestPlaneToProject(point3d1, bestPlaneToProject, undefined);
-	
-	var point3d2 = triangle3d.vertex2.getPosition();
-	var point2d2 = GeometryUtils.projectPoint3DInToBestPlaneToProject(point3d2, bestPlaneToProject, undefined);
-	
-	resultTriangle2d.setPoints(point2d0, point2d1, point2d2);
-	
-	return resultTriangle2d;
-};
-
-/**
- * Given an idx, this function returns the next idx of an array.
- * @param {Number} currIdx 
- * @param {Number} pointsCount The points count of the array.
- * @Return {Number} The next idx.
- */
-GeometryUtils.getNextIdx = function(currIdx, pointsCount)
-{
-	if (currIdx === pointsCount - 1)
-	{ return 0; }
-	else
-	{ return currIdx + 1; }
-};
-
-/**
- * Given an idx, this function returns the previous idx of an array.
- * @param {Number} currIdx 
- * @param {Number} pointsCount The points count of the array.
- * @Return {Number} The previous idx.
- */
-GeometryUtils.getPrevIdx = function(currIdx, pointsCount)
-{
-	if (currIdx === 0)
-	{ return pointsCount - 1; }
-	else
-	{ return currIdx - 1; }
-};
-
-/**
- * This function makes the triangles vertices indices for a regular grid.
- * @param {Number} numCols Grid columns count.
- * @param {Number} numRows Grid rows count.
- * @param {Uint16Array/undefined} resultIndicesArray
- * @param {Object} options 
- * @Return {Uint16Array} resultIndicesArray
- */
-GeometryUtils.getIndicesTrianglesRegularNet = function(numCols, numRows, resultIndicesArray, resultSouthIndices, resultEastIndices, resultNorthIndices, resultWestIndices, options)
-{
-	// given a regular net this function returns triangles vertices indices of the net.
-	var verticesCount = numCols * numRows;
-	var trianglesCount = (numCols-1) * (numRows-1) * 2;
-	if (resultIndicesArray === undefined)
-	{ resultIndicesArray = new Uint16Array(trianglesCount * 3); }
-	
-	var idx_1, idx_2, idx_3;
-	var idxCounter = 0;
-	
-	var resultObject = {};
-	
-	// bLoopColumns : if want object like a cilinder or sphere where the 1rstCol touch with the last col.
-	var bLoopColumns = false; // Default.***
-	var bTrianglesSenseCCW = true;
-	if (options !== undefined)
-	{
-		if (options.bLoopColumns !== undefined)
-		{ bLoopColumns = options.bLoopColumns; }
-	
-		if (options.bTrianglesSenseCCW !== undefined)
-		{ bTrianglesSenseCCW = options.bTrianglesSenseCCW; }
-	}
-	
-	for (var row = 0; row<numRows-1; row++)
-	{
-		for (var col=0; col<numCols-1; col++)
-		{
-			// there are 2 triangles: triA, triB.
-			idx_1 = VertexMatrix.getIndexOfArray(numCols, numRows, col, row);
-			idx_2 = VertexMatrix.getIndexOfArray(numCols, numRows, col+1, row);
-			idx_3 = VertexMatrix.getIndexOfArray(numCols, numRows, col, row+1);
-			
-			if (bTrianglesSenseCCW)
-			{
-				resultIndicesArray[idxCounter] = idx_1; idxCounter++;
-				resultIndicesArray[idxCounter] = idx_2; idxCounter++;
-				resultIndicesArray[idxCounter] = idx_3; idxCounter++;
-			}
-			else
-			{
-				resultIndicesArray[idxCounter] = idx_1; idxCounter++;
-				resultIndicesArray[idxCounter] = idx_3; idxCounter++;
-				resultIndicesArray[idxCounter] = idx_2; idxCounter++;
-			}
-			
-			idx_1 = VertexMatrix.getIndexOfArray(numCols, numRows, col+1, row);
-			idx_2 = VertexMatrix.getIndexOfArray(numCols, numRows, col+1, row+1);
-			idx_3 = VertexMatrix.getIndexOfArray(numCols, numRows, col, row+1);
-			
-			if (bTrianglesSenseCCW)
-			{
-				resultIndicesArray[idxCounter] = idx_1; idxCounter++;
-				resultIndicesArray[idxCounter] = idx_2; idxCounter++;
-				resultIndicesArray[idxCounter] = idx_3; idxCounter++;
-			}
-			else 
-			{
-				resultIndicesArray[idxCounter] = idx_1; idxCounter++;
-				resultIndicesArray[idxCounter] = idx_3; idxCounter++;
-				resultIndicesArray[idxCounter] = idx_2; idxCounter++;
-			}
-		}
-	}
-	
-	resultObject.indicesArray = resultIndicesArray;
-	
-	var bCalculateBorderIndices = false;
-	if (options)
-	{
-		if (options.bCalculateBorderIndices !== undefined && options.bCalculateBorderIndices === true)
-		{ bCalculateBorderIndices = true; }
-	}
-	
-	// Border indices.***
-	if (bCalculateBorderIndices)
-	{
-		// South.
-		if (!resultSouthIndices)
-		{ resultSouthIndices = new Uint16Array(numCols); }
-		
-		for (var col=0; col<numCols; col++)
-		{
-			var idx = VertexMatrix.getIndexOfArray(numCols, numRows, col, 0);
-			resultSouthIndices[col] = idx;
-		}
-		
-		resultObject.southIndicesArray = resultSouthIndices;
-		
-		// East.
-		if (!resultEastIndices)
-		{ resultEastIndices = new Uint16Array(numRows); }
-		
-		for (var row = 0; row<numRows; row++)
-		{
-			var idx = VertexMatrix.getIndexOfArray(numCols, numRows, numCols-1, row);
-			resultEastIndices[row] = idx;
-		}
-		
-		resultObject.eastIndicesArray = resultEastIndices;
-		
-		// North.
-		if (!resultNorthIndices)
-		{ resultNorthIndices = new Uint16Array(numCols); }
-		
-		var counter = 0;
-		for (var col=numCols-1; col>=0; col--)
-		{
-			var idx = VertexMatrix.getIndexOfArray(numCols, numRows, col, numRows-1);
-			resultNorthIndices[counter] = idx;
-			counter ++;
-		}
-		
-		resultObject.northIndicesArray = resultNorthIndices;
-		
-		// West.
-		if (!resultWestIndices)
-		{ resultWestIndices = new Uint16Array(numRows); }
-		
-		counter = 0;
-		for (var row = numRows-1; row>=0; row--)
-		{
-			var idx = VertexMatrix.getIndexOfArray(numCols, numRows, 0, row);
-			resultWestIndices[counter] = idx;
-			counter ++;
-		}
-		
-		resultObject.westIndicesArray = resultWestIndices;
-	}
-	
-	if (bLoopColumns)
-	{
-		var firstCol = 0;
-		var endCol = numCols;
-		for (var row = 0; row<numRows-1; row++)
-		{
-			// there are triangles between lastColumn & 1rstColumn.
-			// there are 2 triangles: triA, triB.
-			idx_1 = VertexMatrix.getIndexOfArray(numCols, numRows, endCol, row);
-			idx_2 = VertexMatrix.getIndexOfArray(numCols, numRows, firstCol, row);
-			idx_3 = VertexMatrix.getIndexOfArray(numCols, numRows, endCol, row+1);
-			if (bTrianglesSenseCCW)
-			{
-				resultIndicesArray[idxCounter] = idx_1; idxCounter++;
-				resultIndicesArray[idxCounter] = idx_2; idxCounter++;
-				resultIndicesArray[idxCounter] = idx_3; idxCounter++;
-			}
-			else 
-			{
-				resultIndicesArray[idxCounter] = idx_1; idxCounter++;
-				resultIndicesArray[idxCounter] = idx_3; idxCounter++;
-				resultIndicesArray[idxCounter] = idx_2; idxCounter++;
-			}
-			
-			idx_1 = VertexMatrix.getIndexOfArray(numCols, numRows, firstCol, row);
-			idx_2 = VertexMatrix.getIndexOfArray(numCols, numRows, firstCol, row+1);
-			idx_3 = VertexMatrix.getIndexOfArray(numCols, numRows, endCol, row+1);
-			if (bTrianglesSenseCCW)
-			{
-				resultIndicesArray[idxCounter] = idx_1; idxCounter++;
-				resultIndicesArray[idxCounter] = idx_2; idxCounter++;
-				resultIndicesArray[idxCounter] = idx_3; idxCounter++;
-			}
-			else 
-			{
-				resultIndicesArray[idxCounter] = idx_1; idxCounter++;
-				resultIndicesArray[idxCounter] = idx_3; idxCounter++;
-				resultIndicesArray[idxCounter] = idx_2; idxCounter++;
-			}
-		}
-	}
-	
-	return resultObject;
-};
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-'use strict';
-
-/**
- *
- * @param {*} value The object.
- * @returns {Boolean} Returns true if the object is empty, returns false otherwise.
- */
-function isEmpty(value)
-{ 
-	if ( value === "" || value === null || value === undefined || ( value !== null && typeof value === "object" && !Object.keys(value).length ) )
-	{ 
-		return true; 
-	}
-	else
-	{ 
-		return false; 
-	} 
-};
-
-
-'use strict';
-
-/**
- *
- * @param {String} url Required.
- * @param {XMLHttpRequest} xhr Optional.
- * @param {number} timeOut Optional. timeout time. milliseconds
- * @param {String} responseType Optional. Default is 'arraybuffer'
- * @param {String} method Optional. Default is 'GET'
- * 
- * @returns {Promise} Promise.js object
- *
- * @example
- * loadWithXhr('url', undefined, undefined, 'json', 'GET').done(function(res) {
- * 	TODO
- * });
- */
-function loadWithXhr(url, xhr, timeOut, responseType, method) 
-{
-	if (!defined(url))
-	{
-		throw new Error('url required');
-	}
-
-	return new Promise(
-		function (resolve, reject) 
-		{
-			if (xhr === undefined)
-			{ xhr = new XMLHttpRequest(); }
-
-			method = method ? method : 'GET';
-			xhr.open(method, url, true);
-			xhr.responseType = responseType ? responseType : 'arraybuffer';
-
-			 // time in milliseconds
-			if (timeOut !== undefined)
-			{ xhr.timeout = timeOut; }
-			
-			// 이벤트 핸들러를 등록한다.
-			xhr.onload = function() 
-			{
-				if (xhr.status < 200 || xhr.status >= 300) 
-				{
-					reject(xhr.status);
-				}
-				else 
-				{
-					// 3.1) DEFERRED를 해결한다. (모든 done()...을 동작시킬 것이다.)
-					resolve(xhr.response);
-				} 
-			};
-			
-			xhr.ontimeout = function (e) 
-			{
-				// XMLHttpRequest timed out.***
-				reject(-1);
-			};
-			
-			xhr.onerror = function(e) 
-			{
-				console.log("Invalid XMLHttpRequest response type.");
-				reject(xhr.status);
-			};
-
-			// 작업을 수행한다.
-			xhr.send(null);
-		}
-	);
-};
-'use strict';
-
-/**
- * ManagerUtils does some calculations about coordinates system of different earth coords.
- * 
- * @class ManagerUtils
- * @constructor 
- */
-var ManagerUtils = function() 
-{
-	
-	
-};
-
-/**
- * 어떤 일을 하고 있습니까?
- * @param octreesArray 변수
- * @param octree 변수
- * @returns result_idx
- */
-ManagerUtils.getIndexToInsertBySquaredDistToEye = function(objectsArray, object, startIdx, endIdx) 
-{
-	// Note: the object must have "distToCamera" variable.
-	// this do a dicotomic search of idx in a ordered table.
-	// 1rst, check the range.
-	if (startIdx === undefined)
-	{ startIdx = 0; }
-	
-	if (endIdx === undefined)
-	{ endIdx = objectsArray.length-1; }
-	
-	var range = endIdx - startIdx;
-	
-	if (range <= 0)
-	{ return 0; }
-	
-	if (range < 6)
-	{
-		// in this case do a lineal search.
-		var finished = false;
-		var i = startIdx;
-		var idx;
-		var octreesCount = objectsArray.length;
-		while (!finished && i<=endIdx)
-		{
-			if (object.distToCamera < objectsArray[i].distToCamera)
-			{
-				idx = i;
-				finished = true;
-			}
-			i++;
-		}
-		
-		if (finished)
-		{
-			return idx;
-		}
-		else 
-		{
-			return endIdx+1;
-		}
-	}
-	else 
-	{
-		// in this case do the dicotomic search.
-		var middleIdx = startIdx + Math.floor(range/2);
-		var newStartIdx;
-		var newEndIdx;
-		if (objectsArray[middleIdx].distToCamera > object.distToCamera)
-		{
-			newStartIdx = startIdx;
-			newEndIdx = middleIdx;
-		}
-		else 
-		{
-			newStartIdx = middleIdx;
-			newEndIdx = endIdx;
-		}
-		return ManagerUtils.getIndexToInsertBySquaredDistToEye(objectsArray, object, newStartIdx, newEndIdx);
-	}
-};
-
-/**
- * world coordinate to geographic coordinate.
- * @param {Point3D} point world coordinate.
- * @param {GeographicCoord|undefined} resultGeographicCoord Optional. result geographicCoord. if undefined, create GeographicCoord instance.
- * @param {MagoManager} magoManager worldwind mode removed, this args is not need. 
- * @returns {GeographicCoord} geographic coordinate object.
- */
-ManagerUtils.pointToGeographicCoord = function(point, resultGeographicCoord) 
-{
-	if (!point) 
-	{
-		throw new Error('point is requred');
-	}
-
-	if (resultGeographicCoord === undefined)
-	{ resultGeographicCoord = new GeographicCoord(); }
-	
-	var cartographic = Globe.CartesianToGeographicWgs84(point.x, point.y, point.z, cartographic);
-	resultGeographicCoord.setLonLatAlt(cartographic.longitude, cartographic.latitude, cartographic.altitude);
-	
-	return resultGeographicCoord;
-};
-
-/**
- * geographic coordinate to world coordinate.
- * @param {number} longitude longitude.
- * @param {number} latitude latitude.
- * @param {number} altitude altitude.
- * @param {Point3D|undefined} resultWorldPoint Optional. result worldCoord. if undefined, create Point3D instance.
- * @returns {Point3D} world coordinate object.
- */
-ManagerUtils.geographicCoordToWorldPoint = function(longitude, latitude, altitude, resultWorldPoint) 
-{
-	if (resultWorldPoint === undefined)
-	{ resultWorldPoint = new Point3D(); }
-
-	var cartesian = Globe.geographicToCartesianWgs84(longitude, latitude, altitude, undefined);
-	resultWorldPoint.set(cartesian[0], cartesian[1], cartesian[2]);
-	return resultWorldPoint;
-};
-
-/**
- * when node mapping type is boundingboxcenter, set pivotPointTraslation and create pivotPoint at geoLocationData
- * this function NO modifies the geographic coords.
- * "newPivotPoint" is in buildingCoords.
- * "newPivotPoint" is the desired position of the new origen of coords, for example:
- * in a building you can desire the center of the bbox as the origin of the coords.
- * @param {GeoLocationData} geoLocationData. Required.
- * @param {Point3D} newPivotPoint newPivotPoint.
- */
-ManagerUtils.translatePivotPointGeoLocationData = function(geoLocationData, newPivotPoint) 
-{
-	if (geoLocationData === undefined)
-	{ return; }
-
-	var rawTranslation = new Point3D();
-	rawTranslation.set(-newPivotPoint.x, -newPivotPoint.y, -newPivotPoint.z);
-
-	geoLocationData.pivotPointTraslationLC = rawTranslation;
-	geoLocationData.doEffectivePivotPointTranslation();
-};
-
-/**
- * this function calculates the transformation matrix for (x, y, z) coordinate, that has NO heading, pitch or roll rotations.
- * @param {Point3D} worldPosition worldPosition.
- * @param {Matrix4|undefined} resultGeoLocMatrix. Optional. result geolocation matrix. if undefined, create Matrix4 instance.
- * @returns {Matrix4} resultGeoLocMatrix. this matrix has NO heading, pitch or roll rotations.
- */
-ManagerUtils.calculateGeoLocationMatrixAtWorldPosition = function(worldPosition, resultGeoLocMatrix) 
-{
-	if (resultGeoLocMatrix === undefined)
-	{ resultGeoLocMatrix = new Matrix4(); }
-
-	Globe.transformMatrixAtCartesianPointWgs84(worldPosition.x, worldPosition.y, worldPosition.z, resultGeoLocMatrix._floatArrays);
-	
-	return resultGeoLocMatrix;
-};
-
-/**
- * this function calculates the transformation matrix for (longitude, latitude, altitude) coordinate, that has NO heading, pitch or roll rotations.
- * @param {number} longitude longitude.
- * @param {number} latitude latitude.
- * @param {number} altitude altitude.
- * @param {Matrix4|undefined} resultGeoLocMatrix. Optional. result geolocation matrix. if undefined, create Matrix4 instance.
- * @returns {Matrix4} resultGeoLocMatrix. this matrix has NO heading, pitch or roll rotations.
- */
-ManagerUtils.calculateGeoLocationMatrixAtLonLatAlt = function(longitude, latitude, altitude, resultGeoLocMatrix) 
-{
-	if (resultGeoLocMatrix === undefined)
-	{ resultGeoLocMatrix = new Matrix4(); }
-	
-	var worldPosition = this.geographicCoordToWorldPoint(longitude, latitude, altitude, worldPosition);
-	resultGeoLocMatrix = ManagerUtils.calculateGeoLocationMatrixAtWorldPosition(worldPosition, resultGeoLocMatrix);
-	
-	return resultGeoLocMatrix;
-};
-
-/**
- * This function calculates the "resultGeoLocMatrix" & "resultTransformMatrix".
- * @param {Point3D} worldPosition worldPosition.
- * @param {number} heading heading.
- * @param {number} pitch pitch.
- * @param {number} roll roll.
- * @param {Matrix4|undefined} resultGeoLocMatrix. Optional. result geolocation matrix. if undefined, create Matrix4 instance. this transformMatrix without the heading, pitch, roll rotations.
- * @param {Matrix4|undefined} resultTransformMatrix. Optional. result transform matrix. if undefined, create Matrix4 instance. this matrix including the heading, pitch, roll rotations.
- * @returns {Matrix4} resultTransformMatrix.
- */
-ManagerUtils.calculateTransformMatrixAtWorldPosition = function(worldPosition, heading, pitch, roll, resultGeoLocMatrix, resultTransformMatrix) 
-{
-	var xRotMatrix = new Matrix4();  // created as identity matrix.
-	var yRotMatrix = new Matrix4();  // created as identity matrix.
-	var zRotMatrix = new Matrix4();  // created as identity matrix.
-	
-	if (heading !== undefined && heading !== 0)
-	{ zRotMatrix.rotationAxisAngDeg(heading, 0.0, 0.0, 1.0); }
-
-	if (pitch !== undefined && pitch !== 0)
-	{ xRotMatrix.rotationAxisAngDeg(pitch, 1.0, 0.0, 0.0); }
-
-	if (roll !== undefined && roll !== 0)
-	{ yRotMatrix.rotationAxisAngDeg(roll, 0.0, 1.0, 0.0); }
-
-	if (resultGeoLocMatrix === undefined)
-	{ resultGeoLocMatrix = new Matrix4(); }  // created as identity matrix.
-	
-	if (resultTransformMatrix === undefined)
-	{ resultTransformMatrix = new Matrix4(); }  // created as identity matrix.
-
-	// 1rst, calculate the transformation matrix for the location.
-	resultGeoLocMatrix = ManagerUtils.calculateGeoLocationMatrixAtWorldPosition(worldPosition, resultGeoLocMatrix);
-	
-	resultTransformMatrix.copyFromMatrix4(resultGeoLocMatrix);
-	var zRotatedTMatrix;
-	var zxRotatedTMatrix;
-	var zxyRotatedTMatrix;
-
-	zRotatedTMatrix = zRotMatrix.getMultipliedByMatrix(resultTransformMatrix, zRotatedTMatrix);
-	zxRotatedTMatrix = xRotMatrix.getMultipliedByMatrix(zRotatedTMatrix, zxRotatedTMatrix);
-	zxyRotatedTMatrix = yRotMatrix.getMultipliedByMatrix(zxRotatedTMatrix, zxyRotatedTMatrix);
-	
-	resultTransformMatrix = zxyRotatedTMatrix;
-	return resultTransformMatrix;
-};
-
-/**
- * This function calculates all data and matrices for the location(longitude, latitude, altitude) and rotation(heading, pitch, roll).
- * @param {number} longitude Required. longitude.
- * @param {number} latitude Required. latitude.
- * @param {number} altitude altitude.
- * @param {number} heading heading. Unit is degree.
- * @param {number} pitch pitch. Unit is degree.
- * @param {number} roll roll. Unit is degree.
- * @param {GeoLocationData|undefined} resultGeoLocationData Optional. result geolocation matrix. if undefined, create GeoLocationData instance.
- * @param {MagoManager} magoManager for magoManager.globe
- * @returns {GeoLocationData} resultGeoLocationData.
- */
-ManagerUtils.calculateGeoLocationData = function(longitude, latitude, altitude, heading, pitch, roll, resultGeoLocationData) 
-{
-	if (resultGeoLocationData === undefined)
-	{ resultGeoLocationData = new GeoLocationData(); }
-
-	// 0) Position.**
-	if (resultGeoLocationData.geographicCoord === undefined)
-	{ resultGeoLocationData.geographicCoord = new GeographicCoord(); }
-
-	if (longitude !== undefined)
-	{ resultGeoLocationData.geographicCoord.longitude = longitude; }
-	else 
-	{ longitude = resultGeoLocationData.geographicCoord.longitude; }
-
-	if (latitude !== undefined)
-	{ resultGeoLocationData.geographicCoord.latitude = latitude; }
-	else 
-	{ latitude = resultGeoLocationData.geographicCoord.latitude; }
-
-	if (altitude !== undefined)
-	{ resultGeoLocationData.geographicCoord.altitude = altitude; }
-	else 
-	{ altitude = resultGeoLocationData.geographicCoord.altitude; }
-
-	if (heading !== undefined)
-	{ resultGeoLocationData.heading = heading; }
-
-	if (pitch !== undefined)
-	{ resultGeoLocationData.pitch = pitch; }
-
-	if (roll !== undefined)
-	{ resultGeoLocationData.roll = roll; }
-
-	if (resultGeoLocationData.geographicCoord.longitude === undefined || resultGeoLocationData.geographicCoord.latitude === undefined)
-	{ return; }
-	
-	//if (magoManager.configInformation === undefined)
-	//{ return; }
-
-	resultGeoLocationData.position = ManagerUtils.geographicCoordToWorldPoint(longitude, latitude, altitude, resultGeoLocationData.position);
-
-	// High and Low values of the position.**
-	if (resultGeoLocationData.positionHIGH === undefined)
-	{ resultGeoLocationData.positionHIGH = new Float32Array([0.0, 0.0, 0.0]); }
-	if (resultGeoLocationData.positionLOW === undefined)
-	{ resultGeoLocationData.positionLOW = new Float32Array([0.0, 0.0, 0.0]); }
-	ManagerUtils.calculateSplited3fv([resultGeoLocationData.position.x, resultGeoLocationData.position.y, resultGeoLocationData.position.z], resultGeoLocationData.positionHIGH, resultGeoLocationData.positionLOW);
-
-	// Determine the elevation of the position.**
-	//var cartographic = Cesium.Ellipsoid.WGS84.cartesianToCartographic(position);
-	//var height = cartographic.height;
-	// End Determine the elevation of the position.-------------------------------------------------------
-	if (resultGeoLocationData.tMatrix === undefined)
-	{ resultGeoLocationData.tMatrix = new Matrix4(); }
-	else
-	{ resultGeoLocationData.tMatrix.Identity(); }
-
-	if (resultGeoLocationData.geoLocMatrix === undefined)
-	{ resultGeoLocationData.geoLocMatrix = new Matrix4(); }
-	else
-	{ resultGeoLocationData.geoLocMatrix.Identity(); }
-
-	if (resultGeoLocationData.rotMatrix === undefined)
-	{ resultGeoLocationData.rotMatrix = new Matrix4(); }
-	else
-	{ resultGeoLocationData.rotMatrix.Identity(); }
-
-	// Set inverseMatrices as undefined.
-	resultGeoLocationData.tMatrixInv = undefined; // reset. is calculated when necessary.
-	resultGeoLocationData.rotMatrixInv = undefined; // reset. is calculated when necessary.
-	resultGeoLocationData.geoLocMatrixInv = undefined; // reset. is calculated when necessary.
-
-	// 1rst, calculate the transformation matrix for the location.
-	resultGeoLocationData.tMatrix = ManagerUtils.calculateTransformMatrixAtWorldPosition(resultGeoLocationData.position, resultGeoLocationData.heading, resultGeoLocationData.pitch, resultGeoLocationData.roll, 
-		resultGeoLocationData.geoLocMatrix, resultGeoLocationData.tMatrix);
-	resultGeoLocationData.rotMatrix.copyFromMatrix4(resultGeoLocationData.tMatrix);
-	resultGeoLocationData.rotMatrix._floatArrays[12] = 0;
-	resultGeoLocationData.rotMatrix._floatArrays[13] = 0;
-	resultGeoLocationData.rotMatrix._floatArrays[14] = 0;
-	
-	// finally assing the pivotPoint.
-	if (resultGeoLocationData.pivotPoint === undefined)
-	{ resultGeoLocationData.pivotPoint = new Point3D(); }
-
-	resultGeoLocationData.pivotPoint.set(resultGeoLocationData.position.x, resultGeoLocationData.position.y, resultGeoLocationData.position.z);
-	resultGeoLocationData.doEffectivePivotPointTranslation();
-	
-	return resultGeoLocationData;
-};
-
-/**
- * This function calculates geolocation data use pixel point(calculated world point). 
- * When use Object Marker, this function called.
- * @param {number} absoluteX absoluteX.
- * @param {number} absoluteY absoluteY.
- * @param {number} absoluteZ absoluteZ.
- * @param {GeoLocationData|undefined} resultGeoLocationData Optional. result geolocation matrix. if undefined, create GeoLocationData instance.
- * @param {MagoManager} magoManager
- * @returns {GeoLocationData} resultGeoLocationData.
- */
-ManagerUtils.calculateGeoLocationDataByAbsolutePoint = function(absoluteX, absoluteY, absoluteZ, resultGeoLocationData, magoManager) 
-{
-	if (resultGeoLocationData === undefined)
-	{ resultGeoLocationData = new GeoLocationData(); }
-
-	// 0) Position.**
-	if (resultGeoLocationData.geographicCoord === undefined)
-	{ resultGeoLocationData.geographicCoord = new GeographicCoord(); }
-	
-	if (magoManager.configInformation === undefined)
-	{ return; }
-	
-	if (resultGeoLocationData.position === undefined)
-	{ resultGeoLocationData.position = new Point3D(); }
-		
-	resultGeoLocationData.position.x = absoluteX;
-	resultGeoLocationData.position.y = absoluteY;
-	resultGeoLocationData.position.z = absoluteZ;
-	
-	//추후에 세슘의존성 버리는 코드로 대체 가능해 보임. 손수석님과 검토 필요.
-	/*
-	if (magoManager.isCesiumGlobe())
-	{
-		// *if this in Cesium:
-		//resultGeoLocationData.position = Cesium.Cartesian3.fromDegrees(resultGeoLocationData.geographicCoord.longitude, resultGeoLocationData.geographicCoord.latitude, resultGeoLocationData.geographicCoord.altitude);
-		// must find cartographic data.
-		var cartographic = new Cesium.Cartographic();
-		var cartesian = new Cesium.Cartesian3();
-		cartesian.x = absoluteX;
-		cartesian.y = absoluteY;
-		cartesian.z = absoluteZ;
-		cartographic = Cesium.Cartographic.fromCartesian(cartesian, magoManager.scene._globe._ellipsoid, cartographic);
-		resultGeoLocationData.geographicCoord.longitude = cartographic.longitude * 180.0/Math.PI;
-		resultGeoLocationData.geographicCoord.latitude = cartographic.latitude * 180.0/Math.PI;
-		resultGeoLocationData.geographicCoord.altitude = cartographic.height;
-	}
-	*/
-
-	resultGeoLocationData.geographicCoord = ManagerUtils.pointToGeographicCoord(new Point3D(absoluteX, absoluteY, absoluteZ));
-
-	// High and Low values of the position.**
-	if (resultGeoLocationData.positionHIGH === undefined)
-	{ resultGeoLocationData.positionHIGH = new Float32Array([0.0, 0.0, 0.0]); }
-	if (resultGeoLocationData.positionLOW === undefined)
-	{ resultGeoLocationData.positionLOW = new Float32Array([0.0, 0.0, 0.0]); }
-	this.calculateSplited3fv([resultGeoLocationData.position.x, resultGeoLocationData.position.y, resultGeoLocationData.position.z], resultGeoLocationData.positionHIGH, resultGeoLocationData.positionLOW);
-
-	// Determine the elevation of the position.**
-	//var cartographic = Cesium.Ellipsoid.WGS84.cartesianToCartographic(position);
-	//var height = cartographic.height;
-	// End Determine the elevation of the position.-------------------------------------------------------
-	if (resultGeoLocationData.tMatrix === undefined)
-	{ resultGeoLocationData.tMatrix = new Matrix4(); }
-	else
-	{ resultGeoLocationData.tMatrix.Identity(); }
-
-	if (resultGeoLocationData.geoLocMatrix === undefined)
-	{ resultGeoLocationData.geoLocMatrix = new Matrix4(); }
-	else
-	{ resultGeoLocationData.geoLocMatrix.Identity(); }
-
-	if (resultGeoLocationData.rotMatrix === undefined)
-	{ resultGeoLocationData.rotMatrix = new Matrix4(); }
-	else
-	{ resultGeoLocationData.rotMatrix.Identity(); }
-
-	// Set inverseMatrices as undefined.
-	resultGeoLocationData.tMatrixInv = undefined; // reset. is calculated when necessary.
-	resultGeoLocationData.rotMatrixInv = undefined; // reset. is calculated when necessary.
-	resultGeoLocationData.geoLocMatrixInv = undefined; // reset. is calculated when necessary.
-
-	// 1rst, calculate the transformation matrix for the location.
-	resultGeoLocationData.tMatrix = ManagerUtils.calculateTransformMatrixAtWorldPosition(resultGeoLocationData.position, resultGeoLocationData.heading, resultGeoLocationData.pitch, resultGeoLocationData.roll, 
-		resultGeoLocationData.geoLocMatrix, resultGeoLocationData.tMatrix);
-	resultGeoLocationData.rotMatrix.copyFromMatrix4(resultGeoLocationData.tMatrix);
-	resultGeoLocationData.rotMatrix._floatArrays[12] = 0;
-	resultGeoLocationData.rotMatrix._floatArrays[13] = 0;
-	resultGeoLocationData.rotMatrix._floatArrays[14] = 0;
-	
-	// finally assing the pivotPoint.
-	if (resultGeoLocationData.pivotPoint === undefined)
-	{ resultGeoLocationData.pivotPoint = new Point3D(); }
-
-	resultGeoLocationData.pivotPoint.set(resultGeoLocationData.position.x, resultGeoLocationData.position.y, resultGeoLocationData.position.z);
-	resultGeoLocationData.doEffectivePivotPointTranslation();
-	
-	return resultGeoLocationData;
-};
-
-/**
- * This function calculates geolocation data use pixel point(calculated world point). 
- * When use Object Marker, this function called.
- * @param {number} absoluteX absoluteX.
- * @param {number} absoluteY absoluteY.
- * @param {number} absoluteZ absoluteZ.
- * @param {GeoLocationData|undefined} resultGeoLocationData Optional. result geolocation matrix. if undefined, create GeoLocationData instance.
- * @param {MagoManager} magoManager
- * @returns {GeoLocationData} resultGeoLocationData.
- */
-ManagerUtils.calculateGeoLocationDataByAbsolutePoint__original = function(absoluteX, absoluteY, absoluteZ, resultGeoLocationData, magoManager) 
-{
-	if (resultGeoLocationData === undefined)
-	{ resultGeoLocationData = new GeoLocationData(); }
-
-	// 0) Position.**
-	if (resultGeoLocationData.geographicCoord === undefined)
-	{ resultGeoLocationData.geographicCoord = new GeographicCoord(); }
-	
-	if (magoManager.configInformation === undefined)
-	{ return; }
-	
-	if (resultGeoLocationData.position === undefined)
-	{ resultGeoLocationData.position = new Point3D(); }
-		
-	resultGeoLocationData.position.x = absoluteX;
-	resultGeoLocationData.position.y = absoluteY;
-	resultGeoLocationData.position.z = absoluteZ;
-	
-	//추후에 세슘의존성 버리는 코드로 대체 가능해 보임. 손수석님과 검토 필요.
-	if (magoManager.isCesiumGlobe())
-	{
-		// *if this in Cesium:
-		//resultGeoLocationData.position = Cesium.Cartesian3.fromDegrees(resultGeoLocationData.geographicCoord.longitude, resultGeoLocationData.geographicCoord.latitude, resultGeoLocationData.geographicCoord.altitude);
-		// must find cartographic data.
-		var cartographic = new Cesium.Cartographic();
-		var cartesian = new Cesium.Cartesian3();
-		cartesian.x = absoluteX;
-		cartesian.y = absoluteY;
-		cartesian.z = absoluteZ;
-		cartographic = Cesium.Cartographic.fromCartesian(cartesian, magoManager.scene._globe._ellipsoid, cartographic);
-		resultGeoLocationData.geographicCoord.longitude = cartographic.longitude * 180.0/Math.PI;
-		resultGeoLocationData.geographicCoord.latitude = cartographic.latitude * 180.0/Math.PI;
-		resultGeoLocationData.geographicCoord.altitude = cartographic.height;
-	}
-
-	// High and Low values of the position.**
-	if (resultGeoLocationData.positionHIGH === undefined)
-	{ resultGeoLocationData.positionHIGH = new Float32Array([0.0, 0.0, 0.0]); }
-	if (resultGeoLocationData.positionLOW === undefined)
-	{ resultGeoLocationData.positionLOW = new Float32Array([0.0, 0.0, 0.0]); }
-	this.calculateSplited3fv([resultGeoLocationData.position.x, resultGeoLocationData.position.y, resultGeoLocationData.position.z], resultGeoLocationData.positionHIGH, resultGeoLocationData.positionLOW);
-
-	// Determine the elevation of the position.**
-	//var cartographic = Cesium.Ellipsoid.WGS84.cartesianToCartographic(position);
-	//var height = cartographic.height;
-	// End Determine the elevation of the position.-------------------------------------------------------
-	if (resultGeoLocationData.tMatrix === undefined)
-	{ resultGeoLocationData.tMatrix = new Matrix4(); }
-	else
-	{ resultGeoLocationData.tMatrix.Identity(); }
-
-	if (resultGeoLocationData.geoLocMatrix === undefined)
-	{ resultGeoLocationData.geoLocMatrix = new Matrix4(); }
-	else
-	{ resultGeoLocationData.geoLocMatrix.Identity(); }
-
-	if (resultGeoLocationData.geoLocMatrixInv === undefined)
-	{ resultGeoLocationData.geoLocMatrixInv = new Matrix4(); }
-	else
-	{ resultGeoLocationData.geoLocMatrixInv.Identity(); }
-
-	//---------------------------------------------------------
-
-	if (resultGeoLocationData.tMatrixInv === undefined)
-	{ resultGeoLocationData.tMatrixInv = new Matrix4(); }
-	else
-	{ resultGeoLocationData.tMatrixInv.Identity(); }
-
-	if (resultGeoLocationData.rotMatrix === undefined)
-	{ resultGeoLocationData.rotMatrix = new Matrix4(); }
-	else
-	{ resultGeoLocationData.rotMatrix.Identity(); }
-
-	if (resultGeoLocationData.rotMatrixInv === undefined)
-	{ resultGeoLocationData.rotMatrixInv = new Matrix4(); }
-	else
-	{ resultGeoLocationData.rotMatrixInv.Identity(); }
-
-	var xRotMatrix = new Matrix4();  // created as identity matrix.
-	var yRotMatrix = new Matrix4();  // created as identity matrix.
-	var zRotMatrix = new Matrix4();  // created as identity matrix.
-
-	if (resultGeoLocationData.heading !== undefined && resultGeoLocationData.heading !== 0)
-	{
-		zRotMatrix.rotationAxisAngDeg(resultGeoLocationData.heading, 0.0, 0.0, -1.0);
-	}
-
-	if (resultGeoLocationData.pitch !== undefined && resultGeoLocationData.pitch !== 0)
-	{
-		xRotMatrix.rotationAxisAngDeg(resultGeoLocationData.pitch, -1.0, 0.0, 0.0);
-	}
-
-	if (resultGeoLocationData.roll !== undefined && resultGeoLocationData.roll !== 0)
-	{
-		yRotMatrix.rotationAxisAngDeg(resultGeoLocationData.roll, 0.0, -1.0, 0.0);
-	}
-	
-	if (magoManager.isCesiumGlobe())
-	{
-		// *if this in Cesium:
-		Cesium.Transforms.eastNorthUpToFixedFrame(resultGeoLocationData.position, undefined, resultGeoLocationData.tMatrix._floatArrays);
-		resultGeoLocationData.geoLocMatrix.copyFromMatrix4(resultGeoLocationData.tMatrix);// "geoLocMatrix" is the pure transformation matrix, without heading or pitch or roll.
-
-		var zRotatedTMatrix = zRotMatrix.getMultipliedByMatrix(resultGeoLocationData.tMatrix, zRotatedTMatrix);
-		var zxRotatedTMatrix = xRotMatrix.getMultipliedByMatrix(zRotatedTMatrix, zxRotatedTMatrix);
-		var zxyRotatedTMatrix = yRotMatrix.getMultipliedByMatrix(zxRotatedTMatrix, zxyRotatedTMatrix);
-		resultGeoLocationData.tMatrix = zxyRotatedTMatrix;
-		
-		// test.
-		//var yRotatedTMatrix = yRotMatrix.getMultipliedByMatrix(resultGeoLocationData.tMatrix, yRotatedTMatrix);
-		//var yxRotatedTMatrix = xRotMatrix.getMultipliedByMatrix(yRotatedTMatrix, yxRotatedTMatrix);
-		//var yxzRotatedTMatrix = zRotMatrix.getMultipliedByMatrix(yxRotatedTMatrix, yxzRotatedTMatrix);
-		//resultGeoLocationData.tMatrix = yxzRotatedTMatrix;
-		// end test.---
-
-		resultGeoLocationData.rotMatrix.copyFromMatrix4(resultGeoLocationData.tMatrix);
-		resultGeoLocationData.rotMatrix._floatArrays[12] = 0;
-		resultGeoLocationData.rotMatrix._floatArrays[13] = 0;
-		resultGeoLocationData.rotMatrix._floatArrays[14] = 0;
-
-		// now, calculates the inverses.
-		Cesium.Matrix4.inverse(resultGeoLocationData.tMatrix._floatArrays, resultGeoLocationData.tMatrixInv._floatArrays);
-		Cesium.Matrix4.inverse(resultGeoLocationData.rotMatrix._floatArrays, resultGeoLocationData.rotMatrixInv._floatArrays);
-		Cesium.Matrix4.inverse(resultGeoLocationData.geoLocMatrix._floatArrays, resultGeoLocationData.geoLocMatrixInv._floatArrays);
-	}
-
-	// finally assing the pivotPoint.
-	if (resultGeoLocationData.pivotPoint === undefined)
-	{ resultGeoLocationData.pivotPoint = new Point3D(); }
-
-	resultGeoLocationData.pivotPoint.set(resultGeoLocationData.position.x, resultGeoLocationData.position.y, resultGeoLocationData.position.z);
-
-	return resultGeoLocationData;
-};
-
-/**
- * 자릿수가 긴 숫자를 나머지와 몫으로 분리. gl에서는 float형밖에 처리 불가.
- * @example <caption>Example usage of calculateSplitedValues</caption>
- * ManagerUtils.calculateSplitedValues(4049653.5985745606, new SplitValue());
- * resultSplitValue.high = 3997696; // Math.floor(4049653.5985745606 / 65536.0) * 65536.0;
- * resultSplitValue.low = 51957.5985745606 // 4049653.5985745606 - 3997696;
- * @param {number} value Required. coordinate x or y or z.
- * @param {SplitValue} resultSplitValue Optional. result split value. if undefined, create SplitValue instance.
- * @returns {SplitValue} resultSplitValue.
- */
-ManagerUtils.calculateSplitedValues = function(value, resultSplitValue)
-{
-	if (resultSplitValue === undefined)
-	{ resultSplitValue = new SplitValue(); }
-
-	var doubleHigh;
-	if (value >= 0.0) 
-	{
-		doubleHigh = Math.floor(value / 65536.0) * 65536.0; //unsigned short max
-		resultSplitValue.high = doubleHigh;
-		resultSplitValue.low = value - doubleHigh;
-	}
-	else 
-	{
-		doubleHigh = Math.floor(-value / 65536.0) * 65536.0;
-		resultSplitValue.high = -doubleHigh;
-		resultSplitValue.low = value + doubleHigh;
-	}
-
-	return resultSplitValue;
-};
-
-/**
- * 자릿수가 긴 숫자를 나머지(low)와 몫(high)으로 분리한 결과를 각각 배열로 생성. gl에서는 float형밖에 처리 불가.
- * @param {Point3D} point3fv Required.
- * @param {Float32Array} resultSplitPoint3fvHigh Optional. result split high value array. if undefined, set new Float32Array(3).
- * @param {Float32Array} resultSplitPoint3fvLow Optional. result split low value array. if undefined, set new Float32Array(3).
- * 
- * @see ManagerUtils#calculateSplitedValues
- */
-ManagerUtils.calculateSplited3fv = function(point3fv, resultSplitPoint3fvHigh, resultSplitPoint3fvLow)
-{
-	if (point3fv === undefined)
-	{ return undefined; }
-
-	if (resultSplitPoint3fvHigh === undefined) // delete unnecesary. agree
-	{ resultSplitPoint3fvHigh = new Float32Array(3); }// delete unnecesary. agree
-
-	if (resultSplitPoint3fvLow === undefined)// delete unnecesary. agree
-	{ resultSplitPoint3fvLow = new Float32Array(3); }// delete unnecesary. agree
-
-	var posSplitX = new SplitValue();
-	posSplitX = this.calculateSplitedValues(point3fv[0], posSplitX);
-	var posSplitY = new SplitValue();
-	posSplitY = this.calculateSplitedValues(point3fv[1], posSplitY);
-	var posSplitZ = new SplitValue();
-	posSplitZ = this.calculateSplitedValues(point3fv[2], posSplitZ);
-
-	resultSplitPoint3fvHigh[0] = posSplitX.high;
-	resultSplitPoint3fvHigh[1] = posSplitY.high;
-	resultSplitPoint3fvHigh[2] = posSplitZ.high;
-
-	resultSplitPoint3fvLow[0] = posSplitX.low;
-	resultSplitPoint3fvLow[1] = posSplitY.low;
-	resultSplitPoint3fvLow[2] = posSplitZ.low;
-};
-
-/**
- * Calculates the pixel linear depth value.
- * @param {WebGLRenderingContext} gl WebGL Rendering Context.
- * @param {Number} pixelX Screen x position of the pixel.
- * @param {Number} pixelY Screen y position of the pixel.
- * @param {FBO} depthFbo Depth frameBuffer object.
- * @param {MagoManager} magoManager Mago3D main manager.
- * @returns {Number} linearDepth Returns the linear depth [0.0, 1.0] ranged value.
- */
-ManagerUtils.calculatePixelLinearDepth = function(gl, pixelX, pixelY, depthFbo, magoManager) 
-{
-	if (depthFbo === undefined)
-	{ depthFbo = magoManager.depthFboNeo; }
-
-	if (!depthFbo) 
-	{
-		return;
-	}
-
-	if (depthFbo) 
-	{
-		depthFbo.bind(); 
-	}
-
-	// Now, read the pixel and find the pixel position.
-	var depthPixels = new Uint8Array(4 * 1 * 1); // 4 x 1x1 pixel.
-	gl.readPixels(pixelX, magoManager.sceneState.drawingBufferHeight - pixelY, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, depthPixels);
-	
-	var zDepth = depthPixels[0]/(256.0*256.0*256.0) + depthPixels[1]/(256.0*256.0) + depthPixels[2]/256.0 + depthPixels[3]; // 0 to 256 range depth.
-	var linearDepth = zDepth / 256.0; // LinearDepth. Convert to [0.0, 1.0] range depth.
-
-	return linearDepth;
-};
-
-/**
- * Calculates the pixel linear depth value.
- * @param {WebGLRenderingContext} gl WebGL Rendering Context.
- * @param {Number} pixelX Screen x position of the pixel.
- * @param {Number} pixelY Screen y position of the pixel.
- * @param {FBO} depthFbo Depth frameBuffer object.
- * @param {MagoManager} magoManager Mago3D main manager.
- * @returns {Number} linearDepth Returns the linear depth [0.0, 1.0] ranged value.
- */
-ManagerUtils.calculatePixelLinearDepthABGR = function(gl, pixelX, pixelY, depthFbo, magoManager) 
-{
-	// Test function.
-	// Test function.
-	// Test function.
-	// Test function.
-	// Called from MagoWorld.updateMouseStartClick(...).***
-	if (depthFbo === undefined)
-	{ depthFbo = magoManager.depthFboNeo; }
-
-	if (!depthFbo) 
-	{
-		return;
-	}
-	
-	if (depthFbo) 
-	{
-		depthFbo.bind(); 
-	}
-	
-	// Now, read the pixel and find the pixel position.
-	var depthPixels = new Uint8Array(4 * 1 * 1); // 4 x 1x1 pixel.
-	gl.readPixels(pixelX, magoManager.sceneState.drawingBufferHeight - pixelY, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, depthPixels);
-	
-	var zDepth = depthPixels[3]/(255.0*255.0*255.0) + depthPixels[2]/(255.0*255.0) + depthPixels[1]/255.0 + depthPixels[0]; // 0 to 256 range depth.
-	var linearDepth = zDepth / 255.0; // LinearDepth. Convert to [0.0, 1.0] range depth.
-	return linearDepth;
-};
-
-/**
- * Calculates the pixel position in camera coordinates.
- * @param {WebGLRenderingContext} gl WebGL Rendering Context.
- * @param {Number} pixelX Screen x position of the pixel.
- * @param {Number} pixelY Screen y position of the pixel.
- * @param {Point3D} resultPixelPos The result of the calculation.
- * @param {MagoManager} magoManager Mago3D main manager.
- * @returns {Point3D} resultPixelPos The result of the calculation.
- */
-ManagerUtils.calculatePixelPositionCamCoord = function(gl, pixelX, pixelY, resultPixelPos, depthFbo, frustumNear, frustumFar, magoManager) 
-{
-	/*
-	vec2 screenPos = vec2(gl_FragCoord.x / screenWidth, gl_FragCoord.y / screenHeight);
-		float z_window  = unpackDepth(texture2D(depthTex, screenPos.xy)); // z_window  is [0.0, 1.0] range depth.
-		if(z_window < 0.001)
-		discard;
-	
-		float depthRange_near = 0.0;
-		float depthRange_far = 1.0;
-		float x_ndc = 2.0 * screenPos.x - 1.0;
-		float y_ndc = 2.0 * screenPos.y - 1.0;
-		float z_ndc = (2.0 * z_window - depthRange_near - depthRange_far) / (depthRange_far - depthRange_near);
-		
-		vec4 viewPosH = projectionMatrixInv * vec4(x_ndc, y_ndc, z_ndc, 1.0);
-		vec3 posCC = viewPosH.xyz/viewPosH.w;
-		vec4 posWC = modelViewMatrixRelToEyeInv * vec4(posCC.xyz, 1.0) + vec4((encodedCameraPositionMCHigh + encodedCameraPositionMCLow).xyz, 1.0);
-		*/
-	// New.*** New.*** New.*** New.*** New.*** New.*** New.*** New.*** New.*** New.*** New.*** New.*** New.*** New.*** New.*** New.*** New.*** New.***
-	/*
-	if (depthFbo) 
-	{
-		depthFbo.bind(); 
-	}
-	
-	var sceneState = magoManager.sceneState;
-	var screenW = sceneState.drawingBufferWidth;
-	var screenH = sceneState.drawingBufferHeight;
-
-	// Now, read the pixel and find the pixel position.
-	var depthPixels = new Uint8Array(4 * 1 * 1); // 4 x 1x1 pixel.
-	gl.readPixels(pixelX, screenH - pixelY, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, depthPixels);
-	
-	// Unpack the depthPixels.
-	//var dot(packedDepth, vec4(1.0, 1.0 / 255.0, 1.0 / 65025.0, 1.0 / 16581375.0));
-
-	var zDepth2 = depthPixels[0]/(256.0*256.0*256.0) + depthPixels[1]/(256.0*256.0) + depthPixels[2]/256.0 + depthPixels[3]; 
-	var zDepth = depthPixels[3]/(256.0*256.0*256.0) + depthPixels[2]/(256.0*256.0) + depthPixels[1]/256.0 + depthPixels[0]; 
-	
-	//zDepth /= 256.0;
-	// Calculate NDC coord.
-	var depthRange_near = 0.0;
-	var depthRange_far = 1.0;
-	var screenPos = new Point2D(pixelX/screenW, pixelY/screenH);
-	var xNdc = 2.0 * screenPos.x - 1.0;
-	var yNdc = 2.0 * screenPos.y - 1.0;
-	var zNdc = (2.0 * zDepth - depthRange_near - depthRange_far) / (depthRange_far - depthRange_near);
-	
-	var projectMatInv = sceneState.getProjectionMatrixInv();
-	var viewPosH = projectMatInv.transformPoint4D__test([xNdc, yNdc, zNdc, 1.0], undefined);
-	var viewPosCC = new Point3D(viewPosH[0]/viewPosH[3], viewPosH[1]/viewPosH[3], viewPosH[2]/viewPosH[3]);
-	
-	//********************************************************************************************************************************************
-	// Old.*** Old.*** Old.*** Old.*** Old.*** Old.*** Old.*** Old.*** Old.*** Old.*** Old.*** Old.*** Old.*** Old.*** Old.*** Old.***
-	*/
-	if (frustumFar === undefined)
-	{ frustumFar = magoManager.sceneState.camera.frustum.far; }
-
-	if (frustumNear === undefined)
-	{ frustumNear = 0.0; }
-	
-	var linearDepth = ManagerUtils.calculatePixelLinearDepth(gl, pixelX, pixelY, depthFbo, magoManager);
-	if (!linearDepth) 
-	{
-		return;
-	}
-	//var realZDepth = frustumNear + linearDepth*frustumFar; // Use this code if the zDepth encoder uses frustum near & frustum far, both.
-	// Note: In our RenderShowDepth shaders, we are encoding zDepth no considering the frustum near.
-	var realZDepth = linearDepth*frustumFar; // original.
-	//var realZDepth = linearDepth*30000.0; // new.
-
-	// now, find the 3d position of the pixel in camCoord.*
-	magoManager.resultRaySC = ManagerUtils.getRayCamSpace(pixelX, pixelY, magoManager.resultRaySC, magoManager);
-	if (resultPixelPos === undefined)
-	{ resultPixelPos = new Point3D(); }
-	
-	resultPixelPos.set(magoManager.resultRaySC[0] * realZDepth, magoManager.resultRaySC[1] * realZDepth, magoManager.resultRaySC[2] * realZDepth);
-	gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-	return resultPixelPos;
-};
-
-/**
- * Calculates the cameraCoord position in world coordinates.
- * @param {Point3D} cameraCoord Camera coordinate position.
- * @param {MagoManager} magoManager Mago3D main manager.
- * @returns {Point3D} resultPixelPos The result of the calculation.
- */
-ManagerUtils.cameraCoordPositionToWorldCoord = function(camCoordPos, resultWorldPos, magoManager) 
-{
-	// now, must transform this pixelCamCoord to world coord.
-	var mv_inv = magoManager.sceneState.getModelViewMatrixInv();
-	if (resultWorldPos === undefined)
-	{ var resultWorldPos = new Point3D(); }
-	resultWorldPos = mv_inv.transformPoint3D(camCoordPos, resultWorldPos);
-	return resultWorldPos;
-};
-
-/**
- * Calculates the pixel position in world coordinates.
- * @param {WebGLRenderingContext} gl WebGL Rendering Context.
- * @param {Number} pixelX Screen x position of the pixel.
- * @param {Number} pixelY Screen y position of the pixel.
- * @param {Point3D} resultPixelPos The result of the calculation.
- * @param {MagoManager} magoManager Mago3D main manager.
- * @returns {Point3D} resultPixelPos The result of the calculation.
- */
-ManagerUtils.screenCoordToWorldCoord = function(gl, pixelX, pixelY, resultWCPos, depthFbo, frustumNear, frustumFar, magoManager) 
-{
-	if (magoManager.isCesiumGlobe())
-	{
-		// https://cesium.com/docs/cesiumjs-ref-doc/Globe.html
-		
-		var cesiumScene = magoManager.scene; 
-		var cesiumGlobe = cesiumScene.globe;
-		var cesiumCamera = cesiumScene.camera;
-		var windowCoordinates = new Cesium.Cartesian2(pixelX, pixelY);
-		var ray = cesiumCamera.getPickRay(windowCoordinates);
-		var intersection = cesiumGlobe.pick(ray, cesiumScene);
-		return intersection;
-	}
-	else/* if (magoManager.configInformation.basicGlobe === Constant.MAGOWORLD)*/
-	{
-		// todo:
-		var camCoord = MagoWorld.screenToCamCoord(pixelX, pixelY, magoManager);
-		return ManagerUtils.cameraCoordPositionToWorldCoord(camCoord, undefined, magoManager);
-	}
-};
-
-/**
- * Calculates the pixel position in world coordinates.
- * @param {WebGLRenderingContext} gl WebGL Rendering Context.
- * @param {Number} pixelX Screen x position of the pixel.
- * @param {Number} pixelY Screen y position of the pixel.
- * @param {Point3D} resultPixelPos The result of the calculation.
- * @param {MagoManager} magoManager Mago3D main manager.
- * @returns {Point3D} resultPixelPos The result of the calculation.
- */
-ManagerUtils.calculatePixelPositionWorldCoord = function(gl, pixelX, pixelY, resultPixelPos, depthFbo, frustumNear, frustumFar, magoManager) 
-{
-	var pixelPosCamCoord = new Point3D();
-	
-	if (frustumFar === undefined)
-	{ frustumFar = magoManager.sceneState.camera.frustum.far; }
-
-	if (frustumNear === undefined)
-	{ frustumNear = 0.0; }
-	
-	if (depthFbo === undefined)
-	{ depthFbo = magoManager.depthFboNeo; }
-	
-	pixelPosCamCoord = ManagerUtils.calculatePixelPositionCamCoord(gl, pixelX, pixelY, pixelPosCamCoord, depthFbo, frustumNear, frustumFar, magoManager);
-
-	if (resultPixelPos === undefined)
-	{ var resultPixelPos = new Point3D(); }
-
-	resultPixelPos = ManagerUtils.cameraCoordPositionToWorldCoord(pixelPosCamCoord, resultPixelPos, magoManager);
-	return resultPixelPos;
-};
-
-/**
- * Calculates a world coordinate point to screen coordinate.
- * @param {WebGLRenderingContext} gl WebGL Rendering Context.
- * @param {Number} worldCoordX x value of the point in world coordinate.
- * @param {Number} worldCoordY y value of the point in world coordinate.
- * @param {Number} worldCoordZ z value of the point in world coordinate.
- * @param {Point3D} resultPixelPos The result of the calculation.
- * @param {MagoManager} magoManager Mago3D main manager.
- * @returns {Point3D} resultPixelPos The result of the calculation.
- */
-ManagerUtils.calculateWorldPositionToScreenCoord = function(gl, worldCoordX, worldCoordY, worldCoordZ, resultScreenCoord, magoManager)
-{
-	if (resultScreenCoord === undefined)
-	{ resultScreenCoord = new Point3D(); }
-	
-	if (magoManager.pointSC === undefined)
-	{ magoManager.pointSC = new Point3D(); }
-	
-	if (magoManager.pointSC2 === undefined)
-	{ magoManager.pointSC2 = new Point3D(); }
-	
-	magoManager.pointSC.set(worldCoordX, worldCoordY, worldCoordZ);
-	
-	// calculate the position in camera coords.
-	var pointSC2 = magoManager.pointSC2;
-	var sceneState = magoManager.sceneState;
-	pointSC2 = sceneState.modelViewMatrix.transformPoint3D(magoManager.pointSC, pointSC2);
-	
-	// now calculate the position in screen coords.
-	var zDist = pointSC2.z;
-	if (zDist > 0)
-	{
-		// the worldPoint is rear the camera.
-		resultScreenCoord.set(-1, -1, 0);
-		return resultScreenCoord;
-	}
-	
-	// now calculate the width and height of the plane in zDist.
-	//var fovyRad = sceneState.camera.frustum.fovyRad;
-	
-	var planeHeight = sceneState.camera.frustum.tangentOfHalfFovy*zDist*2;
-	var planeWidth = planeHeight * sceneState.camera.frustum.aspectRatio; 
-	var pixelX = -pointSC2.x * sceneState.drawingBufferWidth / planeWidth;
-	var pixelY = -(pointSC2.y) * sceneState.drawingBufferHeight / planeHeight;
-
-	pixelX += sceneState.drawingBufferWidth / 2;
-	pixelY += sceneState.drawingBufferHeight / 2;
-	pixelY = sceneState.drawingBufferHeight - pixelY;
-	resultScreenCoord.set(pixelX, pixelY, 0);
-	
-	return resultScreenCoord;
-};
-
-/**
- * Calculates the direction vector of a ray that starts in the camera position and
- * continues to the pixel position in camera space.
- * @param {Number} pixelX Screen x position of the pixel.
- * @param {Number} pixelY Screen y position of the pixel.
- * @param {Float32Array(3)} resultRay Result of the calculation.
- * @returns {Float32Array(3)} resultRay Result of the calculation.
- */
-ManagerUtils.getRayCamSpace = function(pixelX, pixelY, resultRay, magoManager) 
-{
-	// in this function "ray" is a vector.
-	var sceneState = magoManager.sceneState;
-	var frustum_far = 1.0; // unitary frustum far.
-	var frustum = sceneState.camera.frustum;
-	var aspectRatio = frustum.aspectRatio;
-	var tangentOfHalfFovy = frustum.tangentOfHalfFovy; 
-	
-	var hfar = 2.0 * tangentOfHalfFovy * frustum_far; //var hfar = 2.0 * Math.tan(fovy/2.0) * frustum_far;
-	var wfar = hfar * aspectRatio;
-	var mouseX = pixelX;
-	var mouseY = sceneState.drawingBufferHeight - pixelY;
-	if (resultRay === undefined) 
-	{ resultRay = new Float32Array(3); }
-	resultRay[0] = wfar*((mouseX/sceneState.drawingBufferWidth) - 0.5);
-	resultRay[1] = hfar*((mouseY/sceneState.drawingBufferHeight) - 0.5);
-	resultRay[2] = - frustum_far;
-	return resultRay;
-};
-
-/**
- * Calculates the direction vector of a ray that starts in the camera position and
- * continues to the pixel position in world space.
- * @param {WebGLRenderingContext} gl WebGL Rendering Context.
- * @param {Number} pixelX Screen x position of the pixel.
- * @param {Number} pixelY Screen y position of the pixel.
- * @returns {Line} resultRay
- */
-ManagerUtils.getRayWorldSpace = function(gl, pixelX, pixelY, resultRay, magoManager) 
-{
-	// in this function the "ray" is a line.
-	if (resultRay === undefined) 
-	{ resultRay = new Line(); }
-	
-	// world ray = camPos + lambda*camDir.
-	var camPos = magoManager.sceneState.camera.position;
-	var rayCamSpace = new Float32Array(3);
-	rayCamSpace = ManagerUtils.getRayCamSpace(pixelX, pixelY, rayCamSpace, magoManager);
-	
-	if (magoManager.pointSC === undefined)
-	{ magoManager.pointSC = new Point3D(); }
-	
-	var pointSC = magoManager.pointSC;
-	var pointSC2 = magoManager.pointSC2;
-	
-	pointSC.set(rayCamSpace[0], rayCamSpace[1], rayCamSpace[2]);
-
-	// now, must transform this posCamCoord to world coord.
-
-	var mvMatInv = magoManager.sceneState.getModelViewMatrixInv();
-	pointSC2 = mvMatInv.rotatePoint3D(pointSC, pointSC2); // rayWorldSpace.
-	pointSC2.unitary(); // rayWorldSpace.
-	resultRay.setPointAndDir(camPos.x, camPos.y, camPos.z,       pointSC2.x, pointSC2.y, pointSC2.z);// original.
-
-	return resultRay;
-};
-
-/**
- * 두 점을 연결한 선과 정북선 사이의 각도 구하기. 주로 모델이나 데이터의 헤딩을 설정하는데 사용.
- * @param {GeographicCoord} startGeographic 
- * @param {GeographicCoord} endGeographic 
- * @returns {number} heading
- */
-ManagerUtils.getHeadingToNorthByTwoGeographicCoords = function(startGeographic, endGeographic, magoManager) 
-{
-	var firstGeoLocData = Mago3D.ManagerUtils.calculateGeoLocationData(startGeographic.longitude, startGeographic.latitude, 0, 0, 0, 0, firstGeoLocData, magoManager);
-
-	var lastWorldCoord = Mago3D.ManagerUtils.geographicCoordToWorldPoint(endGeographic.longitude, endGeographic.latitude, 0, lastWorldCoord, magoManager);
-	var lastLocalCoord3D = firstGeoLocData.worldCoordToLocalCoord(lastWorldCoord, lastLocalCoord3D);
-	var lastLocalCoord2D = new Point2D(lastLocalCoord3D.x, lastLocalCoord3D.y);
-	lastLocalCoord2D.unitary();
-	var yAxis = new Point2D(0, 1);
-	var heading = yAxis.angleDegToVector(lastLocalCoord2D);
-	if (lastLocalCoord2D.x > 0) 
-	{
-		heading *= -1;
-	}
-
-	return heading;
-};
-
-/**
- * Using screen coordinate, return world coord, geographic coord, screen coord.
- * @param {WebGLRenderingContext} gl WebGL Rendering Context.
- * @param {Number} pixelX Screen x position of the pixel.
- * @param {Number} pixelY Screen y position of the pixel.
- * @param {MagoManager} magoManager Mago3D main manager.
- * @returns {object} world coord, geographic coord, screen coord.
- */
-ManagerUtils.getComplexCoordinateByScreenCoord = function(gl, pixelX, pixelY, depthFbo, frustumNear, frustumFar, magoManager) 
-{
-	var worldCoord = ManagerUtils.screenCoordToWorldCoord(magoManager.getGl(), pixelX, pixelY, worldCoord, undefined, undefined, undefined, magoManager);
-	if (!worldCoord) 
-	{
-		return null;
-	}
-	var geographicCoord = ManagerUtils.pointToGeographicCoord(worldCoord, geographicCoord);
-	
-	return {
-		screenCoordinate     : new Point2D(pixelX, pixelY),
-		worldCoordinate      : worldCoord,
-		geographicCoordinate : geographicCoord
-	};
-};
-
-ManagerUtils.geographicToWkt = function(geographic, type) 
-{
-	var wkt = '';
-	
-	switch (type) 
-	{
-	case 'POINT' : {
-		wkt = 'POINT (';
-		wkt += geographic.longitude;
-		wkt += ' ';
-		wkt += geographic.latitude;
-		wkt += ')';
-		break;
-	}
-	case 'LINE' : {
-		wkt = 'LINESTRING (';
-		for (var i=0, len=geographic.length;i<len;i++) 
-		{
-			if (i>0) 
-			{
-				wkt += ',';
-			}
-			wkt += geographic[i].longitude;
-			wkt += ' ';
-			wkt += geographic[i].latitude;
-		}
-		wkt += ')';
-		break;
-	}
-	case 'POLYGON' : {
-		wkt = 'POLYGON ((';
-		for (var i=0, len=geographic.length;i<len;i++) 
-		{
-			if (i>0) 
-			{
-				wkt += ',';
-			}
-			wkt += geographic[i].longitude;
-			wkt += ' ';
-			wkt += geographic[i].latitude;
-		}
-		wkt += ',';
-		wkt += geographic[0].longitude;
-		wkt += ' ';
-		wkt += geographic[0].latitude;
-		wkt += '))';
-		break;
-	}
-	}
-
-	function coordToString(coord, str) 
-	{
-		var text = str ? str : '';
-		if (Array.isArray(coord)) 
-		{
-			for (var j=0, coordLen=coord.length;j<coordLen;j++) 
-			{
-				coordToString(coord[j], text);
-			}
-		}
-		else 
-		{
-			if (text) 
-			{
-				text += ',';
-			}
-			text += coord.longitude;
-			text += ' ';
-			text += coord.latitude;
-		}
-		
-		return text;
-	}
-	
-	return wkt;
-};
 "function"!=typeof Promise.prototype.done&&(Promise.prototype.done=function(t,n){var o=arguments.length?this.then.apply(this,arguments):this;o.then(null,function(t){setTimeout(function(){throw t},0)})});
 (function e(t, n, r) {
   function s(o, u) {
@@ -104666,6 +105387,12 @@ RectangleDrawer.prototype.init = function()
 	this.endPoint = undefined;
 	this.tempRectangle = undefined;
 	this.manager.magoWorld.cameraMovable = true;
+
+	if (this.manager.modeler.magoRectangle) 
+	{
+		this.manager.modeler.magoRectangle.deleteObjects(this.manager.vboMemoryManager);
+		this.manager.modeler.magoRectangle = undefined;
+	}
 };
 /**
  * @private
@@ -104735,12 +105462,13 @@ RectangleDrawer.prototype.start = function()
 						fillColor: '#ff0000'
 					};
 				}
-				
+				console.info('init : ' + that.style.imageUrl);
 				that.tempRectangle = new MagoRectangle(position, that.style);
 				manager.modeler.magoRectangle = that.tempRectangle;
 			}
 			else 
 			{
+				console.info('as : ' + that.style.imageUrl);
 				that.tempRectangle.init(manager);
 				that.tempRectangle.setPosition(position);
 			}
