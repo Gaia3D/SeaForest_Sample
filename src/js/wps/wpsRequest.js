@@ -1,5 +1,5 @@
 
-var WPS_URL = 'http://192.168.10.98:8080/geoserver/wps';
+var WPS_URL = 'http://localhost:8080/geoserver/wps';
 /**
  * 연직분석 요청 xml 생성 후 리턴
  * @param {number} interval 라인의 시작점과 끝점사이의 점이 개수.
