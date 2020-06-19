@@ -167,17 +167,22 @@ function loadEndFunc(e) {
             //y축은 높이
             var yAxisValues = [];
 
-
+            //단면분석 결과 데이터 후처리
             for(var i=0,len=features.length; i<len; i++) {
                 var feature = features[i];
                 var prop = feature.properties;
                 var coordinates = feature.geometry.coordinates;
+
+                //지도상에 결과 표출을 위한 경위도 배열 생성
                 array.push({
                     longitude : coordinates[0],
                     latitude  : coordinates[1],
                     altitude  : coordinates[2]
                 });
+
+                //그래프 x축 값 배열
                 xAxisValues.push(prop.distance);
+                //그래프 y축 값 배열
                 yAxisValues.push(prop.value);
             }
 
@@ -219,13 +224,18 @@ function loadEndFunc(e) {
         clampToTerrain : false
     });
 
+    // rectangleDrawer가 활성화될 시 콜백
     rectangleDrawer.on(Mago3D.RectangleDrawer.EVENT_TYPE.ACTIVE, function(d) {
+        //기존에 분석결과를 초기화
         closeAnalysis();
     });
+
+    // rectangle이 그려졌을때 콜백
     rectangleDrawer.on(Mago3D.RectangleDrawer.EVENT_TYPE.DRAWEND, function(e){
         var rectangle = e;
         var a = rectangle.getArea();
 
+        //사각형 면적이 클 시 취소.
         if(a / 1000000000 > 1)
         {
             alert('Too much area.');
@@ -233,18 +243,26 @@ function loadEndFunc(e) {
             return;
         }        
         
+        //그려진 사각형을 이용하여 공간분석 요청 promise 객체 생성.
         var promises = getRasterAnalysisPromises(rectangle, 'all');
         
+        //생성한 promise객체 응답처리. r1 : 향분석결과, r2 : 경사분석결과
         analysisResultProcess(promises, function(r1,r2){
+            //drawer를 통해 그린 사각형의 클론을 생성하여 drawedRectangle에 할당
             drawedRectangle = rectangle.clone();
+            //drawer의 동작을 멈춤. 동작이 멈춤과 동시에 그렸던 사각형 객체는 사라짐.
+            rectangleDrawer.setActive(false);
+
+            //분석결과 이미지 표출을 위해 스타일 설정. clampToTerrain를 true로 설정 시 터레인에 맞게 이미지가 표현.
             drawedRectangle.setStyle({
                 clampToTerrain : true
             }, magoManager);
 
             magoManager.modeler.addObject(drawedRectangle, 1);
-            rectangleDrawer.setActive(false);
+
             $('span.analysis.on').removeClass('on');
     
+            //promise 처리 결과로 받은 blob을 base64형태로 변환 후 분석결과화면과 지도상에 표출
             responseToImage(r1, function(e, reader){
                 var base64data = reader.result;   
                 $('#aspectImg').attr('src',base64data).trigger('click');
@@ -263,6 +281,7 @@ function loadEndFunc(e) {
     addJqueryEvent();
 }
 
+//promise 처리.
 function analysisResultProcess (promises, callback)
 {
     startLoading();
@@ -276,6 +295,7 @@ function analysisResultProcess (promises, callback)
     });
 }
 
+//분석 유형에 따른 string형태의 xml생성.
 function getRasterAnalysisRqXml (rectangle, mode)
 {
     var xmls = [];
@@ -306,6 +326,7 @@ function getRasterAnalysisRqXml (rectangle, mode)
     }
 }
 
+//분석 유형에 맞는 xml을 생성 후 blob 요청 promise 객체 리턴
 function getRasterAnalysisPromises(rectangle, mode)
 {
     return getRasterAnalysisRqXml(rectangle, mode).map(xml => requestBlobResource(xml));
@@ -319,6 +340,7 @@ function closeAnalysis() {
     }
 }
 
+//blob response를 base64 image url로 변환 후 콜백수행.
 function responseToImage(response, callback) {
     var blob;
     if(Array.isArray(response)) {
@@ -342,6 +364,7 @@ function responseToImage(response, callback) {
     }
 }
 
+//image를 지도상에 표출
 function setImageOnMap(imgSrc) {
     if(!drawedRectangle) return;
 
