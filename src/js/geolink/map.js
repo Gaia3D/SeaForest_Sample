@@ -127,6 +127,91 @@ function loadEndFunc(e) {
     }
     
     magoManager.addLayer(baseLayer);
+    var wmsLayerNames = [{
+        layerName : 'SeaForest:15m_susim',
+        alias : 'dem'
+    },{
+        layerName : 'SeaForest:BML_CMC_AS',
+        alias : '암반/비암반'
+    },
+    {
+        layerName : 'SeaForest:BML_SSB_AS',
+        alias : '천연해조장'
+    },
+    {
+        layerName : 'SeaForest:BML_SEDIMENT_PS',
+        alias : '퇴적물'
+    },
+    {
+        layerName : 'SeaForest:BML_DEP_LS',
+        alias : '수심'
+    },
+    {
+        layerName : 'SeaForest:BML_HAL_AS',
+        alias : '염생식물'
+    },
+    {
+        layerName : 'SeaForest:BML_SGF_AS',
+        alias : '잘피장'
+    },
+    {
+        layerName : 'SeaForest:VL_WTRTMP_PS',
+        alias : '수온'
+    },
+    {
+        layerName : 'SeaForest:VL_SALT_PS',
+        alias : '염분'
+    },
+    {
+        layerName : 'SeaForest:BML_CMR_PS',
+        alias : '바다목장'
+    },
+    {
+        layerName : 'SeaForest:BML_AFR_PS',
+        alias : '단위인공어초'
+    },
+    {
+        layerName : 'SeaForest:BML_OTI_AS',
+        alias : '마을어장'
+    },
+    {
+        layerName : 'SeaForest:BML_MRF_AS',
+        alias : '바다숲'
+    }];
+
+    for(var i in wmsLayerNames){
+        var wmsLayerName = wmsLayerNames[i];
+        if(wmsLayerName.layerName.indexOf('15m_susim') > 0) {
+            magoManager.addLayer(new Mago3D.WMSLayer({
+                url: 'http://test.muhanit.kr:13032/geoserver_seaforest/gwc/service/wms',
+                opacity : 1,
+                filter:Mago3D.CODE.imageFilter.BATHYMETRY,
+                param: {layers: wmsLayerName.layerName, tiled: true}
+            }));
+        } else {
+            magoManager.addLayer(new Mago3D.WMSLayer({
+                url: 'http://test.muhanit.kr:13032/geoserver_seaforest/gwc/service/wms',
+                opacity : 1,
+                param: {layers: wmsLayerName.layerName, tiled: true}
+            }));
+        }
+
+        olmap.addLayer(new ol.layer.Tile({
+            source : new ol.source.TileWMS({
+                url : 'http://test.muhanit.kr:13032/geoserver_seaforest/gwc/service/wms',
+                params: {
+                    'LAYERS': wmsLayerName.layerName,
+                    'FORMAT': 'image/png',
+                    'TILED' : true,
+                    'VERSION' : '1.1.1',
+                    'SRS' : 'EPSG:3857'
+                },
+                serverType: 'geoserver'
+            })
+        }))
+    }
+
+
     olMagoWorld = new OlMagoWorld({olmap : olmap, magoManager: magoManager});
     
     addJqueryEvent();
