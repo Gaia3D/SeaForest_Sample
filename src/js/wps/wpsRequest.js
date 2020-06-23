@@ -1,53 +1,6 @@
 
-var WPS_URL = 'http://localhost:8080/geoserver/wps';
-/**
- * 연직분석 요청 xml 생성 후 리턴
- * @param {number} interval 라인의 시작점과 끝점사이의 점이 개수.
- * @param {string} userLine LineString 형태의 wkt
- */
-function getXmlRasterProfile(interval, userLine) {
-	var xml = '';
-	xml += requestWPSPostHeader();
-	xml += '<ows:Identifier>statistics:RasterProfile</ows:Identifier>';
-	xml += '<wps:DataInputs>';
-	xml += '<wps:Input>';
-	xml += '<ows:Identifier>inputCoverage</ows:Identifier>';
-	xml += '<wps:Reference mimeType="image/tiff" xlink:href="http://geoserver/wcs" method="POST">';
-	xml += '<wps:Body>';
-	xml += '<wcs:GetCoverage service="WCS" version="1.1.1">';
-	xml += '<ows:Identifier>mago3d:15m_susim</ows:Identifier>';
-	xml += '<wcs:DomainSubset>';
-	xml += '<ows:BoundingBox crs="http://www.opengis.net/gml/srs/epsg.xml#4326">';
-	xml += '<ows:LowerCorner>124.40430420105157 33.03644454682546</ows:LowerCorner>';
-	xml += '<ows:UpperCorner>131.9168700063789 38.840953670927945</ows:UpperCorner>';
-	xml += '</ows:BoundingBox>';
-	xml += '</wcs:DomainSubset>';
-	xml += '<wcs:Output format="image/tiff"/>';
-	xml += '</wcs:GetCoverage>';
-	xml += '</wps:Body>';
-	xml += '</wps:Reference>';
-	xml += '</wps:Input>';
-	xml += '<wps:Input>';
-	xml += '<ows:Identifier>userLine</ows:Identifier>';
-	xml += '<wps:Data>';
-	xml += '<wps:ComplexData mimeType="application/wkt"><![CDATA[' + userLine + ']]></wps:ComplexData>';
-	xml += '</wps:Data>';
-	xml += '</wps:Input>';
-	xml += '<wps:Input>';
-	xml += '<ows:Identifier>interval</ows:Identifier>';
-	xml += '<wps:Data>';
-	xml += '<wps:LiteralData>' + interval + '</wps:LiteralData>';
-	xml += '</wps:Data>';
-	xml += '</wps:Input>';
-	xml += '</wps:DataInputs>';
-	xml += '<wps:ResponseForm>';
-	xml += '<wps:RawDataOutput mimeType="application/vnd.geo+json">';
-	xml += '<ows:Identifier>result</ows:Identifier>';
-	xml += '</wps:RawDataOutput>';
-	xml += '</wps:ResponseForm>';
-	xml += '</wps:Execute>';
-	return xml;
-}
+var WPS_URL = 'http://test.muhanit.kr:13032/geoserver_seaforest/wps';
+
 /**
  * wps 요청 공통 헤더 생성 후 리턴
  * @return {param}
@@ -68,38 +21,62 @@ function requestWPSPostHeader() {
 
 	return header;
 }
-function requestBlobResource(xml) {
-	var resource = $.ajax({
-		url : WPS_URL,
-		contentType : 'text/xml',
-		data : xml,
-		xhr : function(){
-			var xhr = new XMLHttpRequest();
-			xhr.responseType= 'blob'
-			return xhr;
-		},
-		method : 'POST',
-		headers: {
-			'Content-Type': 'text/xml;charset=utf-8'
-		}
-	});
 
-	return resource;
+/**
+ * 단면분석 요청 xml 생성 후 리턴
+ * @param {number} interval 라인의 시작점과 끝점사이의 점이 개수.
+ * @param {string} userLine LineString 형태의 wkt
+ */
+function getXmlRasterProfile(interval, userLine) {
+	var xml = '';
+	xml += requestWPSPostHeader();
+	//수행할 공간분석 선언 : 단면분석
+	xml += '<ows:Identifier>statistics:RasterProfile</ows:Identifier>';
+	xml += '<wps:DataInputs>';
+	xml += '<wps:Input>';
+	xml += '<ows:Identifier>inputCoverage</ows:Identifier>';
+	xml += '<wps:Reference mimeType="image/tiff" xlink:href="http://geoserver/wcs" method="POST">';
+	xml += '<wps:Body>';
+	//공간분석에 사용할 raster를 wcs를 통해 가져옴
+	xml += '<wcs:GetCoverage service="WCS" version="1.1.1">';
+	//공간분석에 사용할 raster 레이어 
+	xml += '<ows:Identifier>SeaForest:15m_susim</ows:Identifier>';
+	xml += '<wcs:DomainSubset>';
+	//공간분석에 사용할 영역, 단면분석은 레이어 전체 영역을 사용.
+	xml += '<ows:BoundingBox crs="http://www.opengis.net/gml/srs/epsg.xml#4326">';
+	xml += '<ows:LowerCorner>124.40430420105157 33.03644454682546</ows:LowerCorner>';
+	xml += '<ows:UpperCorner>131.9168700063789 38.840953670927945</ows:UpperCorner>';
+	xml += '</ows:BoundingBox>';
+	xml += '</wcs:DomainSubset>';
+	xml += '<wcs:Output format="image/tiff"/>';
+	xml += '</wcs:GetCoverage>';
+	xml += '</wps:Body>';
+	xml += '</wps:Reference>';
+	xml += '</wps:Input>';
+	xml += '<wps:Input>';
+	//단면분석에 쓰일 line 정보, wkt 형식
+	xml += '<ows:Identifier>userLine</ows:Identifier>';
+	xml += '<wps:Data>';
+	xml += '<wps:ComplexData mimeType="application/wkt"><![CDATA[' + userLine + ']]></wps:ComplexData>';
+	xml += '</wps:Data>';
+	xml += '</wps:Input>';
+	xml += '<wps:Input>';
+	//첫점과 끝점 사이의 간격, 점의 갯수
+	xml += '<ows:Identifier>interval</ows:Identifier>';
+	xml += '<wps:Data>';
+	xml += '<wps:LiteralData>' + interval + '</wps:LiteralData>';
+	xml += '</wps:Data>';
+	xml += '</wps:Input>';
+	xml += '</wps:DataInputs>';
+	xml += '<wps:ResponseForm>';
+	xml += '<wps:RawDataOutput mimeType="application/vnd.geo+json">';
+	xml += '<ows:Identifier>result</ows:Identifier>';
+	xml += '</wps:RawDataOutput>';
+	xml += '</wps:ResponseForm>';
+	xml += '</wps:Execute>';
+	return xml;
 }
 
-function requestJsonResource(xml) {
-	var resource = $.ajax({
-		url : WPS_URL,
-		contentType : 'text/xml',
-		data : xml,
-		method : 'POST',
-		headers: {
-			'Content-Type': 'text/xml;charset=utf-8'
-		}
-	});
-
-	return resource;
-}
 /**
  * RasterAspect 요청을 위한 xml 생성후 리턴
  * @param {object} minCoord 
@@ -110,15 +87,19 @@ function getXmlRasterAspect(minCoord, maxCoord) {
 	var xml = '';
 
 	xml += requestWPSPostHeader();
+	//수행할 공간분석 선언 : 향분석
 	xml += '<ows:Identifier>statistics:RasterAspect</ows:Identifier>';
 	xml += '<wps:DataInputs>';
 	xml += '<wps:Input>';
 	xml += '<ows:Identifier>inputCoverage</ows:Identifier>';
 	xml += '<wps:Reference mimeType="image/tiff" xlink:href="http://geoserver/wcs" method="POST">';
 	xml += '<wps:Body>';
+	//공간분석에 사용할 raster를 wcs를 통해 가져옴
 	xml += '<wcs:GetCoverage service="WCS" version="1.1.1">';
-	xml += '<ows:Identifier>mago3d:15m_susim</ows:Identifier>';
+	//공간분석에 사용할 raster 레이어
+	xml += '<ows:Identifier>SeaForest:15m_susim</ows:Identifier>';
 	xml += '<wcs:DomainSubset>';
+	//공간분석에 사용할 영역, 향분석은 설정한 영역만큼 요청.
 	xml += '<ows:BoundingBox crs="http://www.opengis.net/gml/srs/epsg.xml#4326">';
 	xml += '<ows:LowerCorner>' + minCoord.longitude + ' ' + minCoord.latitude + '</ows:LowerCorner>';
 	xml += '<ows:UpperCorner>' + maxCoord.longitude + ' ' + maxCoord.latitude + '</ows:UpperCorner>';
@@ -150,15 +131,19 @@ function getXmlRasterSlope(minCoord, maxCoord, zFactor) {
 	var xml = '';
 
 	xml += requestWPSPostHeader();
+	//수행할 공간분석 선언 : 경사분석
 	xml += '<ows:Identifier>statistics:RasterSlope</ows:Identifier>';
 	xml += '<wps:DataInputs>';
 	xml += '<wps:Input>';
 	xml += '<ows:Identifier>inputCoverage</ows:Identifier>';
 	xml += '<wps:Reference mimeType="image/tiff" xlink:href="http://geoserver/wcs" method="POST">';
 	xml += '<wps:Body>';
+	//공간분석에 사용할 raster를 wcs를 통해 가져옴
 	xml += '<wcs:GetCoverage service="WCS" version="1.1.1">';
-	xml += '<ows:Identifier>mago3d:15m_susim</ows:Identifier>';
+	//공간분석에 사용할 raster 레이어
+	xml += '<ows:Identifier>SeaForest:15m_susim</ows:Identifier>';
 	xml += '<wcs:DomainSubset>';
+	//공간분석에 사용할 영역, 경사분석은 설정한 영역만큼 요청.
 	xml += '<ows:BoundingBox crs="http://www.opengis.net/gml/srs/epsg.xml#4326">';
 	xml += '<ows:LowerCorner>' + minCoord.longitude + ' ' + minCoord.latitude + '</ows:LowerCorner>';
 	xml += '<ows:UpperCorner>' + maxCoord.longitude + ' ' + maxCoord.latitude + '</ows:UpperCorner>';
@@ -170,12 +155,17 @@ function getXmlRasterSlope(minCoord, maxCoord, zFactor) {
 	xml += '</wps:Reference>';
 	xml += '</wps:Input>';
 	xml += '<wps:Input>';
+	//경사분석 측정단위, 기본은 Degree, 
 	xml += '<ows:Identifier>slopeType</ows:Identifier>';
 	xml += '<wps:Data>';
 	xml += '<wps:LiteralData>Percentrise</wps:LiteralData>';
 	xml += '</wps:Data>';
 	xml += '</wps:Input>';
 	xml += '<wps:Input>';
+	//Z(고도) 단위의 측정 단위가 x, y(선형) 단위의 측정 단위와 같은 경우 Z 계수는 1이지만, 
+	//서로 다른 경우 정확한 값 산출을 위해 이 값을 조정해야 합니다.
+	//고도는 단위가 보통 m 단위이고 현재 사용하는 x, y는 degree이므로 zFactor를 계산해야함.
+	//그래서 'getZfactor' 메소드를 구현해둠.
 	xml += '<ows:Identifier>zFactor</ows:Identifier>';
 	xml += '<wps:Data>';
 	xml += '<wps:LiteralData>' + zFactor + '</wps:LiteralData>';
@@ -245,26 +235,32 @@ function getImage(minCoord, maxCoord, analisys, style) {
 	var xml = '';
 	xml += '<?xml version="1.0" encoding="UTF-8"?>';
 	xml += requestWPSPostHeader();
+	//수행할 프로세스 선언 : RasterToImage
 	xml += '<ows:Identifier>statistics:RasterToImage</ows:Identifier>';
 	xml += '<wps:DataInputs>';
 	xml += '<wps:Input>';
 	xml += '<ows:Identifier>coverage</ows:Identifier>';
 	xml += '<wps:Reference mimeType="image/tiff" xlink:href="http://geoserver/wps" method="POST">';
+	//RasterToImage는 향이나 경사 분석결과로 리턴되는 이미지를 사용, 
+	//getXmlRasterSlope나 getXmlRasterAspect를 수행한 결과를 넣으면 됨.
 	xml += '<wps:Body>';
 	xml += analisys;
 	xml += '</wps:Body>';
 	xml += '</wps:Reference>';
 	xml += '</wps:Input>';
 	xml += '<wps:Input>';
+	//영역, analisys를 구할 때 사용한 영역과 동일.
 	xml += '<ows:Identifier>bbox</ows:Identifier>';
 	xml += '<wps:Data>';
 	xml += '<wps:LiteralData>' + minCoord.longitude + ',' + minCoord.latitude + ',' + maxCoord.longitude + ',' + maxCoord.latitude + '</wps:LiteralData>';
 	xml += '</wps:Data>';
 	xml += '</wps:Input>';
+	//래스터 스타일. 분석결과에 스타일링을 함
 	xml += '<wps:Input>';
 	xml += style;
 	xml += '</wps:Input>';
 	xml += '<wps:Input>';
+	//이미지 사이즈. 본 펑션 상단에서 구한 픽셀사이즈를 사용.
 	xml += '<ows:Identifier>width</ows:Identifier>';
 	xml += '<wps:Data>';
 	xml += '<wps:LiteralData>' + width + '</wps:LiteralData>';
@@ -364,4 +360,38 @@ function getSlopeStyle() {
 	xml += '</wps:Data>';
 
 	return xml;
+}
+
+
+function requestBlobResource(xml) {
+	var resource = $.ajax({
+		url : WPS_URL,
+		contentType : 'text/xml',
+		data : xml,
+		xhr : function(){
+			var xhr = new XMLHttpRequest();
+			xhr.responseType= 'blob'
+			return xhr;
+		},
+		method : 'POST',
+		headers: {
+			'Content-Type': 'text/xml;charset=utf-8'
+		}
+	});
+
+	return resource;
+}
+
+function requestJsonResource(xml) {
+	var resource = $.ajax({
+		url : WPS_URL,
+		contentType : 'text/xml',
+		data : xml,
+		method : 'POST',
+		headers: {
+			'Content-Type': 'text/xml;charset=utf-8'
+		}
+	});
+
+	return resource;
 }

@@ -186,29 +186,47 @@ function loadEndFunc(e) {
                 yAxisValues.push(prop.value);
             }
 
+            //echart profile 그래프 생성 옵션 
+            var option = ProfileChart.getBasicAreaOption(xAxisValues,yAxisValues);
+            if (option && typeof option === "object") {
+                //echart profile 그래프 생성
+                ProfileChart.active(option);
+            }
+
+            //MagoPolyline position argument
             var position = {
                 coordinates : array
             }
+            //MagoPolyline style argument
             var style = {
+                //선색상
                 color     : '#ff0000',
+                //선굵기
                 thickness : 2.0,
+                //선을 이루는 버텍스의 스타일
                 point     : {
+                    //버텍스의 크기
                     size        : 12,
+                    //버텍스의 외곽선
                     strokeSize : 1,
+                    //버텍스의 외곽선 색상
                     strokeColor : '#FFFFFF',
+                    //버텍스의 색상
                     color       : '#FF0000',
+                    //버텍스의 투명도
                     opacity     : 0.7
                 }
             };
 
-            var option = ProfileChart.getBasicAreaOption(xAxisValues,yAxisValues);
-            if (option && typeof option === "object") {
-                ProfileChart.active(option);
-            }
-
+            //MagoPolyline 생성
             var magoPolyline = new Mago3D.MagoPolyline(position, style);
+            //MagoPolyline 등록
             magoManager.modeler.addObject(magoPolyline, 1);    
+
+            //단면제거 비즈니스로직을 위한 처리.
             drawedLines.push(magoPolyline);
+
+            //그리기 완료 후 그리기 기능 비활성화
             lineDrawer.setActive(false);
             $('#profile').removeClass('on');
             stopLoading();
@@ -220,8 +238,7 @@ function loadEndFunc(e) {
         fillColor : '#34e8eb',
         strokeColor : '#349feb',
         strokeWidth : 3,
-        opacity : 0.5,
-        clampToTerrain : false
+        opacity : 0.5
     });
 
     // rectangleDrawer가 활성화될 시 콜백
