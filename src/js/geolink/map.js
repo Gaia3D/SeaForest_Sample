@@ -185,7 +185,11 @@ function loadEndFunc(e) {
             magoManager.addLayer(new Mago3D.WMSLayer({
                 url: 'http://test.muhanit.kr:13032/geoserver_seaforest/gwc/service/wms',
                 opacity : 1,
-                filter:Mago3D.CODE.imageFilter.BATHYMETRY,
+                filter: {
+                    type : Mago3D.CODE.imageFilter.BATHYMETRY,
+                    properties : {minAltitude : -200, maxAltitude : 1944, caustics : true}
+                },
+                    
                 param: {layers: wmsLayerName.layerName, tiled: true}
             }));
         } else {

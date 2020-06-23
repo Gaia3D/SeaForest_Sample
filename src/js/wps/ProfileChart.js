@@ -1,4 +1,16 @@
 var ProfileChart = (function() {
+    var nameTextStyle = {
+        color:'#ffffff',
+        rich : {
+            main : {
+                fontWeight : 'bolder',
+                fontSize : 16
+            }
+        }
+    };
+    var axisLabel = {
+        color:'#ffffff'
+    };
     var myChart = echarts.init(document.getElementById("chartArea"));
 
     myChart.on('mouseover',function(e){
@@ -45,27 +57,35 @@ var ProfileChart = (function() {
                     trigger: 'item',
                     formatter : function(params) {
                         var result = '';
-                        result += 'distance(m) : ' + params.name;
-                        result += ' height(m) : ' + params.value;
+                        result += 'distance : ' + parseFloat(params.name).toFixed(3);
+                        result += ' height : ' + parseFloat(params.value).toFixed(3);
                         return result;
                     }
                 },
                 xAxis: {
                     type: 'category',
                     boundaryGap: true,
-                    data: xAxisValues
+                    data: xAxisValues.map(val => parseFloat(val).toFixed(3)),
+                    nameLocation : 'middle',
+                    axisLabel : axisLabel,
+                    name : '{main|DISTANCE} ( geometry length / interval )',
+                    nameTextStyle : Object.assign(nameTextStyle, {padding : [10, 0, 0, 0]})
                 },
                 yAxis: {
-                    type: 'value'
+                    type: 'value',
+                    axisLabel : axisLabel,
+                    name : '{main|HEIGHT} ( m )',
+                    nameTextStyle : nameTextStyle
                 },
-                series: [{
+                series: {
                     data: yAxisValues,
                     type: 'line',
-                    symbolSize : 16,
+                    symbolSize : 8,
                     areaStyle: {
                         color : '#ffff00'
-                    }
-                }]
+                    },
+                    smooth : true
+                }
             }
         }
     }
