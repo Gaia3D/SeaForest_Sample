@@ -158,7 +158,7 @@ function getXmlRasterSlope(minCoord, maxCoord, zFactor) {
 	//경사분석 측정단위, 기본은 Degree, 
 	xml += '<ows:Identifier>slopeType</ows:Identifier>';
 	xml += '<wps:Data>';
-	xml += '<wps:LiteralData>Percentrise</wps:LiteralData>';
+	xml += '<wps:LiteralData>Degree</wps:LiteralData>';
 	xml += '</wps:Data>';
 	xml += '</wps:Input>';
 	xml += '<wps:Input>';
@@ -345,11 +345,16 @@ function getSlopeStyle() {
 	xml += '<RasterSymbolizer>';
 	xml += '<Opacity>1.0</Opacity>';
 	xml += '<ColorMap>';
-	xml += '<ColorMapEntry color="#38A800" quantity="5" />';
-	xml += '<ColorMapEntry color="#CFFF74" quantity="10" />';
-	xml += '<ColorMapEntry color="#FFFF00" quantity="15" />';
-	xml += '<ColorMapEntry color="#FEAA00" quantity="30" />';
-	xml += '<ColorMapEntry color="#E60000" quantity="100" />';
+	xml += '<ColorMapEntry color="#006837" quantity="0.3" />';
+	xml += '<ColorMapEntry color="#1a9850" quantity="1.1" />';
+	xml += '<ColorMapEntry color="#a6d96a" quantity="3.0" />';
+	xml += '<ColorMapEntry color="#ffffbf" quantity="5.0" />';
+	xml += '<ColorMapEntry color="#fee08b" quantity="8.5" />';
+	xml += '<ColorMapEntry color="#fdae61" quantity="16.5" />';
+	xml += '<ColorMapEntry color="#f46d43" quantity="24" />';
+	xml += '<ColorMapEntry color="#d73027" quantity="35" />';
+	xml += '<ColorMapEntry color="#a50026" quantity="45" />';
+	xml += '<ColorMapEntry color="#000000" quantity="90" />';
 	xml += '</ColorMap>';
 	xml += '</RasterSymbolizer>';
 	xml += '</Rule>';
