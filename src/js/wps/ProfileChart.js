@@ -59,9 +59,9 @@ var ProfileChart = (function() {
                         var index = params.dataIndex;
                         var geoCoord = lonlats[index];
                         var result = '';
-                        result += 'position : ( lon : ' + parseFloat(geoCoord.longitude).toFixed(5) +', lat : '+ parseFloat(geoCoord.latitude).toFixed(5) + ' )<br/>';
-                        result += ' distance : ' + parseFloat(params.name).toFixed(3) + ' m<br/>';
-                        result += ' height : ' + parseFloat(params.value).toFixed(3) + ' m';
+                        result += 'Position : ( lon : ' + parseFloat(geoCoord.longitude).toFixed(5) +', lat : '+ parseFloat(geoCoord.latitude).toFixed(5) + ' )<br/>';
+                        result += ' Distance : ' + parseFloat(params.name).toFixed(3) + ' m<br/>';
+                        result += ' Height : ' + parseFloat(params.value).toFixed(3) + ' m';
                         return result;
                     }
                 },
