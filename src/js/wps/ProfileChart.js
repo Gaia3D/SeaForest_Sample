@@ -51,14 +51,21 @@ var ProfileChart = (function() {
             myChart.clear();
             $('#chartArea').hide();
         },
-        getBasicAreaOption : function(xAxisValues, yAxisValues) {
+        getBasicAreaOption : function(xAxisValues, yAxisValues, lonlats) {
             return {
                 tooltip: {
                     trigger: 'item',
-                    formatter : function(params) {
+                    formatter : function(params,a,b,c) {
+                        console.info(a);
+                        console.info(b);
+                        console.info(c);
+                        console.info(params);
+                        var index = params.dataIndex;
+                        var geoCoord = lonlats[index];
                         var result = '';
-                        result += 'distance : ' + parseFloat(params.name).toFixed(3);
-                        result += ' height : ' + parseFloat(params.value).toFixed(3);
+                        result += 'position : ( lon : ' + parseFloat(geoCoord.longitude).toFixed(5) +', lat : '+ parseFloat(geoCoord.latitude).toFixed(5) + ' )<br/>';
+                        result += ' distance : ' + parseFloat(params.name).toFixed(3) + ' m<br/>';
+                        result += ' height : ' + parseFloat(params.value).toFixed(3) + ' m';
                         return result;
                     }
                 },
@@ -68,7 +75,7 @@ var ProfileChart = (function() {
                     data: xAxisValues.map(val => parseFloat(val).toFixed(3)),
                     nameLocation : 'middle',
                     axisLabel : axisLabel,
-                    name : '{main|DISTANCE} ( geometry length / interval )',
+                    name : '{main|DISTANCE} ( m, From First Point )',
                     nameTextStyle : Object.assign(nameTextStyle, {padding : [10, 0, 0, 0]})
                 },
                 yAxis: {

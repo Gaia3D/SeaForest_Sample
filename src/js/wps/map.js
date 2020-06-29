@@ -172,22 +172,25 @@ function loadEndFunc(e) {
                 var feature = features[i];
                 var prop = feature.properties;
                 var coordinates = feature.geometry.coordinates;
-
-                //지도상에 결과 표출을 위한 경위도 배열 생성
-                array.push({
+                var geoCoord = {
                     longitude : coordinates[0],
                     latitude  : coordinates[1],
                     altitude  : coordinates[2]
-                });
+                };
+                //지도상에 결과 표출을 위한 경위도 배열 생성
+                array.push(geoCoord);
 
-                //그래프 x축 값 배열
-                xAxisValues.push(prop.distance);
+                 //그래프 x축 값 배열
+                addDistance(array, i, xAxisValues);
+
+               
+                //xAxisValues.push(prop.distance);
                 //그래프 y축 값 배열
                 yAxisValues.push(prop.value);
             }
 
             //echart profile 그래프 생성 옵션 
-            var option = ProfileChart.getBasicAreaOption(xAxisValues,yAxisValues);
+            var option = ProfileChart.getBasicAreaOption(xAxisValues, yAxisValues, array);
             if (option && typeof option === "object") {
                 //echart profile 그래프 생성
                 ProfileChart.active(option);
@@ -230,6 +233,41 @@ function loadEndFunc(e) {
             lineDrawer.setActive(false);
             $('#profile').removeClass('on');
             stopLoading();
+
+            function addDistance(geoCoordArray, index, distanceArray)
+            {
+                if(index === 0)
+                {
+                    distanceArray.push(0);
+                    return;
+                }
+                //지구반지름, m
+                var R = 6371e3;
+                var PI = Math.PI;
+                var toRadian = PI/180;
+
+                var prevIndex = index - 1;
+                var geoCoord1 = geoCoordArray[index];
+                var geoCoord2 = geoCoordArray[prevIndex];
+                
+                var lat1 = geoCoord1.latitude;
+                var lat2 = geoCoord2.latitude;
+                var lon1 = geoCoord1.longitude;
+                var lon2 = geoCoord2.longitude;
+
+                var pi1 = lat1 * toRadian;
+                var pi2 = lat2 * toRadian;
+
+                var dPi = (lat2 - lat1) * toRadian;
+                var dLamda = (lon2 - lon1) * toRadian;
+                
+                var a = Math.sin(dPi/2) * Math.sin(dPi/2) + Math.cos(pi1)*Math.cos(pi2) * Math.sin(dLamda/2) * Math.sin(dLamda/2);
+                var c = 2 * Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
+
+                var dist = R * c;
+
+                distanceArray[index] = dist + distanceArray[prevIndex];
+            }
         });
     });
 
