@@ -56,10 +56,6 @@ var ProfileChart = (function() {
                 tooltip: {
                     trigger: 'item',
                     formatter : function(params,a,b,c) {
-                        console.info(a);
-                        console.info(b);
-                        console.info(c);
-                        console.info(params);
                         var index = params.dataIndex;
                         var geoCoord = lonlats[index];
                         var result = '';
