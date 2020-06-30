@@ -182,7 +182,7 @@ function loadEndFunc(e) {
     for(var i in wmsLayerNames){
         var wmsLayerName = wmsLayerNames[i];
         if(wmsLayerName.layerName.indexOf('15m_susim') > 0) {
-            magoManager.addLayer(new Mago3D.WMSLayer({
+            wmsLayer = new Mago3D.WMSLayer({
                 url: 'http://test.muhanit.kr:13032/geoserver_seaforest/gwc/service/wms',
                 opacity : 1,
                 filter: {
@@ -191,7 +191,8 @@ function loadEndFunc(e) {
                 },
                     
                 param: {layers: wmsLayerName.layerName, tiled: true}
-            }));
+            })
+            magoManager.addLayer(wmsLayer);
         } else {
             magoManager.addLayer(new Mago3D.WMSLayer({
                 url: 'http://test.muhanit.kr:13032/geoserver_seaforest/gwc/service/wms',
@@ -247,6 +248,23 @@ function addJqueryEvent(){
             magoManager.updateSize();
 
             olMagoWorld.setEnabled(false);
+        }
+    });
+
+    //범례토글
+    $('#legend').click(function() {
+        if(!$(this).hasClass('on')) {
+            $(this).addClass('on');
+
+            if(!$('#susimLegend').attr('src'))
+            {
+                $('#susimLegend').attr('src', wmsLayer.filter.getLegendImage(150,300,10))
+            }
+
+            $('#legendContainer').show();
+        } else {
+            $(this).removeClass('on');
+            $('#legendContainer').hide();
         }
     });
 }
