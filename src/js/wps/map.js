@@ -127,9 +127,12 @@ function loadEndFunc(e) {
         url: 'http://test.muhanit.kr:13032/geoserver_seaforest/gwc/service/wms',
         //url: 'http://localhost:8080/geoserver/mago3d/gwc/service/wms', 
         //show: false,
-        opacity : 0.3,
-        //filter:Mago3D.CODE.imageFilter.BATHYMETRY,  
-        param: {layers: 'SeaForest:5m_image', tiled: true}
+        opacity : 1,
+        filter: {
+            type : Mago3D.CODE.imageFilter.BATHYMETRY,
+            properties : {minAltitude : -200, maxAltitude : 1944, caustics : true}
+        },
+        param: {layers: 'SeaForest:15m_susim', tiled: true}
         //param: {layers: 'mago3d:15m_susim', tiled: true}
     });
     magoManager.addLayer(wmsLayer);
