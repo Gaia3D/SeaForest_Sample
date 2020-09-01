@@ -135,7 +135,7 @@ function loadEndFunc(e) {
         param: {layers: 'SeaForest:15m_susim', tiled: true}
         //param: {layers: 'mago3d:15m_susim', tiled: true}
     });
-    magoManager.addLayer(wmsLayer);
+    //magoManager.addLayer(wmsLayer);
     
     lineDrawer = Mago3D.DrawGeometryInteraction.createDrawGeometryInteraction('line');
     lineDrawer.setStyle({
@@ -300,10 +300,21 @@ function loadEndFunc(e) {
             rectangleDrawer.cancle();
             return;
         }        
-        
+
         //그려진 사각형을 이용하여 공간분석 요청 promise 객체 생성.
         var promises = getRasterAnalysisPromises(rectangle, 'all');
         
+        var statisticsPromises = getStatisticsPromises(rectangle);
+        analysisResultProcess(statisticsPromises, function(r1,r2){
+            var xmlSerializer = new XMLSerializer();
+
+            var aspectStatisticsString = xmlSerializer.serializeToString(r1[0].documentElement);
+            var slopeStatisticsString = xmlSerializer.serializeToString(r2[0].documentElement);
+
+            console.info(aspectStatisticsString);
+            console.info(slopeStatisticsString);
+        });
+
         //생성한 promise객체 응답처리. r1 : 향분석결과, r2 : 경사분석결과
         analysisResultProcess(promises, function(r1,r2){
             //drawer를 통해 그린 사각형의 클론을 생성하여 drawedRectangle에 할당
@@ -384,10 +395,26 @@ function getRasterAnalysisRqXml (rectangle, mode)
     }
 }
 
+//분석 유형에 따른 string형태의 xml생성.
+function getStatisticsRqXml (rectangle)
+{
+    var xmls = [];
+    xmls.push(getStatistics(rectangle, 'aspect'));
+    xmls.push(getStatistics(rectangle, 'slope'));
+    
+    return xmls;
+}
+
 //분석 유형에 맞는 xml을 생성 후 blob 요청 promise 객체 리턴
 function getRasterAnalysisPromises(rectangle, mode)
 {
     return getRasterAnalysisRqXml(rectangle, mode).map(xml => requestBlobResource(xml));
+}
+
+//통계 유형에 맞는 xml을 생성 후 xml 요청 promise 객체 리턴
+function getStatisticsPromises(rectangle, mode)
+{
+    return getStatisticsRqXml(rectangle, mode).map(xml => requestXMLResource(xml));
 }
 
 function closeAnalysis() {

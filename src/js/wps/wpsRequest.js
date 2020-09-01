@@ -22,6 +22,51 @@ function requestWPSPostHeader() {
 	return header;
 }
 
+
+function getStatistics(rectangle, type){
+	var minCoord = rectangle.minGeographicCoord;
+	var maxCoord = rectangle.maxGeographicCoord;
+	
+	var wkt = 'POLYGON((';
+	wkt += minCoord.longitude + ' ' + minCoord.latitude + ',';
+	wkt += maxCoord.longitude + ' ' + minCoord.latitude + ',';
+	wkt += maxCoord.longitude + ' ' + maxCoord.latitude + ',';
+	wkt += minCoord.longitude + ' ' + maxCoord.latitude + ',';
+	wkt += minCoord.longitude + ' ' + minCoord.latitude;
+	wkt += '))';
+
+	var analFunc = (type === 'aspect') ? getXmlRasterAspect : getXmlRasterSlope;
+	var analXml = analFunc(minCoord, maxCoord);
+
+	var xml = '';
+	xml += requestWPSPostHeader();
+	xml += '<ows:Identifier>statistics:StatisticsGridCoverage</ows:Identifier>';
+	xml += '<wps:DataInputs>';
+	xml += '	<wps:Input>';
+	xml += '	<ows:Identifier>inputCoverage</ows:Identifier>';
+	xml += '	<wps:Reference mimeType="image/tiff" xlink:href="http://geoserver/wps" method="POST">';
+	xml += '<wps:Body>';
+
+	xml += analXml;
+	xml += '</wps:Body>';
+	xml += '	</wps:Reference>';
+	xml += '	</wps:Input>';
+	xml += '	<wps:Input>';
+	xml += '	<ows:Identifier>cropShape</ows:Identifier>';
+	xml += '	<wps:Data>';
+	xml += '		<wps:ComplexData mimeType="application/wkt"><![CDATA[' + wkt + ']]></wps:ComplexData>';
+	xml += '	</wps:Data>';
+	xml += '	</wps:Input>';
+	xml += '</wps:DataInputs>';
+	xml += '<wps:ResponseForm>';
+	xml += '	<wps:RawDataOutput mimeType="text/xml">';
+	xml += '	<ows:Identifier>result</ows:Identifier>';
+	xml += '	</wps:RawDataOutput>';
+	xml += '</wps:ResponseForm>';
+	xml += '</wps:Execute>';
+	return xml;
+}
+
 /**
  * 단면분석 요청 xml 생성 후 리턴
  * @param {number} interval 라인의 시작점과 끝점사이의 점이 개수.
@@ -366,7 +411,20 @@ function getSlopeStyle() {
 
 	return xml;
 }
+function requestXMLResource(xml) {
+	var resource = $.ajax({
+		url : WPS_URL,
+		contentType : 'text/xml',
+		dataType : 'xml',
+		data : xml,
+		method : 'POST',
+		headers: {
+			'Content-Type': 'text/xml;charset=utf-8'
+		}
+	});
 
+	return resource;
+}
 
 function requestBlobResource(xml) {
 	var resource = $.ajax({
